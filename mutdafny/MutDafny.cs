@@ -1,5 +1,6 @@
 ﻿using Microsoft.Dafny;
 using Microsoft.Dafny.Plugins;
+using MutDafny.Mutator;
 using MutDafny.TargetFinder;
 using PluginConfiguration = Microsoft.Dafny.LanguageServer.Plugins.PluginConfiguration;
 
@@ -27,19 +28,23 @@ public class MutDafny : PluginConfiguration
     public override Rewriter[] GetRewriters(ErrorReporter reporter)
     {
         return _mutate ? 
-            [new Mutator(MutationTargetPos, MutationType, MutationTypeArg, reporter)] : 
+            [new MutantGenerator(MutationTargetPos, MutationType, MutationTypeArg, reporter)] : 
             [];
     }
 }
 
-public class Mutator(int mutationTargetPos, string mutationType, string? mutationTypeArg, ErrorReporter reporter) : Rewriter(reporter)
+public class MutantGenerator(int mutationTargetPos, string mutationType, string? mutationTypeArg, ErrorReporter reporter) : Rewriter(reporter)
 {
     public override void PreResolve(ModuleDefinition module)
     {
-        // TODO: use different finder according to type of operator
-        var targetFinder = new BinaryOpTargetFinder(
-            mutationTargetPos, Reporter
-        );
+        // TODO: use different finder/mutator according to type of operator
+        var targetFinder = new BinaryOpTargetFinder(mutationTargetPos, Reporter);
         targetFinder.Find(module);
+        var target = TargetFinder.TargetFinder.TargetStatement;
+        if (target == null) return;
+        
+        if (mutationTypeArg == null) return; // TODO: only if we're dealing with binary op mutation
+        var mutator = new BinaryOpMutator(mutationTargetPos, mutationTypeArg, Reporter);
+        mutator.Mutate(target);
     }
 }

@@ -10,7 +10,7 @@ public class BinaryOpTargetFinder(int mutationTargetPos, ErrorReporter reporter)
     {
         Statement? statementToReturn = statement switch {
             AssignStatement aStmt => aStmt,
-            VarDeclStmt vDecl => vDecl.Assign,
+            VarDeclStmt vDeclStmt => vDeclStmt.Assign,
             ReturnStmt rStmt => rStmt,
             IfStmt ifStmt => HandleIfStatement(ifStmt),
             WhileStmt whlStmt => HandleWhileStatement(whlStmt), 
@@ -37,7 +37,6 @@ public class BinaryOpTargetFinder(int mutationTargetPos, ErrorReporter reporter)
     private Statement? HandleWhileStatement(WhileStmt whileStmt)
     {
         return IsWorthVisiting(whileStmt.Guard.StartToken.pos, whileStmt.Guard.EndToken.pos) ? 
-            whileStmt : 
-            HandleBlock(whileStmt.Body);
+            whileStmt : HandleBlock(whileStmt.Body);
     }
 }

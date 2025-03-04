@@ -4,14 +4,15 @@ namespace MutDafny.TargetFinder;
 
 public abstract class TargetFinder(int mutationTargetPos, ErrorReporter reporter)
 {
-    public Statement? Find(ModuleDefinition module)
+    public static BlockStmt? TargetBlock { get; private set; }
+    public static Statement? TargetStatement { get; private set; }
+
+    public void Find(ModuleDefinition module)
     {
         // only visit modules that may contain the mutation target
         if (module.EndToken.pos == 0 || // default module
             IsWorthVisiting(module.StartToken.pos, module.EndToken.pos)) {
-            return HandleDefaultClassDecl(module) ?? HandleSourceDecls(module);
-        } else {
-            return null;
+            TargetStatement = HandleDefaultClassDecl(module) ?? HandleSourceDecls(module);
         }
     }
     
@@ -30,7 +31,8 @@ public abstract class TargetFinder(int mutationTargetPos, ErrorReporter reporter
             if (member is Method m) {
                 // only visit methods that may contain the mutation target
                 if (IsWorthVisiting(m.StartToken.pos, m.EndToken.pos)) { 
-                    statement = HandleMethod(m);   
+                    statement = HandleMethod(m);
+                    TargetBlock = m.Body; 
                 }
             }
             // TODO: check functions and predicates that aren't used in spec
@@ -93,6 +95,7 @@ public abstract class TargetFinder(int mutationTargetPos, ErrorReporter reporter
 
     protected Statement? HandleBlock(BlockStmt blockStmt)
     {
+        TargetBlock = blockStmt;
         Statement? statement = null;
         foreach (var stmt in blockStmt.Body) {
             if (IsWorthVisiting(stmt.StartToken.pos, stmt.EndToken.pos)) {
