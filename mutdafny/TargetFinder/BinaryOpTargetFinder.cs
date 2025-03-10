@@ -6,60 +6,56 @@ namespace MutDafny.TargetFinder;
 public class BinaryOpTargetFinder(int mutationTargetPos, ErrorReporter reporter) 
     : TargetFinder(mutationTargetPos, reporter)
 {
-    protected override Statement? HandleStatement(Statement statement)
+    protected override void HandleStatement(Statement statement)
     {
         switch (statement) {
             case AssignStatement aStmt:
-                HandleRhsList(aStmt.Rhss); return aStmt;
+                HandleRhsList(aStmt.Rhss); break;
             case VarDeclStmt vDeclStmt:
-                return vDeclStmt.Assign != null ? 
-                    HandleStatement(vDeclStmt.Assign) : 
-                    null;
+                if (vDeclStmt.Assign != null) 
+                    HandleStatement(vDeclStmt.Assign);
+                break;
             case ReturnStmt rStmt:
-                HandleRhsList(rStmt.Rhss); return rStmt;
+                HandleRhsList(rStmt.Rhss); break;
             case IfStmt ifStmt:
-                return HandleIfStatement(ifStmt);
+                HandleIfStatement(ifStmt); break;
             case WhileStmt whlStmt:
-                return HandleWhileStatement(whlStmt);
+                HandleWhileStatement(whlStmt); break;
             case ForLoopStmt forStmt:
-                return HandleForLoopStatement(forStmt);
+                HandleForLoopStatement(forStmt); break;
             // TODO: check different types of statements
         }
-        return null;
     }
     
-    private Statement? HandleIfStatement(IfStmt ifStmt) {
+    private void HandleIfStatement(IfStmt ifStmt) {
         if (ifStmt.Guard != null && 
             IsWorthVisiting(ifStmt.Guard.StartToken.pos, ifStmt.Guard.EndToken.pos)) {
             HandleExpression(ifStmt.Guard);
-            return ifStmt;
         } if (IsWorthVisiting(ifStmt.Thn.StartToken.pos, ifStmt.Thn.EndToken.pos)) {
-            return HandleBlock(ifStmt.Thn);
+            HandleBlock(ifStmt.Thn);
         } if (ifStmt.Els is BlockStmt bEls) {
-            return HandleBlock(bEls);
+            HandleBlock(bEls);
+        } if (ifStmt.Els != null) {
+            HandleStatement(ifStmt.Els);
         }
-        return ifStmt.Els;
     }
     
-    private Statement? HandleWhileStatement(WhileStmt whileStmt)
+    private void HandleWhileStatement(WhileStmt whileStmt)
     {
         if (IsWorthVisiting(whileStmt.Guard.StartToken.pos, whileStmt.Guard.EndToken.pos)) {
             HandleExpression(whileStmt.Guard);
-            return whileStmt;
         }
-        return HandleBlock(whileStmt.Body);
+        HandleBlock(whileStmt.Body);
     }
 
-    private Statement? HandleForLoopStatement(ForLoopStmt forStmt)
+    private void HandleForLoopStatement(ForLoopStmt forStmt)
     {
         if (IsWorthVisiting(forStmt.Start.StartToken.pos, forStmt.Start.EndToken.pos)) {
             HandleExpression(forStmt.Start);
-            return forStmt;
         } if (IsWorthVisiting(forStmt.End.StartToken.pos, forStmt.End.EndToken.pos)) {
             HandleExpression(forStmt.End);
-            return forStmt;
         }
-        return HandleBlock(forStmt.Body);
+        HandleBlock(forStmt.Body);
     }
 
     private void HandleRhsList(List<AssignmentRhs> rhss)
