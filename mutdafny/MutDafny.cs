@@ -9,7 +9,6 @@ namespace MutDafny;
 public class MutDafny : PluginConfiguration
 {
     private bool _mutate = true;
-
     private int MutationTargetPos { get; set; }
     private string MutationType { get; set; }
     private string? MutationTypeArg { get; set; }
@@ -40,11 +39,11 @@ public class MutantGenerator(int mutationTargetPos, string mutationType, string?
         // TODO: use different finder/mutator according to type of operator
         var targetFinder = new BinaryOpTargetFinder(mutationTargetPos, Reporter);
         targetFinder.Find(module);
-        var target = TargetFinder.TargetFinder.TargetStatement;
-        if (target == null) return;
+        var target = targetFinder.TargetExpression;
+        if (target == null) return; // TODO: target is expression only when dealing with certain mutation operators
         
         if (mutationTypeArg == null) return; // TODO: only if we're dealing with binary op mutation
-        var mutator = new BinaryOpMutator(mutationTargetPos, mutationTypeArg, Reporter);
+        var mutator = new BinaryOpMutator(mutationTypeArg, Reporter);
         mutator.Mutate(target);
     }
 }
