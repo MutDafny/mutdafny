@@ -13,8 +13,7 @@ public class MutDafny : PluginConfiguration
     private string MutationType { get; set; }
     private string? MutationTypeArg { get; set; }
 
-    public override void ParseArguments(string[] args)
-    {
+    public override void ParseArguments(string[] args) {
         if (args.Length < 2) {
             _mutate = false;
             return;
@@ -24,8 +23,7 @@ public class MutDafny : PluginConfiguration
         MutationTypeArg = args.Length > 2 ? args[2] : null;
     }
 
-    public override Rewriter[] GetRewriters(ErrorReporter reporter)
-    {
+    public override Rewriter[] GetRewriters(ErrorReporter reporter) {
         return _mutate ? 
             [new MutantGenerator(MutationTargetPos, MutationType, MutationTypeArg, reporter)] : 
             [];
@@ -34,8 +32,7 @@ public class MutDafny : PluginConfiguration
 
 public class MutantGenerator(int mutationTargetPos, string mutationType, string? mutationTypeArg, ErrorReporter reporter) : Rewriter(reporter)
 {
-    public override void PreResolve(ModuleDefinition module)
-    {
+    public override void PreResolve(ModuleDefinition module) {
         // TODO: use different finder/mutator according to type of operator
         var targetFinder = new BinaryOpTargetFinder(mutationTargetPos, Reporter);
         targetFinder.Find(module);
