@@ -1,7 +1,7 @@
 ﻿using Microsoft.Dafny;
 using Microsoft.Dafny.Plugins;
 using MutDafny.Mutator;
-using MutDafny.TargetFinder;
+using MutDafny.Visitor;
 using PluginConfiguration = Microsoft.Dafny.LanguageServer.Plugins.PluginConfiguration;
 
 namespace MutDafny;
