@@ -328,7 +328,9 @@ public class BinaryOpTargetFinder : TargetFinder
     }
 
     private void VisitExpression(SeqSelectExpr seqSExpr) {
-        List<Expression> exprs = [seqSExpr.Seq, seqSExpr.E0, seqSExpr.E1];
+        List<Expression> exprs = [seqSExpr.Seq];
+        if (seqSExpr.E0 != null) exprs.Add(seqSExpr.E0);
+        if (seqSExpr.E1 != null) exprs.Add(seqSExpr.E1);
         HandleExprList(exprs);
     }
 
@@ -343,7 +345,9 @@ public class BinaryOpTargetFinder : TargetFinder
     }
 
     private void VisitExpression(ComprehensionExpr compExpr) {
-        HandleExprList([compExpr.Range, compExpr.Term]);
+        List<Expression> exprs = [compExpr.Term];
+        if (compExpr.Range != null) exprs.Add(compExpr.Range);
+        HandleExprList(exprs);
         if (TargetFound()) return;
 
         if (compExpr is MapComprehension mComExpr) {
