@@ -32,8 +32,6 @@ public class Visitor
             {typeof(VarDeclStmt), stmt => VisitStatement((stmt as VarDeclStmt)!)},
             {typeof(VarDeclPattern), stmt => VisitStatement((stmt as VarDeclPattern)!)},
             {typeof(ProduceStmt), stmt => VisitStatement((stmt as ProduceStmt)!)},
-            {typeof(ReturnStmt), stmt => VisitStatement((stmt as ProduceStmt)!)},
-            {typeof(YieldStmt), stmt => VisitStatement((stmt as ProduceStmt)!)},
             {typeof(IfStmt), stmt => VisitStatement((stmt as IfStmt)!)},
             {typeof(WhileStmt), stmt => VisitStatement((stmt as WhileStmt)!)},
             {typeof(ForLoopStmt), stmt => VisitStatement((stmt as ForLoopStmt)!)},
@@ -58,7 +56,6 @@ public class Visitor
             {typeof(LetOrFailExpr), expr => VisitExpression((expr as LetOrFailExpr)!)},
             {typeof(ApplyExpr), expr => VisitExpression((expr as ApplyExpr)!)},
             {typeof(SuffixExpr), expr => VisitExpression((expr as SuffixExpr)!)},
-            {typeof(ApplySuffix), expr => VisitExpression((expr as SuffixExpr)!)},
             {typeof(FunctionCallExpr), expr => VisitExpression((expr as FunctionCallExpr)!)},
             {typeof(MemberSelectExpr), expr => HandleExpression(((expr as MemberSelectExpr)!).Obj)},
             {typeof(ITEExpr), expr => VisitExpression((expr as ITEExpr)!)},
@@ -72,7 +69,6 @@ public class Visitor
             {typeof(MultiSelectExpr), expr => VisitExpression((expr as MultiSelectExpr)!)},
             {typeof(SeqUpdateExpr), expr => VisitExpression((expr as SeqUpdateExpr)!)},    
             {typeof(ComprehensionExpr), expr => VisitExpression((expr as ComprehensionExpr)!)},
-            {typeof(MapComprehension), expr => VisitExpression((expr as ComprehensionExpr)!)},
             {typeof(DatatypeUpdateExpr), expr => VisitExpression((expr as DatatypeUpdateExpr)!)},
             {typeof(DatatypeValue), expr => VisitExpression((expr as DatatypeValue)!)},
             {typeof(StmtExpr), expr => VisitExpression((expr as StmtExpr)!)},
@@ -85,7 +81,8 @@ public class Visitor
     public virtual void Find(ModuleDefinition module) {
         // only visit modules that may contain the mutation target
         if (module.EndToken.pos == 0 || // default module
-            IsWorthVisiting(module.StartToken.pos, module.EndToken.pos)) {
+            IsWorthVisiting(module.StartToken.pos, module.EndToken.pos)) 
+        {
             HandleDefaultClassDecl(module);
             if (TargetFound()) return;
             HandleSourceDecls(module);
@@ -133,7 +130,7 @@ public class Visitor
             if (!IsWorthVisiting(member.StartToken.pos, member.EndToken.pos)) continue;
             if (member is Method m) { // includes constructor
                 HandleMethod(m);  
-            } else if (member is Function func) { // includes predicates
+            } else if (member is Function func) { // includes predicate
                 // TODO: only consider functions and predicates that aren't used in spec
                 HandleFunction(func);
             } else if (member is ConstantField cf) {
@@ -168,16 +165,21 @@ public class Visitor
     /// Group of statement visitors
     /// ---------------------------
     protected virtual void HandleStatement(Statement stmt) {
-        if (_statementHandlers.TryGetValue(stmt.GetType(), out var handler)) {
-            handler(stmt);
+        var derivedType = stmt.GetType();
+        while (derivedType != typeof(object) && derivedType != null) {
+            if (_statementHandlers.TryGetValue(derivedType, out var handler)) {
+                handler(stmt);
+                return;
+            }
+            derivedType = derivedType.BaseType;
         }
     }
     
-    private void HandleBlock(BlockStmt blockStmt) {
+    protected void HandleBlock(BlockStmt blockStmt) {
         HandleBlock(blockStmt.Body);
     }
     
-    private void HandleBlock(List<Statement> statements) {
+    protected void HandleBlock(List<Statement> statements) {
         foreach (var stmt in statements) {
             if (IsWorthVisiting(stmt.StartToken.pos, stmt.EndToken.pos)) {
                 HandleStatement(stmt);
@@ -227,9 +229,8 @@ public class Visitor
     protected virtual void VisitStatement(SingleAssignStmt sAStmt) {
         if (IsWorthVisiting(sAStmt.Lhs.StartToken.pos, sAStmt.Lhs.EndToken.pos)) {
             HandleExpression(sAStmt.Lhs);
-        } else {
-            HandleRhsList([sAStmt.Rhs]);
-        }
+        } 
+        HandleRhsList([sAStmt.Rhs]);
     }
 
     protected virtual void VisitStatement(VarDeclStmt vDeclStmt) {
@@ -247,40 +248,39 @@ public class Visitor
     }
     
     protected virtual void VisitStatement(IfStmt ifStmt) {
-        if (ifStmt.Guard != null && 
-            IsWorthVisiting(ifStmt.Guard.StartToken.pos, ifStmt.Guard.EndToken.pos)) {
+        if (ifStmt.Guard != null && IsWorthVisiting(ifStmt.Guard.StartToken.pos, ifStmt.Guard.EndToken.pos)) {
             HandleExpression(ifStmt.Guard);
-        } else if (IsWorthVisiting(ifStmt.Thn.StartToken.pos, ifStmt.Thn.EndToken.pos)) {
+        } if (IsWorthVisiting(ifStmt.Thn.StartToken.pos, ifStmt.Thn.EndToken.pos)) {
             HandleBlock(ifStmt.Thn);
-        } else if (ifStmt.Els is BlockStmt bEls) {
-            HandleBlock(bEls);
-        } else if (ifStmt.Els != null) {
-            HandleStatement(ifStmt.Els);
+        } if (ifStmt.Els != null && IsWorthVisiting(ifStmt.Els.StartToken.pos, ifStmt.Els.EndToken.pos)) {
+            if (ifStmt.Els is BlockStmt bEls) {
+                HandleBlock(bEls);
+            } else if (ifStmt.Els != null) {
+                HandleStatement(ifStmt.Els);
+            }
         }
     }
     
     protected virtual void VisitStatement(WhileStmt whileStmt) {
         if (IsWorthVisiting(whileStmt.Guard.StartToken.pos, whileStmt.Guard.EndToken.pos)) {
             HandleExpression(whileStmt.Guard);
-        } else {
-            HandleBlock(whileStmt.Body);   
         }
+        HandleBlock(whileStmt.Body);   
     }
 
     protected virtual void VisitStatement(ForLoopStmt forStmt) {
         if (IsWorthVisiting(forStmt.Start.StartToken.pos, forStmt.Start.EndToken.pos)) {
             HandleExpression(forStmt.Start);
-        } else if (IsWorthVisiting(forStmt.End.StartToken.pos, forStmt.End.EndToken.pos)) {
+        } if (IsWorthVisiting(forStmt.End.StartToken.pos, forStmt.End.EndToken.pos)) {
             HandleExpression(forStmt.End);
-        } else {
-            HandleBlock(forStmt.Body);
         }
+        HandleBlock(forStmt.Body);
     }
 
     protected virtual void VisitStatement(ForallStmt forStmt) {
         if (IsWorthVisiting(forStmt.Range.StartToken.pos, forStmt.Range.EndToken.pos)) {
             HandleExpression(forStmt.Range);
-        } else {
+        } if (IsWorthVisiting(forStmt.Body.StartToken.pos, forStmt.Body.EndToken.pos)) {
             HandleStatement(forStmt.Body);
         }
     }
@@ -299,7 +299,8 @@ public class Visitor
             return;
         }
         foreach (var cs in matchStmt.Cases) {
-            if (!IsWorthVisiting(cs.StartToken.pos, cs.EndToken.pos)) continue;
+            if (!IsWorthVisiting(cs.StartToken.pos, cs.EndToken.pos)) 
+                continue;
             HandleBlock(cs.Body); break;
         }
     }
@@ -310,7 +311,8 @@ public class Visitor
             return;
         }
         foreach (var cs in nMatchStmt.Cases) {
-            if (!IsWorthVisiting(cs.StartToken.pos, cs.EndToken.pos)) continue;
+            if (!IsWorthVisiting(cs.StartToken.pos, cs.EndToken.pos)) 
+                continue;
             HandleBlock(cs.Body); break;
         }
     }
@@ -320,17 +322,15 @@ public class Visitor
         if (TargetFound()) return;
         if (IsWorthVisiting(callStmt.OriginalInitialLhs.StartToken.pos, callStmt.EndToken.pos)) {
             HandleExpression(callStmt.OriginalInitialLhs);
-        } else if (IsWorthVisiting(callStmt.MethodSelect.StartToken.pos, callStmt.MethodSelect.EndToken.pos)) {
+        } if (IsWorthVisiting(callStmt.MethodSelect.StartToken.pos, callStmt.MethodSelect.EndToken.pos)) {
             HandleExpression(callStmt.MethodSelect);
-        } else if (IsWorthVisiting(callStmt.Receiver.StartToken.pos, callStmt.EndToken.pos)) {
+        } if (IsWorthVisiting(callStmt.Receiver.StartToken.pos, callStmt.EndToken.pos)) {
             HandleExpression(callStmt.Receiver);
-        } else if (IsWorthVisiting(callStmt.Method.StartToken.pos, callStmt.Method.EndToken.pos)) {
+        } if (IsWorthVisiting(callStmt.Method.StartToken.pos, callStmt.Method.EndToken.pos)) {
             HandleMethod(callStmt.Method);
-        } else if (IsWorthVisiting(callStmt.Bindings.StartToken.pos, callStmt.Bindings.EndToken.pos)) {
-            HandleActualBindings(callStmt.Bindings);
-        } else {
-            HandleExprList(callStmt.Args);
         }
+        HandleActualBindings(callStmt.Bindings);
+        HandleExprList(callStmt.Args);
     }
 
     protected virtual void VisitStatement(ModifyStmt mdStmt) {
@@ -354,8 +354,13 @@ public class Visitor
     /// Group of expression visitors
     /// ----------------------------
     protected virtual void HandleExpression(Expression expr) {
-        if (_expressionHandlers.TryGetValue(expr.GetType(), out var handler)) {
-            handler(expr);
+        var derivedType = expr.GetType();
+        while (derivedType != typeof(object) && derivedType != null) {
+            if (_expressionHandlers.TryGetValue(derivedType, out var handler)) {
+                handler(expr);
+                return;
+            }
+            derivedType = derivedType.BaseType;
         }
     }
 
@@ -390,9 +395,8 @@ public class Visitor
     protected virtual void VisitExpression(FunctionCallExpr fCallExpr) {
         if (IsWorthVisiting(fCallExpr.Receiver.StartToken.pos, fCallExpr.Receiver.EndToken.pos)) {
             HandleExpression(fCallExpr.Receiver);
-        } else {
-            HandleActualBindings(fCallExpr.Bindings);
         }
+        HandleActualBindings(fCallExpr.Bindings);
     }
 
     protected virtual void VisitExpression(ITEExpr iteExpr) {
@@ -475,7 +479,7 @@ public class Visitor
     /// ----------------------
     /// Group of visitor utils
     /// ----------------------
-    protected virtual void HandleExprList(List<Expression> exprs) {
+    protected void HandleExprList(List<Expression> exprs) {
         foreach (var expr in exprs) {
             if (!IsWorthVisiting(expr.StartToken.pos, expr.EndToken.pos)) 
                 continue;
@@ -483,7 +487,7 @@ public class Visitor
         }
     }
 
-    protected virtual void HandleRhsList(List<AssignmentRhs> rhss) {
+    protected void HandleRhsList(List<AssignmentRhs> rhss) {
         foreach (var rhs in rhss) {
             if (!IsWorthVisiting(rhs.StartToken.pos, rhs.EndToken.pos))
                 continue;
@@ -491,31 +495,34 @@ public class Visitor
         }
     }
 
-    protected virtual void HandleAssignmentRhs(AssignmentRhs aRhs) {
+    protected void HandleAssignmentRhs(AssignmentRhs aRhs) {
         if (aRhs is ExprRhs exprRhs) {
             HandleExpression(exprRhs.Expr);
         } else if (aRhs is TypeRhs tpRhs) {
-            if (IsWorthVisiting(tpRhs.ElementInit.StartToken.pos, tpRhs.ElementInit.EndToken.pos)) {
-                HandleExpression(tpRhs.ElementInit);
-            } else if (IsWorthVisiting(tpRhs.Bindings.StartToken.pos, tpRhs.Bindings.EndToken.pos)) {
+            var elInit = tpRhs.ElementInit;
+            
+            if (tpRhs.ArrayDimensions != null) {
+                HandleExprList(tpRhs.ArrayDimensions);
+            } if (elInit != null && IsWorthVisiting(elInit.StartToken.pos, elInit.EndToken.pos)) {
+                HandleExpression(elInit);
+            } if (tpRhs.InitDisplay != null) {
+                HandleExprList(tpRhs.InitDisplay);
+            } if (tpRhs.Bindings != null) {
                 HandleActualBindings(tpRhs.Bindings);
-            } else {
-                HandleExprList(tpRhs.InitDisplay);   
             }
         }
     }
 
-    protected virtual void HandleGuardedAlternatives(List<GuardedAlternative> alternatives) {
+    protected void HandleGuardedAlternatives(List<GuardedAlternative> alternatives) {
         foreach (var alt in alternatives) {
             if (IsWorthVisiting(alt.Guard.StartToken.pos, alt.Guard.EndToken.pos)) {
                 HandleExpression(alt.Guard);
-            } else {
-                HandleBlock(alt.Body);  
             }
+            HandleBlock(alt.Body);  
         }
     }
 
-    protected virtual void HandleActualBindings(ActualBindings bindings) {
+    protected void HandleActualBindings(ActualBindings bindings) {
         foreach (var binding in bindings.ArgumentBindings) {
             if (!IsWorthVisiting(binding.Actual.StartToken.pos, binding.Actual.EndToken.pos))
                 continue;
@@ -529,16 +536,16 @@ public class Visitor
                 MutationTargetPos <= tokenEndPos);
     }
 
-    protected virtual bool TargetFound() {
+    protected bool TargetFound() {
         return TargetStatement != null || TargetExpression != null;
     }
 
-    protected virtual INode? GetTarget() {
+    private INode? GetTarget() {
         if (TargetExpression != null) return TargetExpression;
         return TargetStatement;
     }
 
-    protected virtual string GetTargetType() {
+    private string GetTargetType() {
         return TargetExpression != null ? "expression" : "statement";
     }
 }
