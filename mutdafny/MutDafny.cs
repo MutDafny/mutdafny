@@ -33,6 +33,9 @@ public class MutDafny : PluginConfiguration
 public class MutantGenerator(int mutationTargetPos, string mutationType, string? mutationTypeArg, ErrorReporter reporter) : Rewriter(reporter)
 {
     public override void PreResolve(ModuleDefinition module) {
+        var specHelperFinder = new SpecHelperFinder(Reporter);
+        specHelperFinder.Find(module);
+        
         // TODO: use different finder/mutator according to type of operator
         var targetFinder = new BinaryOpTargetFinder(mutationTargetPos, Reporter);
         targetFinder.Find(module);

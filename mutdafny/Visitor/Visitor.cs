@@ -45,6 +45,10 @@ public class Visitor
             {typeof(HideRevealStmt), stmt => VisitStatement((stmt as HideRevealStmt)!)},
             {typeof(BlockByProofStmt), stmt => VisitStatement((stmt as BlockByProofStmt)!)},
             {typeof(SkeletonStatement), stmt => VisitStatement((stmt as SkeletonStatement)!)},
+            // spec statements
+            {typeof(OpaqueBlock), stmt => VisitStatement((stmt as OpaqueBlock)!)},
+            {typeof(PredicateStmt), stmt => VisitStatement((stmt as PredicateStmt)!)},
+            {typeof(CalcStmt), stmt => VisitStatement((stmt as CalcStmt)!)},
         };
         _expressionHandlers = new Dictionary<Type, Action<Expression>> {
             {typeof(BinaryExpr), expr => VisitExpression((expr as BinaryExpr)!)},
@@ -57,7 +61,7 @@ public class Visitor
             {typeof(ApplyExpr), expr => VisitExpression((expr as ApplyExpr)!)},
             {typeof(SuffixExpr), expr => VisitExpression((expr as SuffixExpr)!)},
             {typeof(FunctionCallExpr), expr => VisitExpression((expr as FunctionCallExpr)!)},
-            {typeof(MemberSelectExpr), expr => HandleExpression(((expr as MemberSelectExpr)!).Obj)},
+            {typeof(MemberSelectExpr), expr => VisitExpression((expr as MemberSelectExpr)!)},
             {typeof(ITEExpr), expr => VisitExpression((expr as ITEExpr)!)},
             {typeof(MatchExpr), expr => VisitExpression((expr as MatchExpr)!)},
             {typeof(NestedMatchExpr), expr => VisitExpression((expr as NestedMatchExpr)!)},
@@ -72,6 +76,10 @@ public class Visitor
             {typeof(DatatypeUpdateExpr), expr => VisitExpression((expr as DatatypeUpdateExpr)!)},
             {typeof(DatatypeValue), expr => VisitExpression((expr as DatatypeValue)!)},
             {typeof(StmtExpr), expr => VisitExpression((expr as StmtExpr)!)},
+            // spec expressions
+            {typeof(OldExpr), expr => VisitExpression((expr as OldExpr)!)},
+            {typeof(UnchangedExpr), expr => VisitExpression((expr as UnchangedExpr)!)},
+            {typeof(DecreasesToExpr), expr => VisitExpression((expr as DecreasesToExpr)!)},
         };
     }
 
@@ -131,7 +139,9 @@ public class Visitor
             if (member is Method m) { // includes constructor
                 HandleMethod(m);  
             } else if (member is Function func) { // includes predicate
-                // TODO: only consider functions and predicates that aren't used in spec
+                // only searches for mutation targets in functions/predciates not used in spec
+                var specHelpers = SpecHelperFinder.SpecHelpers;
+                if (specHelpers.Contains(func.Name)) continue;
                 HandleFunction(func);
             } else if (member is ConstantField cf) {
                 HandleExpression(cf.Rhs);
@@ -301,7 +311,7 @@ public class Visitor
         foreach (var cs in matchStmt.Cases) {
             if (!IsWorthVisiting(cs.StartToken.pos, cs.EndToken.pos)) 
                 continue;
-            HandleBlock(cs.Body); break;
+            HandleBlock(cs.Body);
         }
     }
 
@@ -313,7 +323,7 @@ public class Visitor
         foreach (var cs in nMatchStmt.Cases) {
             if (!IsWorthVisiting(cs.StartToken.pos, cs.EndToken.pos)) 
                 continue;
-            HandleBlock(cs.Body); break;
+            HandleBlock(cs.Body);
         }
     }
 
@@ -349,6 +359,15 @@ public class Visitor
         if (skStmt.S == null) return;
         HandleStatement(skStmt.S);
     }
+    
+    // statements used specifically in specs
+    // by default we don't visit these since we are not mutating them
+    protected virtual void VisitStatement(OpaqueBlock opqBlock) { }
+    
+    // includes AssertStmt, AssumeStmt, ExpectStmt
+    protected virtual void VisitStatement(PredicateStmt predStmt) { }
+    
+    protected virtual void VisitStatement(CalcStmt calcStmt) { }
     
     /// ----------------------------
     /// Group of expression visitors
@@ -397,6 +416,10 @@ public class Visitor
             HandleExpression(fCallExpr.Receiver);
         }
         HandleActualBindings(fCallExpr.Bindings);
+    }
+    
+    protected virtual void VisitExpression(MemberSelectExpr mSelExpr) {
+        HandleExpression(mSelExpr.Obj);
     }
 
     protected virtual void VisitExpression(ITEExpr iteExpr) {
@@ -476,6 +499,12 @@ public class Visitor
         HandleExpression(stmtExpr.E); 
     }
     
+    protected virtual void VisitExpression(OldExpr oldExpr) { }
+    
+    protected virtual void VisitExpression(UnchangedExpr unchExpr) { }
+    
+    protected virtual void VisitExpression(DecreasesToExpr dToExpr) { }
+    
     /// ----------------------
     /// Group of visitor utils
     /// ----------------------
@@ -483,7 +512,7 @@ public class Visitor
         foreach (var expr in exprs) {
             if (!IsWorthVisiting(expr.StartToken.pos, expr.EndToken.pos)) 
                 continue;
-            HandleExpression(expr); break;
+            HandleExpression(expr);
         }
     }
 
@@ -526,7 +555,7 @@ public class Visitor
         foreach (var binding in bindings.ArgumentBindings) {
             if (!IsWorthVisiting(binding.Actual.StartToken.pos, binding.Actual.EndToken.pos))
                 continue;
-            HandleExpression(binding.Actual); break;
+            HandleExpression(binding.Actual);
         }
     }
     
