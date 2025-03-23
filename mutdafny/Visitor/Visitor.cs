@@ -55,7 +55,7 @@ public class Visitor
             {typeof(UnaryExpr), expr => HandleExpression(((expr as UnaryExpr)!).E)},
             {typeof(ParensExpression), expr => HandleExpression(((expr as ParensExpression)!).E)},
             {typeof(NegationExpression), expr => HandleExpression(((expr as NegationExpression)!).E)},
-            {typeof(ChainingExpression), expr => HandleExpression(((expr as ChainingExpression)!).E)},
+            {typeof(ChainingExpression), expr => VisitExpression((expr as ChainingExpression)!)},
             {typeof(LetExpr), expr => VisitExpression((expr as LetExpr)!)},
             {typeof(LetOrFailExpr), expr => VisitExpression((expr as LetOrFailExpr)!)},
             {typeof(ApplyExpr), expr => VisitExpression((expr as ApplyExpr)!)},
@@ -144,6 +144,7 @@ public class Visitor
                 if (specHelpers.Contains(func.Name)) continue;
                 HandleFunction(func);
             } else if (member is ConstantField cf) {
+                if (cf.Rhs == null) continue;
                 HandleExpression(cf.Rhs);
             }
 
@@ -386,6 +387,13 @@ public class Visitor
     protected virtual void VisitExpression(BinaryExpr bExpr) {
         List<Expression> exprs = [bExpr.E0, bExpr.E1];
         HandleExprList(exprs);
+    }
+
+    protected virtual void VisitExpression(ChainingExpression cExpr) {
+        if (cExpr.E is BinaryExpr bExpr && bExpr.Op == BinaryExpr.Opcode.And) {
+            List<Expression> exprs = [bExpr.E0, bExpr.E1];
+            HandleExprList(exprs);
+        }
     }
 
     protected virtual void VisitExpression(LetExpr ltExpr) {

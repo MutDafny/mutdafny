@@ -46,6 +46,9 @@ public class TargetScanner: Visitor
            // shift operators
            { BinaryExpr.Opcode.LeftShift, [BinaryExpr.Opcode.RightShift] },
            { BinaryExpr.Opcode.RightShift, [BinaryExpr.Opcode.LeftShift] },
+           // set inclusion operators
+           { BinaryExpr.Opcode.In, [BinaryExpr.Opcode.NotIn] },
+           { BinaryExpr.Opcode.NotIn, [BinaryExpr.Opcode.In] },
        }; 
     }
     
@@ -81,5 +84,11 @@ public class TargetScanner: Visitor
         }
         
         base.VisitExpression(bExpr);
+    }
+
+    protected override void VisitExpression(ChainingExpression cExpr) {
+        if (cExpr.E is BinaryExpr bExpr && bExpr.Op == BinaryExpr.Opcode.And) {
+            base.VisitExpression(bExpr);
+        }
     }
 }
