@@ -8,25 +8,37 @@ namespace MutDafny;
 
 public class MutDafny : PluginConfiguration
 {
-    private bool _mutate = true;
+    private bool _mutate = false;
+    private bool _scan = false;
     private int MutationTargetPos { get; set; }
     private string MutationType { get; set; }
     private string? MutationTypeArg { get; set; }
 
     public override void ParseArguments(string[] args) {
-        if (args.Length < 2) {
-            _mutate = false;
-            return;
+        if (args.Length == 0) {
+            _scan = true;
+        } else if (args.Length >= 2) {
+            _mutate = true;
+            MutationTargetPos = int.Parse(args[0]);
+            MutationType = args[1];
+            MutationTypeArg = args.Length > 2 ? args[2] : null;   
         }
-        MutationTargetPos = int.Parse(args[0]);
-        MutationType = args[1];
-        MutationTypeArg = args.Length > 2 ? args[2] : null;
     }
 
-    public override Rewriter[] GetRewriters(ErrorReporter reporter) {
+    public override Rewriter[] GetRewriters(ErrorReporter reporter)
+    {
         return _mutate ? 
             [new MutantGenerator(MutationTargetPos, MutationType, MutationTypeArg, reporter)] : 
-            [];
+            (_scan ? [new MutationTargetScanner(reporter)] : []);
+    }
+}
+
+public class MutationTargetScanner(ErrorReporter reporter) : Rewriter(reporter)
+{
+    public override void PreResolve(ModuleDefinition module) {
+        var targetScanner = new TargetScanner(Reporter);
+        targetScanner.Find(module);
+        targetScanner.ExportTargets();
     }
 }
 

@@ -10,8 +10,7 @@ public class BinaryOpTargetFinder(int mutationTargetPos, ErrorReporter reporter)
             TargetExpression = bExpr;
             return;
         }
-        List<Expression> exprs = [bExpr.E0, bExpr.E1];
-        HandleExprList(exprs);
+        base.VisitExpression(bExpr);
     }
     
     private bool IsTarget(BinaryExpr expr) {

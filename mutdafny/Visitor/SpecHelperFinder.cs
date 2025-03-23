@@ -6,7 +6,7 @@ namespace MutDafny.Visitor;
 // this type of finder is used to get a list of variables, functions, predicates, etc. that are used as a part of the specification
 public class SpecHelperFinder(ErrorReporter reporter): Visitor(-1, reporter)
 {
-    public static List<string> SpecHelpers { get; private set; } = [];
+    public static List<string> SpecHelpers { get; } = [];
     private bool _isInsideSpec;
     
     /// ---------------------------
@@ -16,13 +16,8 @@ public class SpecHelperFinder(ErrorReporter reporter): Visitor(-1, reporter)
         HandleDefaultClassDecl(module);
         HandleSourceDecls(module);
     }
-    
-    private void HandleDefaultClassDecl(ModuleDefinition module) {
-        if (module.DefaultClass == null) return;
-        HandleMemberDecls(module.DefaultClass);
-    }
 
-    private void HandleSourceDecls(ModuleDefinition module) {
+    protected override void  HandleSourceDecls(ModuleDefinition module) {
         foreach (var decl in module.SourceDecls) {
             if (decl is TopLevelDeclWithMembers declWithMembers) { // includes class, trait, datatype, etc.
                 HandleMemberDecls(declWithMembers);
@@ -52,7 +47,7 @@ public class SpecHelperFinder(ErrorReporter reporter): Visitor(-1, reporter)
         }
     }
 
-    private void HandleMemberDecls(TopLevelDeclWithMembers decl) {
+    protected override void HandleMemberDecls(TopLevelDeclWithMembers decl) {
         foreach (var member in decl.Members) {
             if (member is MethodOrFunction mf) {
                 VisitReqEns(mf.Req);
