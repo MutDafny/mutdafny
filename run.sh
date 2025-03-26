@@ -3,6 +3,11 @@ if [[ -z $1 ]]; then
     exit
 fi
 
+rm -rf mutants
+mkdir mutants
+mkdir mutants/alive
+mkdir mutants/killed
+
 
 echo Scanning $1 for mutation targets
 dotnet ./dafny/Binaries/Dafny.dll verify $1 \
@@ -41,12 +46,19 @@ do
     COLOR='\033[0;31m'; if [[ -n $verified ]]; then COLOR='\033[0m'; fi
     echo -e "${COLOR}${output}\033[0m"
     if [[ -z $verification_finished ]]; # verification did not finish due to invalid program
-        then echo Error: mutant is invalid
-        else
+    then 
+        echo Error: mutant is invalid
+    else
+        output_dir=""
         if [[ -n $verified ]]; 
-            then echo Verification succeeded: mutant is alive
-            else echo Verification failed: mutant was killed
+            then 
+                echo Verification succeeded: mutant is alive
+                output_dir=mutants/alive
+            else 
+                echo Verification failed: mutant was killed
+                output_dir=mutants/killed
         fi
+        mv *.dfy $output_dir
     fi
     echo
 done

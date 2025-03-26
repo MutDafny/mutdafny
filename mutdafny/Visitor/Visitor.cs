@@ -11,6 +11,7 @@ public class Visitor
 {
     public Statement? TargetStatement { get; protected set; }
     public Expression? TargetExpression { get; protected set; }
+    public ChainingExpression? ChainingExprParent { get; private set; }
     
     private readonly Dictionary<Type, Action<Statement>> _statementHandlers;
     private readonly Dictionary<Type, Action<Expression>> _expressionHandlers;
@@ -390,6 +391,8 @@ public class Visitor
     }
 
     protected virtual void VisitExpression(ChainingExpression cExpr) {
+        if (!IsWorthVisiting(cExpr.StartToken.pos, cExpr.EndToken.pos)) return;
+        ChainingExprParent = cExpr;
         if (cExpr.E is BinaryExpr bExpr && bExpr.Op == BinaryExpr.Opcode.And) {
             List<Expression> exprs = [bExpr.E0, bExpr.E1];
             HandleExprList(exprs);

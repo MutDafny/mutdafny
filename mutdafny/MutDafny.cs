@@ -8,8 +8,8 @@ namespace MutDafny;
 
 public class MutDafny : PluginConfiguration
 {
-    private bool _mutate = false;
-    private bool _scan = false;
+    private bool _mutate;
+    private bool _scan;
     private int MutationTargetPos { get; set; }
     private string MutationType { get; set; }
     private string? MutationTypeArg { get; set; }
@@ -57,5 +57,22 @@ public class MutantGenerator(int mutationTargetPos, string mutationType, string?
         if (mutationTypeArg == null) return; // TODO: only if we're dealing with binary op mutation
         var mutator = new BinaryOpMutator(mutationTypeArg, Reporter);
         mutator.Mutate(target);
+        // chaining expressions require additional mutation to ensure consistency upon program serialization
+        if (targetFinder.ChainingExprParent != null) {
+            mutator.MutateParent(target, targetFinder.ChainingExprParent);
+        }
+    }
+
+    public override void PostResolve(Program program) {
+        var stringWriter = new StringWriter();
+        var printer = new Printer(stringWriter, program.Options, PrintModes.Serialization);
+        printer.PrintProgram(program, false);
+        var programText = stringWriter.ToString();
+
+        var filename = Path.GetFileNameWithoutExtension(program.Name);
+        filename += mutationTypeArg != null ? 
+            $"_{mutationTargetPos}_{mutationType}_{mutationTypeArg}.dfy" : 
+            $"_{mutationTargetPos}_{mutationType}.dfy";
+        File.WriteAllText(filename, programText);
     }
 }

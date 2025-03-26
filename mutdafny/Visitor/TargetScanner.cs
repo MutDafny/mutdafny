@@ -1,5 +1,4 @@
-﻿using System.Text;
-using Microsoft.Dafny;
+﻿using Microsoft.Dafny;
 
 namespace MutDafny.Visitor;
 
