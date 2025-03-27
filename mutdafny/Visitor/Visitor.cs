@@ -256,7 +256,7 @@ public class Visitor
 
     // includes ReturnStmt and YieldStmt
     protected virtual void VisitStatement(ProduceStmt pStmt) {
-        HandleRhsList(pStmt.Rhss);
+        if (pStmt.Rhss != null) HandleRhsList(pStmt.Rhss);
     }
     
     protected virtual void VisitStatement(IfStmt ifStmt) {
@@ -277,7 +277,7 @@ public class Visitor
         if (IsWorthVisiting(whileStmt.Guard.StartToken.pos, whileStmt.Guard.EndToken.pos)) {
             HandleExpression(whileStmt.Guard);
         }
-        HandleBlock(whileStmt.Body);   
+        if (whileStmt.Body != null) HandleBlock(whileStmt.Body);   
     }
 
     protected virtual void VisitStatement(ForLoopStmt forStmt) {
@@ -489,8 +489,8 @@ public class Visitor
         HandleExprList(exprs);
         if (TargetFound()) return;
 
-        if (compExpr is MapComprehension mComExpr) {
-            HandleExpression(mComExpr.TermLeft);
+        if (compExpr is MapComprehension mCompExpr) {
+            if (mCompExpr.TermLeft != null) HandleExpression(mCompExpr.TermLeft);
         }
     }
 

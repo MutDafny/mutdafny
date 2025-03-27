@@ -36,6 +36,9 @@ public class MutDafny : PluginConfiguration
 public class MutationTargetScanner(ErrorReporter reporter) : Rewriter(reporter)
 {
     public override void PreResolve(ModuleDefinition module) {
+        var specHelperFinder = new SpecHelperFinder(Reporter);
+        specHelperFinder.Find(module);
+        
         var targetScanner = new TargetScanner(Reporter);
         targetScanner.Find(module);
         targetScanner.ExportTargets();
