@@ -10,8 +10,9 @@ public class MutDafny : PluginConfiguration
 {
     private bool _mutate;
     private bool _scan;
+
     private int MutationTargetPos { get; set; }
-    private string MutationType { get; set; }
+    private string MutationType { get; set; } = "";
     private string? MutationTypeArg { get; set; }
 
     public override void ParseArguments(string[] args) {
@@ -51,19 +52,9 @@ public class MutantGenerator(int mutationTargetPos, string mutationType, string?
         var specHelperFinder = new SpecHelperFinder(Reporter);
         specHelperFinder.Find(module);
         
-        // TODO: use different finder/mutator according to type of operator
-        var targetFinder = new BinaryOpTargetFinder(mutationTargetPos, Reporter);
-        targetFinder.Find(module);
-        var target = targetFinder.TargetExpression;
-        if (target == null) return; // TODO: target is expression only when dealing with certain mutation operators
-        
-        if (mutationTypeArg == null) return; // TODO: only if we're dealing with binary op mutation
-        var mutator = new BinaryOpMutator(mutationTypeArg, Reporter);
-        mutator.Mutate(target);
-        // chaining expressions require additional mutation to ensure consistency upon program serialization
-        if (targetFinder.ChainingExprParent != null) {
-            mutator.MutateParent(target, targetFinder.ChainingExprParent);
-        }
+        var mutatorFactory = new MutatorFactory(Reporter);
+        var mutator = mutatorFactory.Create(mutationTargetPos, mutationType, mutationTypeArg);
+        mutator?.Mutate(module);
     }
 
     public override void PostResolve(Program program) {

@@ -2,9 +2,9 @@
 
 namespace MutDafny.Mutator;
 
-public abstract class Mutator
+public abstract class Mutator(int mutationTargetPos, ErrorReporter reporter) : Visitor.Visitor(mutationTargetPos, reporter)
 {
-    public abstract void Mutate(Statement statement);
-    
-    public abstract void Mutate(Expression expression);
+    public void Mutate(ModuleDefinition topNode) {
+        base.Find(topNode);
+    }
 }
