@@ -11,7 +11,6 @@ public class Visitor
 {
     protected Statement? TargetStatement { get; set; }
     protected Expression? TargetExpression { get; set; }
-    protected ChainingExpression? ChainingExprParent { get; private set; }
     
     private readonly Dictionary<Type, Action<Statement>> _statementHandlers;
     private readonly Dictionary<Type, Action<Expression>> _expressionHandlers;
@@ -53,9 +52,9 @@ public class Visitor
         };
         _expressionHandlers = new Dictionary<Type, Action<Expression>> {
             {typeof(BinaryExpr), expr => VisitExpression((expr as BinaryExpr)!)},
-            {typeof(UnaryExpr), expr => HandleExpression(((expr as UnaryExpr)!).E)},
-            {typeof(ParensExpression), expr => HandleExpression(((expr as ParensExpression)!).E)},
-            {typeof(NegationExpression), expr => HandleExpression(((expr as NegationExpression)!).E)},
+            {typeof(UnaryExpr), expr => VisitExpression((expr as UnaryExpr)!)},
+            {typeof(ParensExpression), expr => VisitExpression((expr as ParensExpression)!)},
+            {typeof(NegationExpression), expr => VisitExpression((expr as NegationExpression)!)},
             {typeof(ChainingExpression), expr => VisitExpression((expr as ChainingExpression)!)},
             {typeof(LetExpr), expr => VisitExpression((expr as LetExpr)!)},
             {typeof(LetOrFailExpr), expr => VisitExpression((expr as LetOrFailExpr)!)},
@@ -69,7 +68,7 @@ public class Visitor
             {typeof(DisplayExpression), expr => VisitExpression((expr as DisplayExpression)!)},
             {typeof(MapDisplayExpr), expr => VisitExpression((expr as MapDisplayExpr)!)},
             {typeof(SeqConstructionExpr), expr => VisitExpression((expr as SeqConstructionExpr)!)},
-            {typeof(MultiSetFormingExpr), expr => HandleExpression(((expr as MultiSetFormingExpr)!).E)},
+            {typeof(MultiSetFormingExpr), expr => VisitExpression((expr as MultiSetFormingExpr)!)},
             {typeof(SeqSelectExpr), expr => VisitExpression((expr as SeqSelectExpr)!)},
             {typeof(MultiSelectExpr), expr => VisitExpression((expr as MultiSelectExpr)!)},
             {typeof(SeqUpdateExpr), expr => VisitExpression((expr as SeqUpdateExpr)!)},    
@@ -308,7 +307,6 @@ public class Visitor
     protected virtual void VisitStatement(MatchStmt matchStmt) {
         if (IsWorthVisiting(matchStmt.Source.StartToken.pos, matchStmt.Source.EndToken.pos)) {
             HandleExpression(matchStmt.Source);
-            return;
         }
         foreach (var cs in matchStmt.Cases) {
             if (!IsWorthVisiting(cs.StartToken.pos, cs.EndToken.pos)) 
@@ -320,7 +318,6 @@ public class Visitor
     protected virtual void VisitStatement(NestedMatchStmt nMatchStmt) {
         if (IsWorthVisiting(nMatchStmt.Source.StartToken.pos, nMatchStmt.Source.EndToken.pos)) {
             HandleExpression(nMatchStmt.Source);
-            return;
         }
         foreach (var cs in nMatchStmt.Cases) {
             if (!IsWorthVisiting(cs.StartToken.pos, cs.EndToken.pos)) 
@@ -389,10 +386,20 @@ public class Visitor
         List<Expression> exprs = [bExpr.E0, bExpr.E1];
         HandleExprList(exprs);
     }
+    
+    protected virtual void VisitExpression(UnaryExpr uExpr) {
+        HandleExpression(uExpr.E);
+    }
+    
+    protected virtual void VisitExpression(ParensExpression pExpr) {
+        HandleExpression(pExpr.E);
+    }
+    
+    protected virtual void VisitExpression(NegationExpression nExpr) {
+        HandleExpression(nExpr.E);
+    }
 
     protected virtual void VisitExpression(ChainingExpression cExpr) {
-        if (!IsWorthVisiting(cExpr.StartToken.pos, cExpr.EndToken.pos)) return;
-        ChainingExprParent = cExpr;
         if (cExpr.E is BinaryExpr bExpr && bExpr.Op == BinaryExpr.Opcode.And) {
             List<Expression> exprs = [bExpr.E0, bExpr.E1];
             HandleExprList(exprs);
@@ -465,6 +472,10 @@ public class Visitor
         List<Expression> exprs = [seqCExpr.N, seqCExpr.Initializer];
         HandleExprList(exprs);
     }
+    
+    protected virtual void VisitExpression(MultiSetFormingExpr mSetFExpr) {
+        HandleExpression(mSetFExpr.E);
+    }
 
     protected virtual void VisitExpression(SeqSelectExpr seqSExpr) {
         List<Expression> exprs = [seqSExpr.Seq];
@@ -489,8 +500,8 @@ public class Visitor
         HandleExprList(exprs);
         if (TargetFound()) return;
 
-        if (compExpr is MapComprehension mCompExpr) {
-            if (mCompExpr.TermLeft != null) HandleExpression(mCompExpr.TermLeft);
+        if (compExpr is MapComprehension mCompExpr && mCompExpr.TermLeft != null) {
+            HandleExpression(mCompExpr.TermLeft);
         }
     }
 

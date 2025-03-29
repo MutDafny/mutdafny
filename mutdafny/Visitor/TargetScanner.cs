@@ -86,8 +86,18 @@ public class TargetScanner: Visitor
     }
 
     protected override void VisitExpression(ChainingExpression cExpr) {
-        if (cExpr.E is BinaryExpr bExpr && bExpr.Op == BinaryExpr.Opcode.And) {
-            base.VisitExpression(bExpr);
+        foreach (var (e, i) in cExpr.Operands.Select((e, i) => (e, i))) {
+            if (i == cExpr.Operators.Count) return;
+            // if the lhs operand is at position i of the operands list
+            // then the operator is at position i of the operators list
+            var op = cExpr.Operators[i];
+            
+            if (!_replacementList.TryGetValue(op, out var replacementList)) 
+                return;
+            foreach (var replacement in replacementList) {
+                // binary operator replacement
+                Targets.Add((e.Center.pos, "BOR", replacement.ToString()));
+            }
         }
     }
 }
