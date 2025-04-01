@@ -92,4 +92,19 @@ public class TargetScanner: Visitor
             }
         }
     }
+    
+    protected override void VisitExpression(UnaryExpr uExpr) {
+        if (uExpr is UnaryOpExpr uOpExpr && uOpExpr.Op == UnaryOpExpr.Opcode.Not) {
+            // conditional/logical operator deletion
+            Targets.Add((uOpExpr.Center.pos, "UOD", ""));
+        }
+        
+        base.VisitExpression(uExpr);
+    }
+    
+    protected override void VisitExpression(NegationExpression nExpr) {
+        // arithmetic operator deletion
+        Targets.Add((nExpr.Center.pos, "UOD", ""));
+        base.VisitExpression(nExpr);
+    }
 }
