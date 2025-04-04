@@ -3,7 +3,7 @@
 namespace MutDafny.Mutator;
 
 // this mutation operator replaces one binary operator with another
-public class BinaryOpMutator(int mutationTargetPos, string op, ErrorReporter reporter) : Mutator(mutationTargetPos, reporter)
+public class BinaryOpMutator(string mutationTargetPos, string op, ErrorReporter reporter) : Mutator(mutationTargetPos, reporter)
 {
     protected override void VisitExpression(BinaryExpr bExpr) {
         if (IsTarget(bExpr)) {
@@ -16,7 +16,7 @@ public class BinaryOpMutator(int mutationTargetPos, string op, ErrorReporter rep
     
     protected override void VisitExpression(ChainingExpression cExpr) {
         foreach (var (e, i) in cExpr.Operands.Select((e, i) => (e, i))) {
-            if (e.Center.pos != MutationTargetPos) continue;
+            if (e.Center.pos != int.Parse(MutationTargetPos)) continue;
             // if the lhs operand is at position i of the operands list
             // then the operator is at position i of the operators list
             cExpr.Operators[i] = (BinaryExpr.Opcode)Enum.Parse(typeof(BinaryExpr.Opcode), op);
@@ -33,7 +33,7 @@ public class BinaryOpMutator(int mutationTargetPos, string op, ErrorReporter rep
     }
 
     private void VisitChainingSubExpression(Expression expr) {
-        if (expr is BinaryExpr bExpr && bExpr.E0.Center.pos == MutationTargetPos) {
+        if (expr is BinaryExpr bExpr && bExpr.E0.Center.pos == int.Parse(MutationTargetPos)) {
             TargetExpression = bExpr;
             Mutate(bExpr);
         }
@@ -47,6 +47,6 @@ public class BinaryOpMutator(int mutationTargetPos, string op, ErrorReporter rep
     }
     
     private bool IsTarget(BinaryExpr expr) {
-        return expr.Center.pos == MutationTargetPos;
+        return expr.Center.pos == int.Parse(MutationTargetPos);
     }
 }

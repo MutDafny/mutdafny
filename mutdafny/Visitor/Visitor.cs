@@ -14,10 +14,10 @@ public class Visitor
     
     private readonly Dictionary<Type, Action<Statement>> _statementHandlers;
     private readonly Dictionary<Type, Action<Expression>> _expressionHandlers;
-    protected readonly int MutationTargetPos;
+    protected readonly string MutationTargetPos;
     protected readonly ErrorReporter Reporter;
     
-    protected Visitor(int mutationTargetPos, ErrorReporter reporter)
+    protected Visitor(string mutationTargetPos, ErrorReporter reporter)
     {
         MutationTargetPos = mutationTargetPos;
         Reporter = reporter;
@@ -51,11 +51,13 @@ public class Visitor
             {typeof(CalcStmt), stmt => VisitStatement((stmt as CalcStmt)!)},
         };
         _expressionHandlers = new Dictionary<Type, Action<Expression>> {
+            {typeof(LiteralExpr), expr => VisitExpression((expr as LiteralExpr)!)},
             {typeof(BinaryExpr), expr => VisitExpression((expr as BinaryExpr)!)},
             {typeof(UnaryExpr), expr => VisitExpression((expr as UnaryExpr)!)},
             {typeof(ParensExpression), expr => VisitExpression((expr as ParensExpression)!)},
             {typeof(NegationExpression), expr => VisitExpression((expr as NegationExpression)!)},
             {typeof(ChainingExpression), expr => VisitExpression((expr as ChainingExpression)!)},
+            {typeof(NameSegment), expr => VisitExpression((expr as NameSegment)!)},
             {typeof(LetExpr), expr => VisitExpression((expr as LetExpr)!)},
             {typeof(LetOrFailExpr), expr => VisitExpression((expr as LetOrFailExpr)!)},
             {typeof(ApplyExpr), expr => VisitExpression((expr as ApplyExpr)!)},
@@ -381,6 +383,9 @@ public class Visitor
             derivedType = derivedType.BaseType;
         }
     }
+    
+    // no sub-expressions to further visit
+    protected virtual void VisitExpression(LiteralExpr litExpr) { }
 
     protected virtual void VisitExpression(BinaryExpr bExpr) {
         List<Expression> exprs = [bExpr.E0, bExpr.E1];
@@ -405,6 +410,9 @@ public class Visitor
             HandleExprList(exprs);
         }
     }
+    
+    // no sub-expressions to further visit
+    protected virtual void VisitExpression(NameSegment nSegExpr) { }
 
     protected virtual void VisitExpression(LetExpr ltExpr) {
         var exprs = Enumerable.Concat([ltExpr.Body], ltExpr.RHSs).ToList();
@@ -582,9 +590,15 @@ public class Visitor
     }
     
     protected bool IsWorthVisiting(int tokenStartPos, int tokenEndPos) {
-        return MutationTargetPos == -1 || // visit the tree without searching for specific target
-               (tokenStartPos <= MutationTargetPos && // specific target
-                MutationTargetPos <= tokenEndPos);
+        if (Int32.TryParse(MutationTargetPos, out var position)) {
+            return position == -1 || // visit the tree without searching for specific target
+                   (tokenStartPos <= position && // specific target
+                    position <= tokenEndPos);
+        } 
+        var positions = MutationTargetPos.Split("-");
+        if (positions.Length < 2) return false;
+        return (tokenStartPos <= int.Parse(positions[0]) &&
+                int.Parse(positions[1]) <= tokenEndPos);
     }
 
     protected bool TargetFound() {

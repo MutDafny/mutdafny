@@ -2,7 +2,7 @@
 
 namespace MutDafny.Mutator;
 
-public abstract class ExprReplacementMutator(int mutationTargetPos, ErrorReporter reporter) 
+public abstract class ExprReplacementMutator(string mutationTargetPos, ErrorReporter reporter) 
     : Mutator(mutationTargetPos, reporter)
 {
     protected abstract Expression CreateMutatedExpression(Expression originalExpr);
@@ -288,8 +288,7 @@ public abstract class ExprReplacementMutator(int mutationTargetPos, ErrorReporte
         }
     }
 
-    protected override void VisitExpression(SeqConstructionExpr seqCExpr)
-    {
+    protected override void VisitExpression(SeqConstructionExpr seqCExpr) {
         HandleExpression(seqCExpr.N);
         if (TargetFound()) { // mutate
             seqCExpr.N = CreateMutatedExpression(seqCExpr.N);
@@ -382,7 +381,7 @@ public abstract class ExprReplacementMutator(int mutationTargetPos, ErrorReporte
             HandleExpression(update.Item3);
             if (TargetFound()) { // mutate
                 var newItem = CreateMutatedExpression(update.Item3);
-                var newUpdate = Tuple.Create(update.Item1, update.Item2, newItem as Expression);
+                var newUpdate = Tuple.Create(update.Item1, update.Item2, newItem);
                 dtUExpr.Updates[i] = newUpdate;
                 return;
             }

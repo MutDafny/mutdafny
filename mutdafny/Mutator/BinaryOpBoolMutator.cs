@@ -3,7 +3,7 @@
 namespace MutDafny.Mutator;
 
 // this mutation operator replaces a relational or conditional binary expression with true or false
-public class BinaryOpBoolMutator(int mutationTargetPos, string val, ErrorReporter reporter) 
+public class BinaryOpBoolMutator(string mutationTargetPos, string val, ErrorReporter reporter) 
     : ExprReplacementMutator(mutationTargetPos, reporter)
 {
     protected override void VisitExpression(BinaryExpr bExpr) {
@@ -15,7 +15,7 @@ public class BinaryOpBoolMutator(int mutationTargetPos, string val, ErrorReporte
     }
 
     private bool IsTarget(BinaryExpr expr) {
-        return expr.Center.pos == MutationTargetPos;
+        return expr.Center.pos == int.Parse(MutationTargetPos);
     }
 
     protected override Expression CreateMutatedExpression(Expression originalExpr) {

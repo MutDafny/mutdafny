@@ -11,7 +11,7 @@ public class MutDafny : PluginConfiguration
     private bool _mutate;
     private bool _scan;
 
-    private int MutationTargetPos { get; set; }
+    private string MutationTargetPos { get; set; } = "";
     private string MutationType { get; set; } = "";
     private string? MutationTypeArg { get; set; }
 
@@ -20,7 +20,7 @@ public class MutDafny : PluginConfiguration
             _scan = true;
         } else if (args.Length >= 2) {
             _mutate = true;
-            MutationTargetPos = int.Parse(args[0]);
+            MutationTargetPos = args[0];
             MutationType = args[1];
             MutationTypeArg = args.Length > 2 ? args[2] : null;   
         }
@@ -40,13 +40,19 @@ public class MutationTargetScanner(ErrorReporter reporter) : Rewriter(reporter)
         var specHelperFinder = new SpecHelperFinder(Reporter);
         specHelperFinder.Find(module);
         
-        var targetScanner = new TargetScanner(Reporter);
+        var targetScanner = new PreResolveTargetScanner(Reporter);
+        targetScanner.Find(module);
+        targetScanner.ExportTargets();
+    }
+
+    public override void PostResolve(ModuleDefinition module) {
+        var targetScanner = new PostResolveTargetScanner(Reporter);
         targetScanner.Find(module);
         targetScanner.ExportTargets();
     }
 }
 
-public class MutantGenerator(int mutationTargetPos, string mutationType, string? mutationTypeArg, ErrorReporter reporter) : Rewriter(reporter)
+public class MutantGenerator(string mutationTargetPos, string mutationType, string? mutationTypeArg, ErrorReporter reporter) : Rewriter(reporter)
 {
     public override void PreResolve(ModuleDefinition module) {
         var specHelperFinder = new SpecHelperFinder(Reporter);

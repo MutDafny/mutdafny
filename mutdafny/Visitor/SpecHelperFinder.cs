@@ -4,7 +4,7 @@ using Expression = Microsoft.Dafny.Expression;
 namespace MutDafny.Visitor;
 
 // this type of finder is used to get a list of variables, functions, predicates, etc. that are used as a part of the specification
-public class SpecHelperFinder(ErrorReporter reporter): Visitor(-1, reporter)
+public class SpecHelperFinder(ErrorReporter reporter): Visitor("-1", reporter)
 {
     public static List<string> SpecHelpers { get; } = [];
     private bool _isInsideSpec;

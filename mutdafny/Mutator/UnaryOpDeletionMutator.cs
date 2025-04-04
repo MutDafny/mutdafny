@@ -3,7 +3,7 @@
 namespace MutDafny.Mutator;
 
 // this mutation operator deletes unary operators, such as the arithmetic - and the logical/conditional !
-public class UnaryOpDeletionMutator(int mutationTargetPos, ErrorReporter reporter) 
+public class UnaryOpDeletionMutator(string mutationTargetPos, ErrorReporter reporter) 
     : ExprReplacementMutator(mutationTargetPos, reporter)
 {
     protected override void VisitExpression(UnaryExpr uExpr) {
@@ -23,7 +23,7 @@ public class UnaryOpDeletionMutator(int mutationTargetPos, ErrorReporter reporte
     }
     
     private bool IsTarget(Expression expr) {
-        return expr.Center.pos == MutationTargetPos;
+        return expr.Center.pos == int.Parse(MutationTargetPos);
     }
 
     protected override Expression CreateMutatedExpression(Expression originalExpr) {
