@@ -70,6 +70,10 @@ public class PreResolveTargetScanner : TargetScanner
 
     protected override void VisitExpression(ChainingExpression cExpr) {
         foreach (var (e, i) in cExpr.Operands.Select((e, i) => (e, i))) {
+            if (e is NegationExpression nExpr) {
+                Targets.Add(($"{nExpr.Center.pos}", "UOD", ""));
+            }
+            
             if (i == cExpr.Operators.Count) return;
             // if the lhs operand is at position i of the operands list
             // then the operator is at position i of the operators list

@@ -62,7 +62,10 @@ public class PostResolveTargetScanner(ErrorReporter reporter) : TargetScanner(re
     
     protected override void VisitExpression(ChainingExpression cExpr) {
         HandleType(cExpr);
-        base.VisitExpression(cExpr);
+        foreach (var operand in cExpr.Operands) {
+            if (operand is not NegationExpression)
+                HandleType(operand);
+        }
     }
 
     protected override void VisitExpression(NameSegment nSegExpr) {

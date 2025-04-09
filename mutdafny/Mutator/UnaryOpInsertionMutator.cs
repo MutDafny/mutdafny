@@ -5,6 +5,8 @@ namespace MutDafny.Mutator;
 public class UnaryOpInsertionMutator(string mutationTargetPos, string op, ErrorReporter reporter) 
     : ExprReplacementMutator(mutationTargetPos, reporter)
 {
+    private ChainingExpression? _chainingExpressionParent;
+    
     private bool IsTarget(Expression expr) {
         var positions = MutationTargetPos.Split("-");
         if (positions.Length < 2) return false;
@@ -16,13 +18,24 @@ public class UnaryOpInsertionMutator(string mutationTargetPos, string op, ErrorR
     
     protected override Expression CreateMutatedExpression(Expression originalExpr) {
         Expression mutatedExpr;
-        if (op == UnaryOpExpr.Opcode.Not.ToString()) {
+        if (_chainingExpressionParent != null) {
+            var operands = _chainingExpressionParent.Operands;
+            foreach (var (e, i) in operands.Select((e, i) => (e, i)).ToList()) {
+                if (e != TargetExpression) continue;
+                operands[i] = new NegationExpression(e.Origin, e);
+            }
+            mutatedExpr = new ChainingExpression(_chainingExpressionParent.Origin, operands, 
+                _chainingExpressionParent.Operators, _chainingExpressionParent.OperatorLocs, 
+                _chainingExpressionParent.PrefixLimits);
+            
+        } else if (op == UnaryOpExpr.Opcode.Not.ToString()) {
             mutatedExpr = new UnaryOpExpr(originalExpr.Origin, UnaryOpExpr.Opcode.Not, originalExpr);
         } else {
             mutatedExpr = new NegationExpression(originalExpr.Origin, originalExpr);
         }
        
         TargetExpression = null;
+        _chainingExpressionParent = null;
         return mutatedExpr;
     }
 
@@ -65,6 +78,21 @@ public class UnaryOpInsertionMutator(string mutationTargetPos, string op, ErrorR
             return;
         }
         base.VisitExpression(nExpr);
+    }
+    
+    protected override void VisitExpression(ChainingExpression cExpr) {
+        if (IsTarget(cExpr)) {
+            TargetExpression = cExpr;
+            return;
+        }
+        
+        foreach (var operand in cExpr.Operands) {
+            if (IsTarget(operand)) {
+                TargetExpression = operand;
+                _chainingExpressionParent = cExpr;
+                return;
+            }
+        }
     }
 
     protected override void VisitExpression(NameSegment nSegExpr) {
