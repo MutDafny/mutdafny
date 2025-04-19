@@ -22,7 +22,11 @@ public class MutDafny : PluginConfiguration
             _mutate = true;
             MutationTargetPos = args[0];
             MutationType = args[1];
-            MutationTypeArg = args.Length > 2 ? args[2] : null;   
+            MutationTypeArg = args.Length switch {
+                2 => null,
+                3 => args[2],
+                _ => string.Join(" ", new List<string>(args[new Range(2, args.Length)]))
+            };
         }
     }
 

@@ -23,6 +23,65 @@ public class PostResolveTargetScanner(ErrorReporter reporter) : TargetScanner(re
                 break;
         }
     }
+
+    private void HandleType(LiteralExpr litExpr) {
+        HandleType(litExpr as Expression);
+
+        switch (litExpr.Type) {
+            case IntType:
+                HandleIntegerLiteral(litExpr); break;
+            case RealType:
+                HandleRealLiteral(litExpr); break;
+            default:
+                if (litExpr is StringLiteralExpr) {
+                    HandleStringLiteral(litExpr);
+                }
+                break;
+        }
+    }
+
+    private void HandleIntegerLiteral(LiteralExpr litExpr) {
+        if (!int.TryParse(litExpr.Value.ToString(), out var numVal))
+            return;
+        
+        Targets.Add(($"{litExpr.Center.pos}", "LVR", $"{numVal + 1}"));
+        Targets.Add(($"{litExpr.Center.pos}", "LVR", $"{numVal - 1}"));
+        if (numVal == 0 || numVal + 1 == 0 || numVal - 1 == 0)
+            return;
+        Targets.Add(($"{litExpr.Center.pos}", "LVR", $"0"));
+    }
+    
+    private void HandleRealLiteral(LiteralExpr litExpr) {
+        if (!double.TryParse(litExpr.Value.ToString(), out var numVal))
+            return;
+        var decimalPlaces = BitConverter.GetBytes(decimal.GetBits((decimal)numVal)[3])[2];
+        var format = "0." + new string('0', decimalPlaces);
+        
+        var incVal = (numVal + 1).ToString(format);
+        incVal = incVal.Contains('.') ? incVal : incVal + ".0";
+        Targets.Add(($"{litExpr.Center.pos}", "LVR", incVal));
+
+        var decVal = (numVal - 1).ToString(format);
+        decVal = decVal.Contains('.') ? decVal : decVal + ".0";
+        Targets.Add(($"{litExpr.Center.pos}", "LVR", decVal));
+        
+        if (numVal == 0 || numVal + 1 == 0 || numVal - 1 == 0)
+            return;
+        Targets.Add(($"{litExpr.Center.pos}", "LVR", $"0.0"));
+    } 
+
+    private void HandleStringLiteral(LiteralExpr litExpr) {
+        var sVal = litExpr.Value.ToString();
+        if (sVal == null) return;
+        
+        var repVal = sVal == "" ? "MutDafny" : "";
+        Targets.Add(($"{litExpr.Center.pos}", "LVR", repVal));
+        if (sVal.Length <= 1) return;
+        Targets.Add(($"{litExpr.Center.pos}", "LVR", 
+            sVal[0] + "XX" + 
+            sVal.Substring(1, sVal.Length - 2) + 
+            "XX" + sVal[^1]));
+    }
    
     /// -------------------------------------
     /// Group of overriden statement visitors

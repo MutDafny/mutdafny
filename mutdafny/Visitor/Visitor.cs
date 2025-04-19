@@ -590,7 +590,7 @@ public class Visitor
     }
     
     protected bool IsWorthVisiting(int tokenStartPos, int tokenEndPos) {
-        if (Int32.TryParse(MutationTargetPos, out var position)) {
+        if (int.TryParse(MutationTargetPos, out var position)) {
             return position == -1 || // visit the tree without searching for specific target
                    (tokenStartPos <= position && // specific target
                     position <= tokenEndPos);
