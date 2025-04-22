@@ -4,29 +4,29 @@ namespace MutDafny.Visitor;
 
 public class PostResolveTargetScanner(ErrorReporter reporter) : TargetScanner(reporter)
 {
-    private bool _skipChildMutation;
+    private bool _skipChildUOIMutation;
+    private bool _skipChildEVRMutation;
     
-    private void HandleType(Expression expr) {
-        if (_skipChildMutation) {
-            _skipChildMutation = false;
+    private void ScanUOITargets(Expression expr) {
+        if (_skipChildUOIMutation) {
+            _skipChildUOIMutation = false;
             return;
         }
+        var exprLocation = $"{expr.StartToken.pos}-{expr.EndToken.pos}";
         
         switch (expr.Type) {
             case IntType:
             case RealType:
-                Targets.Add(($"{expr.StartToken.pos}-{expr.EndToken.pos}", "UOI", "Minus")); 
+                Targets.Add((exprLocation, "UOI", "Minus")); 
                 break;
             case BoolType:
             case BitvectorType:
-                Targets.Add(($"{expr.StartToken.pos}-{expr.EndToken.pos}", "UOI", UnaryOpExpr.Opcode.Not.ToString()));
+                Targets.Add((exprLocation, "UOI", UnaryOpExpr.Opcode.Not.ToString()));
                 break;
         }
     }
 
-    private void HandleType(LiteralExpr litExpr) {
-        HandleType(litExpr as Expression);
-
+    private void ScanLVRTargets(LiteralExpr litExpr) {
         switch (litExpr.Type) {
             case IntType:
                 HandleIntegerLiteral(litExpr); break;
@@ -82,6 +82,40 @@ public class PostResolveTargetScanner(ErrorReporter reporter) : TargetScanner(re
             sVal.Substring(1, sVal.Length - 2) + 
             "XX" + sVal[^1]));
     }
+    
+    private void ScanEVRTargets(Expression expr) {
+        if (_skipChildEVRMutation) return;
+        var exprLocation = $"{expr.StartToken.pos}-{expr.EndToken.pos}";
+        
+        switch (expr.Type) {
+            case IntType:
+                Targets.Add((exprLocation, "EVR", "int")); break;
+            case RealType:
+                Targets.Add((exprLocation, "EVR", "real")); break;
+            case BitvectorType:
+                Targets.Add((exprLocation, "EVR", "bv")); break;
+            case CharType:
+                Targets.Add((exprLocation, "EVR", "char")); break;
+            case SetType:
+                Targets.Add((exprLocation, "EVR", "set")); break;
+            case MultiSetType:
+                Targets.Add((exprLocation, "EVR", "multiset")); break;
+            case SeqType:
+                Targets.Add((exprLocation, "EVR", "seq")); break;
+            case MapType:
+                Targets.Add((exprLocation, "EVR", "map")); break;
+            case UserDefinedType uType:
+                if (expr.Type.AsCollectionType is SeqType seqType && seqType.Arg is CharType) { // string type
+                    Targets.Add((exprLocation, "EVR", "string"));
+                } else if (expr.Type.IsArrayType) {
+                    Targets.Add((exprLocation, "EVR", "array"));
+                }
+                if (uType.Name[^1] == '?') { // nullable type
+                    Targets.Add((exprLocation, "EVR", "null"));
+                }
+                break;
+        }
+    }
    
     /// -------------------------------------
     /// Group of overriden statement visitors
@@ -96,138 +130,168 @@ public class PostResolveTargetScanner(ErrorReporter reporter) : TargetScanner(re
     /// Group of overriden expression visitors
     /// --------------------------------------
     protected override void VisitExpression(LiteralExpr litExpr) {
-        HandleType(litExpr);
+        ScanUOITargets(litExpr);
+        ScanLVRTargets(litExpr);
     }
     protected override void VisitExpression(BinaryExpr bExpr) {
-        HandleType(bExpr);
+        ScanUOITargets(bExpr);
+        ScanEVRTargets(bExpr);
         base.VisitExpression(bExpr);
     }
     
     protected override void VisitExpression(UnaryExpr uExpr) {
-        _skipChildMutation = true;
+        _skipChildUOIMutation = true;
+        ScanEVRTargets(uExpr);
         base.VisitExpression(uExpr);
     }
     
     protected override void VisitExpression(ParensExpression pExpr) {
-        HandleType(pExpr);
-        _skipChildMutation = true;
+        ScanUOITargets(pExpr);
+        _skipChildUOIMutation = true;
         base.VisitExpression(pExpr);
     }
     
     protected override void VisitExpression(NegationExpression nExpr) {
-        _skipChildMutation = true;
+        _skipChildUOIMutation = true;
+        ScanEVRTargets(nExpr);
         base.VisitExpression(nExpr);
     }
     
     protected override void VisitExpression(ChainingExpression cExpr) {
-        HandleType(cExpr);
+        ScanUOITargets(cExpr);
+        ScanEVRTargets(cExpr);
         foreach (var operand in cExpr.Operands) {
             if (operand is not NegationExpression)
-                HandleType(operand);
+                ScanUOITargets(operand);
         }
     }
 
     protected override void VisitExpression(NameSegment nSegExpr) {
-        HandleType(nSegExpr);
+        ScanUOITargets(nSegExpr);
+        ScanEVRTargets(nSegExpr);
     }
     
     protected override void VisitExpression(LetExpr ltExpr) {
-        HandleType(ltExpr);
+        ScanUOITargets(ltExpr);
+        ScanEVRTargets(ltExpr);
         base.VisitExpression(ltExpr);
     }
     
     protected override void VisitExpression(LetOrFailExpr ltOrFExpr) {
-        HandleType(ltOrFExpr);
+        ScanUOITargets(ltOrFExpr);
+        ScanEVRTargets(ltOrFExpr);
         base.VisitExpression(ltOrFExpr);
     }
     
     protected override void VisitExpression(ApplyExpr appExpr) {
-        HandleType(appExpr);
+        ScanUOITargets(appExpr);
+        ScanEVRTargets(appExpr);
         base.VisitExpression(appExpr);
     }
     
     protected override void VisitExpression(SuffixExpr suffixExpr) {
-        HandleType(suffixExpr);
+        ScanUOITargets(suffixExpr);
+        ScanEVRTargets(suffixExpr);
+        _skipChildEVRMutation = true;
         base.VisitExpression(suffixExpr);
+        _skipChildEVRMutation = false;
     }
     
     protected override void VisitExpression(FunctionCallExpr fCallExpr) {
-        HandleType(fCallExpr);
+        ScanUOITargets(fCallExpr);
+        ScanEVRTargets(fCallExpr);
         base.VisitExpression(fCallExpr);
     }
     
     protected override void VisitExpression(MemberSelectExpr mSelExpr) {
-        HandleType(mSelExpr);
+        ScanUOITargets(mSelExpr);
+        ScanEVRTargets(mSelExpr);
         base.VisitExpression(mSelExpr);
     }
     
     protected override void VisitExpression(ITEExpr iteExpr) {
-        HandleType(iteExpr);
+        ScanUOITargets(iteExpr);
+        ScanEVRTargets(iteExpr);
         base.VisitExpression(iteExpr);
     }
     
     protected override void VisitExpression(MatchExpr mExpr) {
-        HandleType(mExpr);
+        ScanUOITargets(mExpr);
+        ScanEVRTargets(mExpr);
         base.VisitExpression(mExpr);
     }
     
     protected override void VisitExpression(NestedMatchExpr nMExpr) {
-        HandleType(nMExpr);
+        ScanUOITargets(nMExpr);
+        ScanEVRTargets(nMExpr);
         base.VisitExpression(nMExpr);
     }
     
     protected override void VisitExpression(DisplayExpression dExpr) {
-        HandleType(dExpr);
+        ScanUOITargets(dExpr);
         base.VisitExpression(dExpr);
     }
     
     protected override void VisitExpression(MapDisplayExpr mDExpr) {
-        HandleType(mDExpr);
+        ScanUOITargets(mDExpr);
         base.VisitExpression(mDExpr);
     }
     
     protected override void VisitExpression(SeqConstructionExpr seqCExpr) {
-        HandleType(seqCExpr);
+        ScanUOITargets(seqCExpr);
+        ScanEVRTargets(seqCExpr);
         base.VisitExpression(seqCExpr);
     }
     
     protected override void VisitExpression(MultiSetFormingExpr mSetFExpr) {
-        HandleType(mSetFExpr);
+        ScanUOITargets(mSetFExpr);
+        ScanEVRTargets(mSetFExpr);
         base.VisitExpression(mSetFExpr);
     }
     
     protected override void VisitExpression(SeqSelectExpr seqSExpr) {
-        HandleType(seqSExpr);
+        ScanUOITargets(seqSExpr);
+        ScanEVRTargets(seqSExpr);
+        _skipChildEVRMutation = true;
         base.VisitExpression(seqSExpr);
+        _skipChildEVRMutation = false;
     }
     
     protected override void VisitExpression(MultiSelectExpr mSExpr) {
-        HandleType(mSExpr);
+        ScanUOITargets(mSExpr);
+        ScanEVRTargets(mSExpr);
+        _skipChildEVRMutation = true;
         base.VisitExpression(mSExpr);
+        _skipChildEVRMutation = false;
     }
     
     protected override void VisitExpression(SeqUpdateExpr seqUExpr) {
-        HandleType(seqUExpr);
+        ScanUOITargets(seqUExpr);
+        ScanEVRTargets(seqUExpr);
         base.VisitExpression(seqUExpr);
     }
     
     protected override void VisitExpression(ComprehensionExpr compExpr) {
-        HandleType(compExpr);
+        ScanUOITargets(compExpr);
+        ScanEVRTargets(compExpr);
         base.VisitExpression(compExpr);
     }
     
     protected override void VisitExpression(DatatypeUpdateExpr dtUExpr) {
-        HandleType(dtUExpr);
+        ScanUOITargets(dtUExpr);
+        ScanEVRTargets(dtUExpr);
         base.VisitExpression(dtUExpr);
     }
     
     protected override void VisitExpression(DatatypeValue dtValue) {
-        HandleType(dtValue);
+        ScanUOITargets(dtValue);
+        ScanEVRTargets(dtValue);
         base.VisitExpression(dtValue);
     }
     
     protected override void VisitExpression(StmtExpr stmtExpr) {
-        HandleType(stmtExpr);
+        ScanUOITargets(stmtExpr);
+        ScanEVRTargets(stmtExpr);
         base.VisitExpression(stmtExpr);
     }
 }

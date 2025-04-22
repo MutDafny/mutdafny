@@ -3,7 +3,8 @@ using Microsoft.Dafny;
 
 namespace MutDafny.Mutator;
 
-public class LiteralExprReplacementMutator(string mutationTargetPos, string val, ErrorReporter reporter) 
+// this mutation operator replaces a literal value with another of the same type
+public class LiteralValueReplacementMutator(string mutationTargetPos, string val, ErrorReporter reporter) 
     : ExprReplacementMutator(mutationTargetPos, reporter)
 {
     protected override void VisitExpression(LiteralExpr litExpr) {
@@ -23,7 +24,7 @@ public class LiteralExprReplacementMutator(string mutationTargetPos, string val,
         
         return int.TryParse(val, out var intVal) ?
             new LiteralExpr(originalExpr.Origin, intVal) : (
-                double.TryParse(val, out var realVal) ? 
+                double.TryParse(val, out _) ? 
                 new LiteralExpr(originalExpr.Origin, BigDec.FromString(val)) : 
                 new StringLiteralExpr(originalExpr.Origin, val, false)
             );

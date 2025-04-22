@@ -15,8 +15,10 @@ public class MutatorFactory(ErrorReporter reporter)
                 new UnaryOpInsertionMutator(mutationTargetPos, mutationArg, reporter),
             "UOD" => new UnaryOpDeletionMutator(mutationTargetPos, reporter),
             "LVR" => mutationArg == null ? 
-                new LiteralExprReplacementMutator(mutationTargetPos, "", reporter) :
-                new LiteralExprReplacementMutator(mutationTargetPos, mutationArg, reporter),
+                new LiteralValueReplacementMutator(mutationTargetPos, "", reporter) :
+                new LiteralValueReplacementMutator(mutationTargetPos, mutationArg, reporter),
+            "EVR" => mutationArg == null ? null :
+                new ExprValueReplacementMutator(mutationTargetPos, mutationArg, reporter),
             _ => null
         };
     }

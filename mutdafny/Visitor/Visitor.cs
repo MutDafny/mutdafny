@@ -546,7 +546,7 @@ public class Visitor
         }
     }
 
-    protected void HandleRhsList(List<AssignmentRhs> rhss) {
+    protected virtual void HandleRhsList(List<AssignmentRhs> rhss) {
         foreach (var rhs in rhss) {
             if (!IsWorthVisiting(rhs.StartToken.pos, rhs.EndToken.pos))
                 continue;
