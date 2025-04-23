@@ -19,6 +19,9 @@ public class MutatorFactory(ErrorReporter reporter)
                 new LiteralValueReplacementMutator(mutationTargetPos, mutationArg, reporter),
             "EVR" => mutationArg == null ? null :
                 new ExprValueReplacementMutator(mutationTargetPos, mutationArg, reporter),
+            "CIR" => mutationArg == null ? 
+                new CollectionInitReplacementMutator(mutationTargetPos, "", reporter) :
+                new CollectionInitReplacementMutator(mutationTargetPos, mutationArg, reporter), 
             _ => null
         };
     }

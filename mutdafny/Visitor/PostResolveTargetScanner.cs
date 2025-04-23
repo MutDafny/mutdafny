@@ -1,4 +1,5 @@
 ﻿using Microsoft.Dafny;
+using Type = Microsoft.Dafny.Type;
 
 namespace MutDafny.Visitor;
 
@@ -105,7 +106,7 @@ public class PostResolveTargetScanner(ErrorReporter reporter) : TargetScanner(re
             case MapType:
                 Targets.Add((exprLocation, "EVR", "map")); break;
             case UserDefinedType uType:
-                if (expr.Type.AsCollectionType is SeqType seqType && seqType.Arg is CharType) { // string type
+                if (uType.Name == "string") { // string type
                     Targets.Add((exprLocation, "EVR", "string"));
                 } else if (expr.Type.IsArrayType) {
                     Targets.Add((exprLocation, "EVR", "array"));
@@ -115,6 +116,56 @@ public class PostResolveTargetScanner(ErrorReporter reporter) : TargetScanner(re
                 }
                 break;
         }
+    }
+    
+    private void ScanCIRTargets(Expression expr) {
+        var exprLocation = $"{expr.StartToken.pos}-{expr.EndToken.pos}";
+        string type, arg;
+        
+        switch (expr) {
+            case DisplayExpression dExpr:
+                type = TypeToStr(dExpr.Type.TypeArgs[0]);
+                if (dExpr.Elements.Count == 0 && type == "") 
+                    return;
+                arg = dExpr.Elements.Count == 0 ? type : "";
+                Targets.Add((exprLocation, "CIR", arg)); break;
+            case MapDisplayExpr mDExpr:
+                type = $"{TypeToStr(mDExpr.Type.TypeArgs[0])}-{TypeToStr(mDExpr.Type.TypeArgs[1])}";
+                if (mDExpr.Elements.Count == 0 && type == "") 
+                    return;
+                arg = mDExpr.Elements.Count == 0 ? type : "";
+                Targets.Add((exprLocation, "CIR", arg)); break;
+        }
+    }
+
+    private string TypeToStr(Type type) {
+        if (type.IsIntegerType) return "int";
+        if (type.IsRealType) return "real";
+        if (type.IsBitVectorType) return "bv";
+        if (type.IsBoolType) return "bool";
+        if (type.IsCharType) return "char";
+        return type.IsStringType ? "string" : "";
+    }
+
+    private void ScanCIRTargets(TypeRhs tpRhs) {
+        if (tpRhs.ArrayDimensions == null)
+            return;
+        
+        var type = tpRhs.EType switch {
+            IntType => "int",
+            RealType => "real",
+            BitvectorType => "bv",
+            BoolType => "bool",
+            CharType => "char",
+            UserDefinedType uType => uType.Name == "string" ? "string" : "",
+            _ => "",
+        };
+        var exprLocation = $"{tpRhs.StartToken.pos}-{tpRhs.EndToken.pos}";
+        var hasInit = (tpRhs.InitDisplay != null && tpRhs.InitDisplay.Count != 0) || tpRhs.ElementInit != null;
+        if (!hasInit && type == "")
+            return;
+        var arg = hasInit ? "" : type;
+        Targets.Add((exprLocation, "CIR", arg));
     }
    
     /// -------------------------------------
@@ -229,11 +280,13 @@ public class PostResolveTargetScanner(ErrorReporter reporter) : TargetScanner(re
     
     protected override void VisitExpression(DisplayExpression dExpr) {
         ScanUOITargets(dExpr);
+        ScanCIRTargets(dExpr);
         base.VisitExpression(dExpr);
     }
     
     protected override void VisitExpression(MapDisplayExpr mDExpr) {
         ScanUOITargets(mDExpr);
+        ScanCIRTargets(mDExpr);
         base.VisitExpression(mDExpr);
     }
     
@@ -293,5 +346,27 @@ public class PostResolveTargetScanner(ErrorReporter reporter) : TargetScanner(re
         ScanUOITargets(stmtExpr);
         ScanEVRTargets(stmtExpr);
         base.VisitExpression(stmtExpr);
+    }
+    
+    /// ----------------------
+    /// Group of visitor utils
+    /// ----------------------
+    protected override void HandleAssignmentRhs(AssignmentRhs aRhs) {
+        if (aRhs is ExprRhs exprRhs) {
+            HandleExpression(exprRhs.Expr);
+        } else if (aRhs is TypeRhs tpRhs) {
+            ScanCIRTargets(tpRhs);
+            
+            var elInit = tpRhs.ElementInit;
+            if (tpRhs.ArrayDimensions != null) {
+                HandleExprList(tpRhs.ArrayDimensions);
+            } if (elInit != null && IsWorthVisiting(elInit.StartToken.pos, elInit.EndToken.pos)) {
+                HandleExpression(elInit);
+            } if (tpRhs.InitDisplay != null) {
+                HandleExprList(tpRhs.InitDisplay);
+            } if (tpRhs.Bindings != null) {
+                HandleActualBindings(tpRhs.Bindings);
+            }
+        }
     }
 }

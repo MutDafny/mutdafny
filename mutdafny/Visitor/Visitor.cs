@@ -11,6 +11,7 @@ public class Visitor
 {
     protected Statement? TargetStatement { get; set; }
     protected Expression? TargetExpression { get; set; }
+    protected AssignmentRhs? TargetAssignmentRhs { get; set; }
     
     private readonly Dictionary<Type, Action<Statement>> _statementHandlers;
     private readonly Dictionary<Type, Action<Expression>> _expressionHandlers;
@@ -602,15 +603,17 @@ public class Visitor
     }
 
     protected bool TargetFound() {
-        return TargetStatement != null || TargetExpression != null;
+        return TargetStatement != null || TargetExpression != null || TargetAssignmentRhs != null;
     }
 
     private INode? GetTarget() {
         if (TargetExpression != null) return TargetExpression;
-        return TargetStatement;
+        if (TargetStatement != null) return TargetStatement;
+        return TargetAssignmentRhs;
     }
 
     private string GetTargetType() {
-        return TargetExpression != null ? "expression" : "statement";
+        return TargetExpression != null ? "expression" : 
+            (TargetStatement != null ? "statement" : "assignment rhs");
     }
 }

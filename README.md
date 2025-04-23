@@ -37,4 +37,4 @@ cd mutdafny && dotnet build
 | UOD (Unary Operator Deletion) | Deletion of a unary minus or not operator in front of an expression | NA |
 | LVR (Literal Value Replacement) | Replacement of a numerical literal value with its increment, decrement and zero and of a string literal value either an empty one, a default one, or a mutation of the original | Replacement value |
 | EVR (Expression Value Replacement) | Replacement of an expression with a default literal value of its type  | Type |
-| CIR (Collection Initialization Replacement) | Replacement of non-empty collection initializers with an empty one and of empty initializers with a default non-empty one | NA (for empty initialization) or `init` |
+| CIR (Collection Initialization Replacement) | Replacement of non-empty collection initializers with an empty one and of empty initializers with a default non-empty one | NA (for empty initialization) or type of the collection's elements
