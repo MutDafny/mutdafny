@@ -6,20 +6,23 @@ namespace MutDafny.Mutator;
 public class BinaryOpBoolMutator(string mutationTargetPos, string val, ErrorReporter reporter) 
     : ExprReplacementMutator(mutationTargetPos, reporter)
 {
+    protected override Expression CreateMutatedExpression(Expression originalExpr) {
+        TargetExpression = null;
+        return new LiteralExpr(originalExpr.Origin, bool.Parse(val));
+    }
+    
+    private bool IsTarget(BinaryExpr expr) {
+        return expr.Center.pos == int.Parse(MutationTargetPos);
+    }
+    
+    /// -----------------
+    /// Overriden visitor
+    /// -----------------
     protected override void VisitExpression(BinaryExpr bExpr) {
         if (IsTarget(bExpr)) {
             TargetExpression = bExpr;
             return;
         }
         base.VisitExpression(bExpr);
-    }
-
-    private bool IsTarget(BinaryExpr expr) {
-        return expr.Center.pos == int.Parse(MutationTargetPos);
-    }
-
-    protected override Expression CreateMutatedExpression(Expression originalExpr) {
-        TargetExpression = null;
-        return new LiteralExpr(originalExpr.Origin, bool.Parse(val));
     }
 }

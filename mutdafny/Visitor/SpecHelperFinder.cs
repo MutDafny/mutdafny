@@ -6,8 +6,15 @@ namespace MutDafny.Visitor;
 // this type of finder is used to get a list of variables, functions, predicates, etc. that are used as a part of the specification
 public class SpecHelperFinder(ErrorReporter reporter): Visitor("-1", reporter)
 {
-    public static List<string> SpecHelpers { get; } = [];
+    public List<string> SpecHelpers { get; } = [];
     private bool _isInsideSpec;
+
+    public void ExportHelpers() {
+        using StreamWriter sw = File.AppendText("helpers.txt");
+        foreach (var helper in SpecHelpers) {
+            sw.WriteLine(helper);
+        }
+    }
     
     /// ---------------------------
     /// Group of top level visitors

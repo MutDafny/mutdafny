@@ -7,7 +7,38 @@ public class UnaryOpDeletionMutator(string mutationTargetPos, ErrorReporter repo
     : ExprReplacementMutator(mutationTargetPos, reporter)
 {
     private ChainingExpression? _chainingExpressionParent;
+
+    protected override Expression CreateMutatedExpression(Expression originalExpr) {
+        Expression mutatedExpr;
+        if (_chainingExpressionParent != null) {
+            var operands = _chainingExpressionParent.Operands;
+            foreach (var (e, i) in operands.Select((e, i) => (e, i)).ToList()) {
+                if (e != TargetExpression || TargetExpression is not NegationExpression nExpr) 
+                    continue;
+                operands[i] = nExpr.E;
+            }
+            mutatedExpr = new ChainingExpression(_chainingExpressionParent.Origin, operands, 
+                _chainingExpressionParent.Operators, _chainingExpressionParent.OperatorLocs, 
+                _chainingExpressionParent.PrefixLimits);
+            
+        } else if (TargetExpression is UnaryExpr uExpr) {
+            mutatedExpr = uExpr.E;
+        } else {
+            var nExpr = TargetExpression as NegationExpression;
+            mutatedExpr = nExpr!.E;
+        }
+       
+        TargetExpression = null;
+        return mutatedExpr;
+    }
     
+    private bool IsTarget(Expression expr) {
+        return expr.Center.pos == int.Parse(MutationTargetPos);
+    }
+    
+    /// ---------------------------
+    /// Group of overriden visitors
+    /// ---------------------------
     protected override void VisitExpression(UnaryExpr uExpr) {
         if (IsTarget(uExpr)) {
             TargetExpression = uExpr;
@@ -32,33 +63,5 @@ public class UnaryOpDeletionMutator(string mutationTargetPos, ErrorReporter repo
                 return;
             }
         }
-    }
-    
-    private bool IsTarget(Expression expr) {
-        return expr.Center.pos == int.Parse(MutationTargetPos);
-    }
-
-    protected override Expression CreateMutatedExpression(Expression originalExpr) {
-        Expression mutatedExpr;
-        if (_chainingExpressionParent != null) {
-            var operands = _chainingExpressionParent.Operands;
-            foreach (var (e, i) in operands.Select((e, i) => (e, i)).ToList()) {
-                if (e != TargetExpression || TargetExpression is not NegationExpression nExpr) 
-                    continue;
-                operands[i] = nExpr.E;
-            }
-            mutatedExpr = new ChainingExpression(_chainingExpressionParent.Origin, operands, 
-                _chainingExpressionParent.Operators, _chainingExpressionParent.OperatorLocs, 
-                _chainingExpressionParent.PrefixLimits);
-            
-        } else if (TargetExpression is UnaryExpr uExpr) {
-            mutatedExpr = uExpr.E;
-        } else {
-            var nExpr = TargetExpression as NegationExpression;
-            mutatedExpr = nExpr!.E;
-        }
-       
-        TargetExpression = null;
-        return mutatedExpr;
     }
 }

@@ -14,6 +14,8 @@ public class MutDafny : PluginConfiguration
     private string MutationTargetPos { get; set; } = "";
     private string MutationType { get; set; } = "";
     private string? MutationTypeArg { get; set; }
+    
+    public static List<string> SpecHelpers { get; set; } = [];
 
     public override void ParseArguments(string[] args) {
         if (args.Length == 0) {
@@ -30,8 +32,7 @@ public class MutDafny : PluginConfiguration
         }
     }
 
-    public override Rewriter[] GetRewriters(ErrorReporter reporter)
-    {
+    public override Rewriter[] GetRewriters(ErrorReporter reporter) {
         return _mutate ? 
             [new MutantGenerator(MutationTargetPos, MutationType, MutationTypeArg, reporter)] : 
             (_scan ? [new MutationTargetScanner(reporter)] : []);
@@ -43,6 +44,8 @@ public class MutationTargetScanner(ErrorReporter reporter) : Rewriter(reporter)
     public override void PreResolve(ModuleDefinition module) {
         var specHelperFinder = new SpecHelperFinder(Reporter);
         specHelperFinder.Find(module);
+        specHelperFinder.ExportHelpers();
+        MutDafny.SpecHelpers = specHelperFinder.SpecHelpers;
         
         var targetScanner = new PreResolveTargetScanner(Reporter);
         targetScanner.Find(module);
@@ -59,8 +62,7 @@ public class MutationTargetScanner(ErrorReporter reporter) : Rewriter(reporter)
 public class MutantGenerator(string mutationTargetPos, string mutationType, string? mutationTypeArg, ErrorReporter reporter) : Rewriter(reporter)
 {
     public override void PreResolve(ModuleDefinition module) {
-        var specHelperFinder = new SpecHelperFinder(Reporter);
-        specHelperFinder.Find(module);
+        MutDafny.SpecHelpers = new List<string>(File.ReadAllLines("helpers.txt"));
         
         var mutatorFactory = new MutatorFactory(Reporter);
         var mutator = mutatorFactory.Create(mutationTargetPos, mutationType, mutationTypeArg);

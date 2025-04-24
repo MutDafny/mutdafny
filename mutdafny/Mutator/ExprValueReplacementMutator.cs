@@ -8,15 +8,6 @@ namespace MutDafny.Mutator;
 public class ExprValueReplacementMutator(string mutationTargetPos, string val, ErrorReporter reporter) 
     : ExprReplacementMutator(mutationTargetPos, reporter)
 {
-    private bool IsTarget(Expression expr) {
-        var positions = MutationTargetPos.Split("-");
-        if (positions.Length < 2) return false;
-        var startPosition = int.Parse(positions[0]);
-        var endPosition = int.Parse(positions[1]);
-        
-        return expr.StartToken.pos == startPosition && expr.EndToken.pos == endPosition;
-    }
-    
     protected override Expression CreateMutatedExpression(Expression originalExpr) {
         TargetExpression = null;
 
@@ -40,6 +31,15 @@ public class ExprValueReplacementMutator(string mutationTargetPos, string val, E
             new LiteralExpr(originalRhs.Origin, 0), 
             []
         );
+    }
+    
+    private bool IsTarget(Expression expr) {
+        var positions = MutationTargetPos.Split("-");
+        if (positions.Length < 2) return false;
+        var startPosition = int.Parse(positions[0]);
+        var endPosition = int.Parse(positions[1]);
+        
+        return expr.StartToken.pos == startPosition && expr.EndToken.pos == endPosition;
     }
     
     /// ----------------------------

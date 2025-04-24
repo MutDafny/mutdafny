@@ -8,15 +8,6 @@ public class UnaryOpInsertionMutator(string mutationTargetPos, string op, ErrorR
 {
     private ChainingExpression? _chainingExpressionParent;
     
-    private bool IsTarget(Expression expr) {
-        var positions = MutationTargetPos.Split("-");
-        if (positions.Length < 2) return false;
-        var startPosition = int.Parse(positions[0]);
-        var endPosition = int.Parse(positions[1]);
-        
-        return expr.StartToken.pos == startPosition && expr.EndToken.pos == endPosition;
-    }
-    
     protected override Expression CreateMutatedExpression(Expression originalExpr) {
         Expression mutatedExpr;
         if (_chainingExpressionParent != null) {
@@ -38,6 +29,15 @@ public class UnaryOpInsertionMutator(string mutationTargetPos, string op, ErrorR
         TargetExpression = null;
         _chainingExpressionParent = null;
         return mutatedExpr;
+    }
+    
+    private bool IsTarget(Expression expr) {
+        var positions = MutationTargetPos.Split("-");
+        if (positions.Length < 2) return false;
+        var startPosition = int.Parse(positions[0]);
+        var endPosition = int.Parse(positions[1]);
+        
+        return expr.StartToken.pos == startPosition && expr.EndToken.pos == endPosition;
     }
 
     /// ----------------------------
