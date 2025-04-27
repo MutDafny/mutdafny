@@ -1,4 +1,6 @@
-﻿using Microsoft.Dafny;
+﻿using System.Numerics;
+using Microsoft.BaseTypes;
+using Microsoft.Dafny;
 using Type = Microsoft.Dafny.Type;
 
 namespace MutDafny.Visitor;
@@ -177,13 +179,22 @@ public class PostResolveTargetScanner(ErrorReporter reporter) : TargetScanner(re
         HandleRhsList([sAStmt.Rhs]);
     }
 
+    protected override void VisitStatement(VarDeclStmt vDeclStmt) {
+        if (vDeclStmt.IsGhost) return;
+        base.VisitStatement(vDeclStmt);
+    }
+
     /// --------------------------------------
     /// Group of overriden expression visitors
     /// --------------------------------------
     protected override void VisitExpression(LiteralExpr litExpr) {
-        ScanUOITargets(litExpr);
+        if (!((litExpr.Value is BigInteger bi && bi == BigInteger.Zero) || 
+              (litExpr.Value is BigDec bd && bd != BigDec.ZERO))) {
+            ScanUOITargets(litExpr);
+        }
         ScanLVRTargets(litExpr);
     }
+    
     protected override void VisitExpression(BinaryExpr bExpr) {
         ScanUOITargets(bExpr);
         ScanEVRTargets(bExpr);

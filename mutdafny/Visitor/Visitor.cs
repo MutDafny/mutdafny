@@ -137,6 +137,8 @@ public class Visitor
 
     protected virtual void HandleMemberDecls(TopLevelDeclWithMembers decl) {
         foreach (var member in decl.Members) {
+            if (member.IsGhost) continue; // only searches for mutation targets in non-ghost constructs
+            
             // only visit members that may contain the mutation target
             if (!IsWorthVisiting(member.StartToken.pos, member.EndToken.pos)) continue;
             if (member is Method m) { // includes constructor
