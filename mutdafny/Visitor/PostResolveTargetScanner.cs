@@ -5,18 +5,19 @@ using Type = Microsoft.Dafny.Type;
 
 namespace MutDafny.Visitor;
 
-public class PostResolveTargetScanner(ErrorReporter reporter) : TargetScanner(reporter)
+public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter reporter) : TargetScanner(operatorsInUse, reporter)
 {
     private bool _skipChildUOIMutation;
     private bool _skipChildEVRMutation;
     
     private void ScanUOITargets(Expression expr) {
+        if (!ShouldImplement("UOI")) return;
         if (_skipChildUOIMutation) {
             _skipChildUOIMutation = false;
             return;
         }
-        var exprLocation = $"{expr.StartToken.pos}-{expr.EndToken.pos}";
         
+        var exprLocation = $"{expr.StartToken.pos}-{expr.EndToken.pos}";
         switch (expr.Type) {
             case IntType:
             case RealType:
@@ -30,6 +31,8 @@ public class PostResolveTargetScanner(ErrorReporter reporter) : TargetScanner(re
     }
 
     private void ScanLVRTargets(LiteralExpr litExpr) {
+        if (!ShouldImplement("LVR")) return;
+        
         switch (litExpr.Type) {
             case IntType:
                 HandleIntegerLiteral(litExpr); break;
@@ -87,9 +90,10 @@ public class PostResolveTargetScanner(ErrorReporter reporter) : TargetScanner(re
     }
     
     private void ScanEVRTargets(Expression expr) {
+        if (!ShouldImplement("EVR")) return;
         if (_skipChildEVRMutation) return;
-        var exprLocation = $"{expr.StartToken.pos}-{expr.EndToken.pos}";
         
+        var exprLocation = $"{expr.StartToken.pos}-{expr.EndToken.pos}";
         switch (expr.Type) {
             case IntType:
                 Targets.Add((exprLocation, "EVR", "int")); break;
@@ -121,9 +125,10 @@ public class PostResolveTargetScanner(ErrorReporter reporter) : TargetScanner(re
     }
     
     private void ScanCIRTargets(Expression expr) {
+        if (!ShouldImplement("CIR")) return;
+        
         var exprLocation = $"{expr.StartToken.pos}-{expr.EndToken.pos}";
         string type, arg;
-        
         switch (expr) {
             case DisplayExpression dExpr:
                 type = TypeToStr(dExpr.Type.TypeArgs[0]);
@@ -150,8 +155,8 @@ public class PostResolveTargetScanner(ErrorReporter reporter) : TargetScanner(re
     }
 
     private void ScanCIRTargets(TypeRhs tpRhs) {
-        if (tpRhs.ArrayDimensions == null)
-            return;
+        if (!ShouldImplement("CIR")) return;
+        if (tpRhs.ArrayDimensions == null) return;
         
         var type = tpRhs.EType switch {
             IntType => "int",

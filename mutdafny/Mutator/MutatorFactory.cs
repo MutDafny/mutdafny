@@ -4,9 +4,9 @@ namespace MutDafny.Mutator;
 
 public class MutatorFactory(ErrorReporter reporter)
 {
-    public Mutator? Create(string mutationTargetPos, string mutationType, string? mutationArg)
+    public Mutator? Create(string mutationTargetPos, string mutationOperator, string? mutationArg)
     {
-        return mutationType switch {
+        return mutationOperator switch {
             "BOR" => mutationArg == null ? null : 
                 new BinaryOpMutator(mutationTargetPos, mutationArg, reporter),
             "BBR" => mutationArg == null ? null : 

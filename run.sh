@@ -13,7 +13,7 @@ mkdir mutants/killed
 echo Scanning $1 for mutation targets
 dotnet ./dafny/Binaries/Dafny.dll verify $1 \
     --allow-warnings --solver-path ./dafny/Binaries/z3 \
-    --plugin ./mutdafny/bin/Debug/net8.0/mutdafny.dll > /dev/null
+    --plugin ./mutdafny/bin/Debug/net8.0/mutdafny.dll,scan > /dev/null
 
 
 IFS=','
@@ -31,12 +31,12 @@ do
         echo Mutating position $pos: operator $op
         output=$(dotnet ./dafny/Binaries/Dafny.dll verify $1 \
             --allow-warnings --solver-path ./dafny/Binaries/z3 \
-            --plugin ./mutdafny/bin/Debug/net8.0/mutdafny.dll,"$pos $op")
+            --plugin ./mutdafny/bin/Debug/net8.0/mutdafny.dll,"mut $pos $op")
     else
         echo Mutating position $pos: operator $op, argument $arg
         output=$(dotnet ./dafny/Binaries/Dafny.dll verify $1 \
             --allow-warnings --solver-path ./dafny/Binaries/z3 \
-            --plugin ./mutdafny/bin/Debug/net8.0/mutdafny.dll,"$pos $op $arg")
+            --plugin ./mutdafny/bin/Debug/net8.0/mutdafny.dll,"mut $pos $op $arg")
     fi
 
 
@@ -64,6 +64,7 @@ do
         mv *.dfy $output_dir
     fi
     echo
+    rm elapsed-time.txt
 done
 
 rm targets.csv

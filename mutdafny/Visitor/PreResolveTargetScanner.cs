@@ -6,7 +6,7 @@ public class PreResolveTargetScanner : TargetScanner
 {
     private readonly Dictionary<BinaryExpr.Opcode, List<BinaryExpr.Opcode>> _replacementList;
 
-    public PreResolveTargetScanner(ErrorReporter reporter): base(reporter)
+    public PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter reporter): base(operatorsInUse, reporter)
     {
        _replacementList = new Dictionary<BinaryExpr.Opcode, List<BinaryExpr.Opcode>> {
            // arithmetic operators
@@ -47,9 +47,10 @@ public class PreResolveTargetScanner : TargetScanner
     protected override void VisitExpression(BinaryExpr bExpr) {
         if (!_replacementList.TryGetValue(bExpr.Op, out var replacementList)) 
             return;
-        foreach (var replacement in replacementList) {
-            // binary operator replacement
-            Targets.Add(($"{bExpr.Center.pos}", "BOR", replacement.ToString()));
+        if (ShouldImplement("BOR")) {
+            foreach (var replacement in replacementList) {
+                Targets.Add(($"{bExpr.Center.pos}", "BOR", replacement.ToString()));
+            }
         }
     
         List<BinaryExpr.Opcode> relationalOperators = [BinaryExpr.Opcode.Eq, BinaryExpr.Opcode.Neq, 
@@ -58,9 +59,9 @@ public class PreResolveTargetScanner : TargetScanner
         List<BinaryExpr.Opcode> conditionalOperators = [BinaryExpr.Opcode.And, BinaryExpr.Opcode.Or,
             BinaryExpr.Opcode.Iff, BinaryExpr.Opcode.Imp, BinaryExpr.Opcode.Exp
         ];
-        if (relationalOperators.Contains(bExpr.Op) || conditionalOperators.Contains(bExpr.Op)) {
+        if (ShouldImplement("BBR") && 
+            (relationalOperators.Contains(bExpr.Op) || conditionalOperators.Contains(bExpr.Op))) {
             // relational and conditional expressions can be replaced with true/false 
-            // binary operator boolean replacement
             Targets.Add(($"{bExpr.Center.pos}", "BBR", "true"));
             Targets.Add(($"{bExpr.Center.pos}", "BBR", "false"));
         }
@@ -70,7 +71,7 @@ public class PreResolveTargetScanner : TargetScanner
 
     protected override void VisitExpression(ChainingExpression cExpr) {
         foreach (var (e, i) in cExpr.Operands.Select((e, i) => (e, i))) {
-            if (e is NegationExpression nExpr) {
+            if (ShouldImplement("UOD") && e is NegationExpression nExpr) {
                 Targets.Add(($"{nExpr.Center.pos}", "UOD", ""));
             }
             
@@ -81,15 +82,16 @@ public class PreResolveTargetScanner : TargetScanner
             
             if (!_replacementList.TryGetValue(op, out var replacementList)) 
                 return;
-            foreach (var replacement in replacementList) {
-                // binary operator replacement
-                Targets.Add(($"{e.Center.pos}", "BOR", replacement.ToString()));
+            if (ShouldImplement("BOR")) {
+                foreach (var replacement in replacementList) {
+                    Targets.Add(($"{e.Center.pos}", "BOR", replacement.ToString()));
+                }
             }
         }
     }
     
     protected override void VisitExpression(UnaryExpr uExpr) {
-        if (uExpr is UnaryOpExpr uOpExpr && uOpExpr.Op == UnaryOpExpr.Opcode.Not) {
+        if (ShouldImplement("UOD") && uExpr is UnaryOpExpr uOpExpr && uOpExpr.Op == UnaryOpExpr.Opcode.Not) {
             // conditional/logical operator deletion
             Targets.Add(($"{uOpExpr.Center.pos}", "UOD", ""));
         }
@@ -98,8 +100,10 @@ public class PreResolveTargetScanner : TargetScanner
     }
     
     protected override void VisitExpression(NegationExpression nExpr) {
-        // arithmetic operator deletion
-        Targets.Add(($"{nExpr.Center.pos}", "UOD", ""));
-        base.VisitExpression(nExpr);
+        if (ShouldImplement("UOD")) {
+            // arithmetic operator deletion
+            Targets.Add(($"{nExpr.Center.pos}", "UOD", ""));
+            base.VisitExpression(nExpr);  
+        }
     }
 }
