@@ -48,10 +48,24 @@ public class PreResolveTargetScanner : TargetScanner
         if (method.Body == null) return;
         HandleBlock(method.Body);
     }
-    
+
     /// -------------------------------------
     /// Group of overriden statement visitors
     /// -------------------------------------
+    protected override void VisitStatement(WhileStmt whileStmt) {
+        if (!ShouldImplement("LBI")) return;
+        Targets.Add(($"{whileStmt.StartToken.pos}-{whileStmt.EndToken.pos}", "LBI", ""));
+        
+        base.VisitStatement(whileStmt);
+    }
+    
+    protected override void VisitStatement(ForLoopStmt forStmt) {
+        if (!ShouldImplement("LBI")) return;
+        Targets.Add(($"{forStmt.StartToken.pos}-{forStmt.EndToken.pos}", "LBI", ""));
+        
+        base.VisitStatement(forStmt);
+    }
+    
     protected override void VisitStatement(BreakOrContinueStmt bcStmt) {
         if (!ShouldImplement("LSR")) return;
         if (bcStmt.IsContinue) {

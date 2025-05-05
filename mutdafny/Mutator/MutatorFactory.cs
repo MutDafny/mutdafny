@@ -21,6 +21,7 @@ public class MutatorFactory(ErrorReporter reporter)
                 new ExprValueReplacementMutator(mutationTargetPos, mutationArg, reporter),
             "LSR" => mutationArg == null ? null : 
                 new LoopStmtReplacementMutator(mutationTargetPos, mutationArg, reporter),
+            "LBI" => new BreakInsertionMutator(mutationTargetPos, reporter),
             "CIR" => mutationArg == null ? 
                 new CollectionInitReplacementMutator(mutationTargetPos, "", reporter) :
                 new CollectionInitReplacementMutator(mutationTargetPos, mutationArg, reporter), 
