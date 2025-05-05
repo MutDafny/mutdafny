@@ -5,6 +5,8 @@ using Type = Microsoft.Dafny.Type;
 
 namespace MutDafny.Mutator;
 
+// this mutation operator replaces a collection's empty initialization with a default non-empty one
+// and non-empty initialization with an empty one
 public class CollectionInitReplacementMutator(string mutationTargetPos, string val, ErrorReporter reporter) 
     : ExprReplacementMutator(mutationTargetPos, reporter)
 {

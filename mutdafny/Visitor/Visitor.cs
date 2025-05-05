@@ -37,6 +37,7 @@ public class Visitor
             {typeof(WhileStmt), stmt => VisitStatement((stmt as WhileStmt)!)},
             {typeof(ForLoopStmt), stmt => VisitStatement((stmt as ForLoopStmt)!)},
             {typeof(ForallStmt), stmt => VisitStatement((stmt as ForallStmt)!)},
+            {typeof(BreakOrContinueStmt), stmt => VisitStatement((stmt as BreakOrContinueStmt)!)},
             {typeof(AlternativeLoopStmt), stmt => VisitStatement((stmt as AlternativeLoopStmt)!)},
             {typeof(AlternativeStmt), stmt => VisitStatement((stmt as AlternativeStmt)!)},
             {typeof(MatchStmt), stmt => VisitStatement((stmt as MatchStmt)!)},
@@ -195,7 +196,7 @@ public class Visitor
         HandleBlock(blockStmt.Body);
     }
     
-    protected void HandleBlock(List<Statement> statements) {
+    protected virtual void HandleBlock(List<Statement> statements) {
         foreach (var stmt in statements) {
             if (IsWorthVisiting(stmt.StartToken.pos, stmt.EndToken.pos)) {
                 HandleStatement(stmt);
@@ -300,6 +301,8 @@ public class Visitor
             HandleStatement(forStmt.Body);
         }
     }
+    
+    protected virtual void VisitStatement(BreakOrContinueStmt bcStmt) { }
 
     protected virtual void VisitStatement(AlternativeLoopStmt altLStmt) {
         HandleGuardedAlternatives(altLStmt.Alternatives);

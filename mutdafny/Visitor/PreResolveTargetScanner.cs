@@ -5,7 +5,8 @@ namespace MutDafny.Visitor;
 public class PreResolveTargetScanner : TargetScanner
 {
     private readonly Dictionary<BinaryExpr.Opcode, List<BinaryExpr.Opcode>> _replacementList;
-
+    private bool _isCurrentMethodVoid;
+    
     public PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter reporter): base(operatorsInUse, reporter)
     {
        _replacementList = new Dictionary<BinaryExpr.Opcode, List<BinaryExpr.Opcode>> {
@@ -39,6 +40,27 @@ public class PreResolveTargetScanner : TargetScanner
            { BinaryExpr.Opcode.In, [BinaryExpr.Opcode.NotIn] },
            { BinaryExpr.Opcode.NotIn, [BinaryExpr.Opcode.In] },
        }; 
+    }
+    
+    protected override void HandleMethod(Method method) {
+        _isCurrentMethodVoid = method.Outs.Count == 0;
+        
+        if (method.Body == null) return;
+        HandleBlock(method.Body);
+    }
+    
+    /// -------------------------------------
+    /// Group of overriden statement visitors
+    /// -------------------------------------
+    protected override void VisitStatement(BreakOrContinueStmt bcStmt) {
+        if (!ShouldImplement("LSR")) return;
+        if (bcStmt.IsContinue) {
+            Targets.Add(($"{bcStmt.Center.pos}", "LSR", "break"));
+        } else {
+            Targets.Add(($"{bcStmt.Center.pos}", "LSR", "continue"));
+            if (!_isCurrentMethodVoid) return;
+            Targets.Add(($"{bcStmt.Center.pos}", "LSR", "return"));
+        }
     }
 
     /// --------------------------------------
