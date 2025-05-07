@@ -6,6 +6,7 @@ public class PreResolveTargetScanner : TargetScanner
 {
     private readonly Dictionary<BinaryExpr.Opcode, List<BinaryExpr.Opcode>> _replacementList;
     private bool _isCurrentMethodVoid;
+    private bool _isChildIfBlock;
     
     public PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter reporter): base(operatorsInUse, reporter)
     {
@@ -44,25 +45,44 @@ public class PreResolveTargetScanner : TargetScanner
     
     protected override void HandleMethod(Method method) {
         _isCurrentMethodVoid = method.Outs.Count == 0;
+        if (ShouldImplement("SDL"))
+            Targets.Add(($"{method.StartToken.pos}-{method.EndToken.pos}", "SDL", ""));
         
-        if (method.Body == null) return;
-        HandleBlock(method.Body);
+        base.HandleMethod(method);
     }
 
     /// -------------------------------------
     /// Group of overriden statement visitors
     /// -------------------------------------
+    protected override void VisitStatement(IfStmt ifStmt) {
+        if (ShouldImplement("SDL")) {
+            if (ifStmt.Els == null) {
+                Targets.Add(($"{ifStmt.StartToken.pos}-{ifStmt.EndToken.pos}", "SDL", ""));
+                _isChildIfBlock = false;
+            } else if (_isChildIfBlock) {
+                Targets.Add(($"{ifStmt.Thn.StartToken.pos}-{ifStmt.Thn.EndToken.pos}", "SDL", ""));
+            } else { // first block
+                _isChildIfBlock = true;
+            }
+
+            if (ifStmt.Els is BlockStmt) { // last block
+                Targets.Add(($"{ifStmt.Els.StartToken.pos}-{ifStmt.Els.EndToken.pos}", "SDL", ""));
+                _isChildIfBlock = false;
+            }
+        }
+
+        base.VisitStatement(ifStmt);
+    }
+    
     protected override void VisitStatement(WhileStmt whileStmt) {
-        if (!ShouldImplement("LBI")) return;
-        Targets.Add(($"{whileStmt.StartToken.pos}-{whileStmt.EndToken.pos}", "LBI", ""));
-        
+        if (ShouldImplement("LBI"))
+            Targets.Add(($"{whileStmt.StartToken.pos}-{whileStmt.EndToken.pos}", "LBI", ""));
         base.VisitStatement(whileStmt);
     }
     
     protected override void VisitStatement(ForLoopStmt forStmt) {
-        if (!ShouldImplement("LBI")) return;
-        Targets.Add(($"{forStmt.StartToken.pos}-{forStmt.EndToken.pos}", "LBI", ""));
-        
+        if (ShouldImplement("LBI"))
+            Targets.Add(($"{forStmt.StartToken.pos}-{forStmt.EndToken.pos}", "LBI", ""));
         base.VisitStatement(forStmt);
     }
     
@@ -75,6 +95,25 @@ public class PreResolveTargetScanner : TargetScanner
             if (!_isCurrentMethodVoid) return;
             Targets.Add(($"{bcStmt.Center.pos}", "LSR", "return"));
         }
+    }
+    
+    protected override void VisitStatement(AlternativeLoopStmt altLStmt) {
+        if (ShouldImplement("SDL") && altLStmt.Alternatives.Count > 1) { // stmt must have at least one alternative
+            foreach (var alt in altLStmt.Alternatives) {
+                Targets.Add(($"{alt.Guard.StartToken.pos}-{alt.Guard.EndToken.pos}", "SDL", ""));
+            }
+        }
+        base.VisitStatement(altLStmt);
+    }
+    
+    protected override void VisitStatement(NestedMatchStmt nMatchStmt) {
+        if (ShouldImplement("SDL") && nMatchStmt.Cases.Count > 1) { // stmt must have at least one alternative
+            foreach (var cs in nMatchStmt.Cases) {
+                if (cs.Pat is IdPattern idPat && idPat.IsWildcardPattern) continue;
+                Targets.Add(($"{cs.StartToken.pos}-{cs.EndToken.pos}", "SDL", ""));
+            }
+        }
+        base.VisitStatement(nMatchStmt);
     }
 
     /// --------------------------------------
@@ -141,5 +180,15 @@ public class PreResolveTargetScanner : TargetScanner
             Targets.Add(($"{nExpr.Center.pos}", "UOD", ""));
             base.VisitExpression(nExpr);  
         }
+    }
+    
+    protected override void VisitExpression(NestedMatchExpr nMExpr) {
+        if (ShouldImplement("SDL") && nMExpr.Cases.Count > 1) {
+            foreach (var cs in nMExpr.Cases) {
+                if (cs.Pat is IdPattern idPat && idPat.IsWildcardPattern) continue;
+                Targets.Add(($"{cs.StartToken.pos}-{cs.EndToken.pos}", "SDL", ""));
+            }
+        }
+        base.VisitExpression(nMExpr);
     }
 }

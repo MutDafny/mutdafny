@@ -25,6 +25,7 @@ public class MutatorFactory(ErrorReporter reporter)
             "CIR" => mutationArg == null ? 
                 new CollectionInitReplacementMutator(mutationTargetPos, "", reporter) :
                 new CollectionInitReplacementMutator(mutationTargetPos, mutationArg, reporter), 
+            "SDL" => new StmtDeletionMutator(mutationTargetPos, reporter),
             _ => null
         };
     }
