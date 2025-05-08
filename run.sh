@@ -64,7 +64,7 @@ do
         mv *.dfy $output_dir
     fi
     echo
-    rm elapsed-time.txt
+    rm elapsed-time.csv
 done
 
 rm targets.csv
