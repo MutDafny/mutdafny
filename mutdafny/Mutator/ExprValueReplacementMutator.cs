@@ -32,6 +32,11 @@ public class ExprValueReplacementMutator(string mutationTargetPos, string val, E
             []
         );
     }
+
+    private ExprRhs CreateNullExprRhs(AssignmentRhs aRhs) {
+        var nullExpr = new LiteralExpr(aRhs.Origin, null);
+        return new ExprRhs(aRhs.Origin, nullExpr);
+    }
     
     private bool IsTarget(Expression expr) {
         var positions = MutationTargetPos.Split("-");
@@ -40,6 +45,15 @@ public class ExprValueReplacementMutator(string mutationTargetPos, string val, E
         var endPosition = int.Parse(positions[1]);
         
         return expr.StartToken.pos == startPosition && expr.EndToken.pos == endPosition;
+    }
+
+    private bool IsTarget(TypeRhs typeRhs) {
+        var positions = MutationTargetPos.Split("-");
+        if (positions.Length < 2) return false;
+        var startPosition = int.Parse(positions[0]);
+        var endPosition = int.Parse(positions[1]);
+        
+        return typeRhs.StartToken.pos == startPosition && typeRhs.EndToken.pos == endPosition;
     }
     
     /// ----------------------------
@@ -239,9 +253,13 @@ public class ExprValueReplacementMutator(string mutationTargetPos, string val, E
             if (!IsWorthVisiting(rhs.StartToken.pos, rhs.EndToken.pos))
                 continue;
             HandleAssignmentRhs(rhs);
-            if (TargetFound()) {
+            if (!TargetFound()) continue;
+            if (TargetExpression != null) {
                 TargetExpression = null;
                 rhss[i] = CreateArrayInit(rhs);
+            } else if (TargetAssignmentRhs != null) {
+                TargetAssignmentRhs = null;
+                rhss[i] = CreateNullExprRhs(rhs);
             }
         }
     }
@@ -254,8 +272,12 @@ public class ExprValueReplacementMutator(string mutationTargetPos, string val, E
                 exprRhs.Expr = CreateMutatedExpression(exprRhs.Expr);
             }
         } else if (aRhs is TypeRhs tpRhs) {
-            var elInit = tpRhs.ElementInit;
+            if (IsTarget(tpRhs)) {
+                TargetAssignmentRhs = tpRhs;
+                return;
+            }
             
+            var elInit = tpRhs.ElementInit;
             if (tpRhs.ArrayDimensions != null) {
                 HandleExprList(tpRhs.ArrayDimensions);
             } if (elInit != null && IsWorthVisiting(elInit.StartToken.pos, elInit.EndToken.pos)) {

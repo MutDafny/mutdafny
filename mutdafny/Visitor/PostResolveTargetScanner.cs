@@ -124,6 +124,16 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
         }
     }
     
+    private void ScanEVRTargets(TypeRhs tpRhs) {
+        if (!ShouldImplement("EVR")) return;
+        if (_skipChildEVRMutation) return;
+        
+        if (tpRhs.Type is UserDefinedType uType && uType.ResolvedClass is NonNullTypeDecl nnTypeDecl && 
+            nnTypeDecl.Class != null) {
+            Targets.Add(($"{tpRhs.StartToken.pos}-{tpRhs.EndToken.pos}", "EVR", "null"));
+        }
+    }
+    
     private void ScanCIRTargets(Expression expr) {
         if (!ShouldImplement("CIR")) return;
         
@@ -372,6 +382,7 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
             HandleExpression(exprRhs.Expr);
         } else if (aRhs is TypeRhs tpRhs) {
             ScanCIRTargets(tpRhs);
+            ScanEVRTargets(tpRhs);
             
             var elInit = tpRhs.ElementInit;
             if (tpRhs.ArrayDimensions != null) {
