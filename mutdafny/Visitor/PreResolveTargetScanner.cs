@@ -5,9 +5,12 @@ namespace MutDafny.Visitor;
 public class PreResolveTargetScanner : TargetScanner
 {
     private readonly Dictionary<BinaryExpr.Opcode, List<BinaryExpr.Opcode>> _replacementList;
+    private List<string> _currentMethodOuts;
+    private List<string> _currentInitMethodOuts;
     private bool _isCurrentMethodVoid;
     private bool _isChildIfBlock;
-    
+    private bool _isParentVarDeclStmt;
+
     public PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter reporter): base(operatorsInUse, reporter)
     {
        _replacementList = new Dictionary<BinaryExpr.Opcode, List<BinaryExpr.Opcode>> {
@@ -45,7 +48,9 @@ public class PreResolveTargetScanner : TargetScanner
     
     protected override void HandleMethod(Method method) {
         _isCurrentMethodVoid = method.Outs.Count == 0;
-        if (ShouldImplement("SDL"))
+        _currentMethodOuts = method.Outs.Select(o => o.Name).ToList();
+        _currentInitMethodOuts = [];
+        if (ShouldImplement("SDL") && _isCurrentMethodVoid)
             Targets.Add(($"{method.StartToken.pos}-{method.EndToken.pos}", "SDL", ""));
         
         base.HandleMethod(method);
@@ -54,6 +59,39 @@ public class PreResolveTargetScanner : TargetScanner
     /// -------------------------------------
     /// Group of overriden statement visitors
     /// -------------------------------------
+    protected override void VisitStatement(ConcreteAssignStatement cAStmt) {
+        var canMutate = true;
+        foreach (var lhs in cAStmt.Lhss) {
+            if (lhs is not NameSegment nSegExpr) continue;
+            var name = nSegExpr.Name;
+            if (_currentMethodOuts.Contains(name) && !_currentInitMethodOuts.Contains(name)) {
+                // output variable is initialized in this statement
+                canMutate = false;
+                _currentInitMethodOuts.Add(name);
+            }
+        }
+        
+        if (!_isParentVarDeclStmt && ShouldImplement("SDL") && canMutate) {
+            Targets.Add(($"{cAStmt.StartToken.pos}-{cAStmt.EndToken.pos}", "SDL", ""));
+        }
+        base.VisitStatement(cAStmt);
+    }
+    
+    protected override void VisitStatement(VarDeclStmt vDeclStmt) {
+        _isParentVarDeclStmt = true;
+        base.VisitStatement(vDeclStmt);
+        _isParentVarDeclStmt = false;
+    }
+    
+    protected override void VisitStatement(ProduceStmt pStmt) {
+        if (ShouldImplement("SDL") && pStmt is ReturnStmt && 
+            (_currentInitMethodOuts.SequenceEqual(_currentMethodOuts) || _isCurrentMethodVoid)) {
+            // only mutate if method is void or if outputs have been initialized
+            Targets.Add(($"{pStmt.StartToken.pos}-{pStmt.EndToken.pos}", "SDL", ""));
+        }
+        base.VisitStatement(pStmt);
+    }
+    
     protected override void VisitStatement(IfStmt ifStmt) {
         if (ShouldImplement("SDL")) {
             if (ifStmt.Els == null) {
@@ -87,13 +125,17 @@ public class PreResolveTargetScanner : TargetScanner
     }
     
     protected override void VisitStatement(BreakOrContinueStmt bcStmt) {
-        if (!ShouldImplement("LSR")) return;
-        if (bcStmt.IsContinue) {
-            Targets.Add(($"{bcStmt.Center.pos}", "LSR", "break"));
-        } else {
-            Targets.Add(($"{bcStmt.Center.pos}", "LSR", "continue"));
-            if (!_isCurrentMethodVoid) return;
-            Targets.Add(($"{bcStmt.Center.pos}", "LSR", "return"));
+        if (ShouldImplement("LSR")) {
+            if (bcStmt.IsContinue) {
+                Targets.Add(($"{bcStmt.Center.pos}", "LSR", "break"));
+            } else {
+                Targets.Add(($"{bcStmt.Center.pos}", "LSR", "continue"));
+                if (!_isCurrentMethodVoid) return;
+                Targets.Add(($"{bcStmt.Center.pos}", "LSR", "return"));
+            }
+        }
+        if (ShouldImplement("SDL")) {
+            Targets.Add(($"{bcStmt.StartToken.pos}-{bcStmt.EndToken.pos}", "SDL", ""));
         }
     }
     
