@@ -21,11 +21,23 @@ public class StmtDeletionMutator(string mutationTargetPos, ErrorReporter reporte
     protected override void HandleMethod(Method method) {
         if (method.Body == null) return;
         if (IsTarget(method.StartToken.pos, method.EndToken.pos)) {
-            method.Body = new BlockStmt(method.Body.Origin, []);
+            method.Body = method.Body is DividedBlockStmt ? 
+                new DividedBlockStmt(method.Body.Origin, [], null, []) : 
+                new BlockStmt(method.Body.Origin, []);
             return;
         }
         
         base.HandleMethod(method);
+    }
+    
+    protected override void HandleBlock(BlockStmt blockStmt) {
+        if (blockStmt is DividedBlockStmt dBlockStmt) {
+            HandleBlock(dBlockStmt.BodyInit);
+            HandleBlock(dBlockStmt.BodyProper);
+            HandleBlock(dBlockStmt.Body);
+        } else {
+            HandleBlock(blockStmt.Body);
+        }
     }
     
     protected override void HandleBlock(List<Statement> statements) {
@@ -38,6 +50,22 @@ public class StmtDeletionMutator(string mutationTargetPos, ErrorReporter reporte
             statements.Remove(stmt);
             return;
         }
+    }
+    
+    protected override void VisitStatement(ConcreteAssignStatement cAStmt) {
+        if (IsTarget(cAStmt.StartToken.pos, cAStmt.EndToken.pos)) {
+            TargetStatement = cAStmt;
+            return;
+        }
+        base.VisitStatement(cAStmt);
+    }
+    
+    protected override void VisitStatement(ProduceStmt pStmt) {
+        if (IsTarget(pStmt.StartToken.pos, pStmt.EndToken.pos)) {
+            TargetStatement = pStmt;
+            return;
+        }
+        base.VisitStatement(pStmt);
     }
     
     protected override void VisitStatement(IfStmt ifStmt) {
@@ -77,6 +105,14 @@ public class StmtDeletionMutator(string mutationTargetPos, ErrorReporter reporte
             _parentStmt = ifStmt;
             RecursivelyMutateIfStmt(ifStmt2);
         }
+    }
+    
+    protected override void VisitStatement(BreakOrContinueStmt bcStmt) {
+        if (IsTarget(bcStmt.StartToken.pos, bcStmt.EndToken.pos)) {
+            TargetStatement = bcStmt;
+            return;
+        }
+        base.VisitStatement(bcStmt);
     }
     
     protected override void VisitStatement(AlternativeLoopStmt altLStmt) {

@@ -192,8 +192,13 @@ public class Visitor
         }
     }
     
-    protected void HandleBlock(BlockStmt blockStmt) {
-        HandleBlock(blockStmt.Body);
+    protected virtual void HandleBlock(BlockStmt blockStmt) {
+        if (blockStmt is DividedBlockStmt dBlockStmt) {
+            HandleBlock(dBlockStmt.BodyInit);
+            HandleBlock(dBlockStmt.BodyProper);
+        } else {
+            HandleBlock(blockStmt.Body);
+        }
     }
     
     protected virtual void HandleBlock(List<Statement> statements) {
