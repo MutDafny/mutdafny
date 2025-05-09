@@ -9,6 +9,7 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
 {
     private bool _skipChildUOIMutation;
     private bool _skipChildEVRMutation;
+    private string _childMethodCallPos = "";
     
     private void ScanUOITargets(Expression expr) {
         if (!ShouldImplement("UOI")) return;
@@ -184,11 +185,50 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
         var arg = hasInit ? "" : type;
         Targets.Add((exprLocation, "CIR", arg));
     }
-   
+
+    private void ScanMCRTargets(ConcreteAssignStatement cAStmt) {
+        if (!ShouldImplement("MCR")) return;
+        
+        var arg = "";
+        foreach (var lhs in cAStmt.Lhss) {
+            var type = lhs.Type switch {
+                IntType => "int",
+                RealType => "real",
+                BitvectorType => "bv",
+                BoolType => "bool",
+                CharType => "char", 
+                SetType => "set", 
+                MultiSetType => "multiset",
+                SeqType => "seq",
+                MapType => "map",
+                UserDefinedType uType => uType.Name == "string" ? "string" :  "",
+                _ => "",
+            };
+
+            if (type == "") return;
+            arg = arg == "" ? type : $"{arg}-{type}";
+        }
+        Targets.Add((_childMethodCallPos, "MCR", arg));
+    }
+
     /// -------------------------------------
     /// Group of overriden statement visitors
     /// -------------------------------------
     protected override void VisitStatement(ConcreteAssignStatement cAStmt) { }
+    
+    protected override void VisitStatement(AssignStatement aStmt) {
+        base.VisitStatement(aStmt);
+        if (_childMethodCallPos != "") // rhs is method call
+            ScanMCRTargets(aStmt);
+        _childMethodCallPos = "";
+    }
+    
+    protected override void VisitStatement(AssignSuchThatStmt aStStmt) {
+        base.VisitStatement(aStStmt);
+        if (_childMethodCallPos != "") // rhs is method call
+            ScanMCRTargets(aStStmt);
+        _childMethodCallPos = "";
+    }
     
     protected override void VisitStatement(SingleAssignStmt sAStmt) {
         HandleRhsList([sAStmt.Rhs]);
@@ -267,6 +307,7 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
     }
     
     protected override void VisitExpression(SuffixExpr suffixExpr) {
+        _childMethodCallPos = $"{suffixExpr.Center.pos}";
         ScanUOITargets(suffixExpr);
         ScanEVRTargets(suffixExpr);
         _skipChildEVRMutation = true;
