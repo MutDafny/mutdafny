@@ -10,6 +10,7 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
     private bool _skipChildUOIMutation;
     private bool _skipChildEVRMutation;
     private string _childMethodCallPos = "";
+    private List<string> _childMethodCallArgTypes = [];
     
     private void ScanUOITargets(Expression expr) {
         if (!ShouldImplement("UOI")) return;
@@ -142,13 +143,13 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
         string type, arg;
         switch (expr) {
             case DisplayExpression dExpr:
-                type = TypeToStr(dExpr.Type.TypeArgs[0]);
+                type = PrimitiveTypeToStr(dExpr.Type.TypeArgs[0]);
                 if (dExpr.Elements.Count == 0 && type == "") 
                     return;
                 arg = dExpr.Elements.Count == 0 ? type : "";
                 Targets.Add((exprLocation, "CIR", arg)); break;
             case MapDisplayExpr mDExpr:
-                type = $"{TypeToStr(mDExpr.Type.TypeArgs[0])}-{TypeToStr(mDExpr.Type.TypeArgs[1])}";
+                type = $"{PrimitiveTypeToStr(mDExpr.Type.TypeArgs[0])}-{PrimitiveTypeToStr(mDExpr.Type.TypeArgs[1])}";
                 if (mDExpr.Elements.Count == 0 && type == "") 
                     return;
                 arg = mDExpr.Elements.Count == 0 ? type : "";
@@ -156,28 +157,11 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
         }
     }
 
-    private string TypeToStr(Type type) {
-        if (type.IsIntegerType) return "int";
-        if (type.IsRealType) return "real";
-        if (type.IsBitVectorType) return "bv";
-        if (type.IsBoolType) return "bool";
-        if (type.IsCharType) return "char";
-        return type.IsStringType ? "string" : "";
-    }
-
     private void ScanCIRTargets(TypeRhs tpRhs) {
         if (!ShouldImplement("CIR")) return;
         if (tpRhs.ArrayDimensions == null) return;
-        
-        var type = tpRhs.EType switch {
-            IntType => "int",
-            RealType => "real",
-            BitvectorType => "bv",
-            BoolType => "bool",
-            CharType => "char",
-            UserDefinedType uType => uType.Name == "string" ? "string" : "",
-            _ => "",
-        };
+
+        var type = PrimitiveTypeToStr(tpRhs.EType);
         var exprLocation = $"{tpRhs.StartToken.pos}-{tpRhs.EndToken.pos}";
         var hasInit = (tpRhs.InitDisplay != null && tpRhs.InitDisplay.Count != 0) || tpRhs.ElementInit != null;
         if (!hasInit && type == "")
@@ -189,26 +173,55 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
     private void ScanMCRTargets(ConcreteAssignStatement cAStmt) {
         if (!ShouldImplement("MCR")) return;
         
-        var arg = "";
+        var typeArg = "";
+        var argProp = "";
         foreach (var lhs in cAStmt.Lhss) {
-            var type = lhs.Type switch {
-                IntType => "int",
-                RealType => "real",
-                BitvectorType => "bv",
-                BoolType => "bool",
-                CharType => "char", 
-                SetType => "set", 
-                MultiSetType => "multiset",
-                SeqType => "seq",
-                MapType => "map",
-                UserDefinedType uType => uType.Name == "string" ? "string" :  "",
-                _ => "",
-            };
-
-            if (type == "") return;
-            arg = arg == "" ? type : $"{arg}-{type}";
+            var type = TypeToStr(lhs.Type);
+            if (type == "") {
+                typeArg = "";
+                break;
+            }
+            typeArg = typeArg == "" ? type : $"{typeArg}-{type}";
         }
-        Targets.Add((_childMethodCallPos, "MCR", arg));
+        if (typeArg != "")
+            Targets.Add((_childMethodCallPos, "MCR", typeArg));
+        
+        foreach (var lhs in cAStmt.Lhss) {
+            var type = TypeToStr(lhs.Type);
+            var methodArgPos = _childMethodCallArgTypes.IndexOf(type);
+            if (methodArgPos == -1) {
+                argProp = "";
+                break;
+            }
+            argProp = argProp == "" ? $"{methodArgPos}" : $"{argProp}-{methodArgPos}";
+        }
+        if (argProp != "")
+            Targets.Add((_childMethodCallPos, "MCR", argProp));
+    }
+    
+    private string PrimitiveTypeToStr(Type type) {
+        if (type.IsIntegerType) return "int";
+        if (type.IsRealType) return "real";
+        if (type.IsBitVectorType) return "bv";
+        if (type.IsBoolType) return "bool";
+        if (type.IsCharType) return "char";
+        return type.IsStringType ? "string" : "";
+    }
+    
+    private string TypeToStr(Type type) {
+        return type switch {
+            IntType => "int",
+            RealType => "real",
+            BitvectorType => "bv",
+            BoolType => "bool",
+            CharType => "char", 
+            SetType => "set", 
+            MultiSetType => "multiset",
+            SeqType => "seq",
+            MapType => "map",
+            UserDefinedType uType => uType.Name == "string" ? "string" :  "",
+            _ => "",
+        };
     }
 
     /// -------------------------------------
@@ -221,6 +234,7 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
         if (_childMethodCallPos != "") // rhs is method call
             ScanMCRTargets(aStmt);
         _childMethodCallPos = "";
+        _childMethodCallArgTypes = [];
     }
     
     protected override void VisitStatement(AssignSuchThatStmt aStStmt) {
@@ -228,6 +242,7 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
         if (_childMethodCallPos != "") // rhs is method call
             ScanMCRTargets(aStStmt);
         _childMethodCallPos = "";
+        _childMethodCallArgTypes = [];
     }
     
     protected override void VisitStatement(SingleAssignStmt sAStmt) {
@@ -308,6 +323,12 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
     
     protected override void VisitExpression(SuffixExpr suffixExpr) {
         _childMethodCallPos = $"{suffixExpr.Center.pos}";
+        if (suffixExpr is ApplySuffix appSufExpr) {
+            foreach (var binding in appSufExpr.Bindings.ArgumentBindings) {
+                _childMethodCallArgTypes.Add(TypeToStr(binding.Actual.Type));
+            }
+        }
+        
         ScanUOITargets(suffixExpr);
         ScanEVRTargets(suffixExpr);
         _skipChildEVRMutation = true;

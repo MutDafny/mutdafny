@@ -39,6 +39,6 @@ cd mutdafny && dotnet build
 | EVR (Expression Value Replacement) | Replacement of an expression with a default literal value of its type  | Type |
 | LSR (Loop Statement Replacement) | Replacement of `continue` with `break` and of `break` with ether `continue` or `return` | Type of replacement statement (`continue`, `break` or `return`) |
 | LBI (Loop Break Insertion) | Insertion of a `break` statement at the beggining of the body of a loop | NA |
-| MCR (Method Call Replacement) | Replacement of a method call with a default literal of its return type | Type/list of types (for methods with multiple output variables) |
+| MCR (Method Call Replacement) | Replacement of a method call with a default literal or with one of its arguments with the same type as the return value | Type/list of types (for methods with multiple output variables) or index/list of indexes referring to the position of the argument to be propagated |
 | CIR (Collection Initialization Replacement) | Replacement of non-empty collection initializers with an empty one and of empty initializers with a default non-empty one | NA (for empty initialization) or type of the collection's elements |
 | SDL (Statement Deletion) | Deletion of a statement or of an entire code block | NA |
