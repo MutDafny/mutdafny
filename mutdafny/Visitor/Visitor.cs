@@ -356,6 +356,7 @@ public class Visitor
     }
 
     protected virtual void VisitStatement(ModifyStmt mdStmt) {
+        if (mdStmt.Body == null) return;
         HandleStatement(mdStmt.Body);
     }
 
