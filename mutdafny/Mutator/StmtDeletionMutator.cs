@@ -6,6 +6,10 @@ public class StmtDeletionMutator(string mutationTargetPos, ErrorReporter reporte
 {
     private IfStmt? _parentStmt;
     
+    private bool IsTarget(int tokenPos) {
+        return tokenPos == int.Parse(mutationTargetPos);
+    }
+    
     private bool IsTarget(int startTokenPos, int endTokenPos) {
         var positions = MutationTargetPos.Split("-");
         if (positions.Length < 2) return false;
@@ -18,6 +22,18 @@ public class StmtDeletionMutator(string mutationTargetPos, ErrorReporter reporte
     /// ---------------------------
     /// Group of overriden visitors
     /// ---------------------------
+    protected override void HandleMemberDecls(TopLevelDeclWithMembers decl) {
+        foreach (var member in decl.Members) {
+            if (member is not ConstantField cf)
+                continue;
+            if (IsTarget(cf.Center.pos)) {
+                cf.Rhs = null;
+                return;
+            }
+        }
+        base.HandleMemberDecls(decl);
+    }
+    
     protected override void HandleMethod(Method method) {
         if (method.Body == null) return;
         if (IsTarget(method.StartToken.pos, method.EndToken.pos)) {

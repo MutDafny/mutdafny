@@ -223,6 +223,20 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
             _ => "",
         };
     }
+    
+    /// -------------------------------------
+    /// Group of overriden top level visitors
+    /// -------------------------------------
+    protected override void HandleMemberDecls(TopLevelDeclWithMembers decl) {
+        foreach (var member in decl.Members) {
+            if (member is not ConstantField cf || cf.Rhs == null) 
+                continue;
+            var fieldType = TypeToStr(cf.Type);
+            if (fieldType == "") continue;
+            Targets.Add(($"{cf.Center.pos}", "SDL", ""));
+        }
+        base.HandleMemberDecls(decl);
+    }
 
     /// -------------------------------------
     /// Group of overriden statement visitors
