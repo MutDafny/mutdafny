@@ -233,4 +233,12 @@ public class PreResolveTargetScanner : TargetScanner
         }
         base.VisitExpression(nMExpr);
     }
+    
+    protected override void VisitExpression(SeqSelectExpr seqSExpr) {
+        if (!seqSExpr.SelectOne && seqSExpr.E0 != null)
+            Targets.Add(($"{seqSExpr.E0.Center.pos}", "SDL", ""));
+        if (!seqSExpr.SelectOne && seqSExpr.E1 != null)
+            Targets.Add(($"{seqSExpr.E1.Center.pos}", "SDL", ""));
+        base.VisitExpression(seqSExpr);
+    }
 }
