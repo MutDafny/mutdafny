@@ -17,7 +17,7 @@ public class MethodCallReplacementMutator : Mutator
         var  args = val.Split('-').ToList();
         if (int.TryParse(args[0], out _)) {
             _replacementArgsPos = args.Select(int.Parse).ToList();
-        } else {
+        } else if (val != "") {
             _types = args;
         }
     }
@@ -25,13 +25,19 @@ public class MethodCallReplacementMutator : Mutator
     private Expression CreateMutatedExpression(Expression originalExpr) {
         if (_types.Count != 0 || _childSuffixExpr == null || _childSuffixExpr is not ApplySuffix appSufExpr)
             return CreateDefaultExpression(_types[0], originalExpr);
-        return appSufExpr.Bindings.ArgumentBindings[_replacementArgsPos[0]].Actual;
+        if (_types.Count == 0 && _replacementArgsPos.Count == 0 &&
+            _childSuffixExpr is ExprDotName exprDName) // naked receiver
+            return exprDName.Lhs;
+        return appSufExpr.Bindings.ArgumentBindings[_replacementArgsPos[0]].Actual; // argument propagation
     }
     
-    private List<AssignmentRhs> CreateMutatedRhs(Expression originalRhs) {
-        return _types.Count != 0 ? 
-            CreateDefaultRhss(originalRhs) : 
-            CreateArgumentPropagationRhss();
+    private List<AssignmentRhs> CreateMutatedRhss(Expression originalRhs) {
+        if (_types.Count != 0)
+            return CreateDefaultRhss(originalRhs);
+        if (_types.Count == 0 && _replacementArgsPos.Count == 0 &&
+            _childSuffixExpr is ExprDotName exprDName) // naked receiver
+            return [new ExprRhs(exprDName.Lhs)];
+        return CreateArgumentPropagationRhss();
     }
 
     private List<AssignmentRhs> CreateDefaultRhss(Expression originalRhs) {
@@ -76,12 +82,24 @@ public class MethodCallReplacementMutator : Mutator
     }
     
     /// -----------------
-    /// Overriden visitor
+    /// Group of overriden visitor
     /// -----------------
+    protected override void HandleMemberDecls(TopLevelDeclWithMembers decl) {
+        foreach (var member in decl.Members) {
+            if (member is not ConstantField cf)
+                continue;
+            if (IsTarget(cf.Rhs)) {
+                cf.Rhs = CreateMutatedExpression(cf.Rhs);
+                return;
+            }
+        }
+        base.HandleMemberDecls(decl);
+    }
+    
     protected override void VisitStatement(AssignStatement aStmt) {
         base.VisitStatement(aStmt);
         if (TargetExpression == null) return; // target not found
-        aStmt.Rhss = CreateMutatedRhs(TargetExpression);
+        aStmt.Rhss = CreateMutatedRhss(TargetExpression);
         TargetExpression = null;
         _childSuffixExpr = null;
     }
@@ -95,8 +113,8 @@ public class MethodCallReplacementMutator : Mutator
     }
     
     protected override void VisitExpression(SuffixExpr suffixExpr) {
-        _childSuffixExpr = suffixExpr;
         if (IsTarget(suffixExpr)) {
+            _childSuffixExpr = suffixExpr;
             TargetExpression = suffixExpr;
             return;
         }
