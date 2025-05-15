@@ -31,12 +31,12 @@ do
         echo Mutating position $pos: operator $op
         output=$(dotnet ./dafny/Binaries/Dafny.dll verify $1 \
             --allow-warnings --solver-path ./dafny/Binaries/z3 \
-            --plugin ./mutdafny/bin/Debug/net8.0/mutdafny.dll,"mut $pos $op")
+            --plugin ./mutdafny/bin/Debug/net8.0/mutdafny.dll,"mut $pos $op" 2>/dev/null)
     else
         echo Mutating position $pos: operator $op, argument $arg
         output=$(dotnet ./dafny/Binaries/Dafny.dll verify $1 \
             --allow-warnings --solver-path ./dafny/Binaries/z3 \
-            --plugin ./mutdafny/bin/Debug/net8.0/mutdafny.dll,"mut $pos $op $arg")
+            --plugin ./mutdafny/bin/Debug/net8.0/mutdafny.dll,"mut $pos $op $arg" 2>/dev/null)
     fi
 
 
@@ -46,10 +46,11 @@ do
     output=$(echo $output | tail -1)
 
     COLOR='\033[0;31m'; if [[ -n $verified ]]; then COLOR='\033[0m'; fi
-    echo -e "${COLOR}${output}\033[0m"
     if [[ -z $verification_finished ]]; then # verification did not finish due to invalid program
+        rm *.dfy
         echo Error: mutant is invalid
     else
+        echo -e "${COLOR}${output}\033[0m"
         output_dir=""
         if [[ -n $timed_out ]]; then
             echo Verification timed out
@@ -62,9 +63,9 @@ do
             output_dir=mutants/killed
         fi
         mv *.dfy $output_dir
+        rm elapsed-time.csv
     fi
     echo
-    rm elapsed-time.csv
 done
 
 rm targets.csv
