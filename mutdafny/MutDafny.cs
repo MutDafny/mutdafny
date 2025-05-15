@@ -69,14 +69,14 @@ public class MutantGenerator(string mutationTargetPos, string mutationOperator, 
     public override void PreResolve(ModuleDefinition module) {
         MutDafny.SpecHelpers = new List<string>(File.ReadAllLines("helpers.txt"));
         
-        if (mutationOperator == "VDL") return;
+        if (mutationOperator == "VDL" || mutationOperator == "ODL") return;
         var mutatorFactory = new MutatorFactory(Reporter);
         var mutator = mutatorFactory.Create(mutationTargetPos, mutationOperator, mutationArg);
         mutator?.Mutate(module);
     }
 
     public override void PostResolve(ModuleDefinition module) {
-        if (mutationOperator != "VDL") return;
+        if (mutationOperator != "VDL" && mutationOperator != "ODL") return;
         var mutatorFactory = new MutatorFactory(Reporter);
         var mutator = mutatorFactory.Create(mutationTargetPos, mutationOperator, mutationArg);
         mutator?.Mutate(module);

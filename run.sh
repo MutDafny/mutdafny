@@ -63,9 +63,9 @@ do
             output_dir=mutants/killed
         fi
         mv *.dfy $output_dir
-        rm elapsed-time.csv
     fi
     echo
+    rm elapsed-time.csv
 done
 
 rm targets.csv

@@ -31,6 +31,8 @@ public class MutatorFactory(ErrorReporter reporter)
             "SDL" => new StmtDeletionMutator(mutationTargetPos, reporter),
             "VDL" => mutationArg == null ? null :
                 new VariableDeletionMutator(mutationTargetPos, mutationArg, reporter),
+            "ODL" => mutationArg == null ? null :
+                new OperatorDeletionMutator(mutationTargetPos, mutationArg, reporter),
             _ => null
         };
     }

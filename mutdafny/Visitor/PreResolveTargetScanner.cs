@@ -6,6 +6,7 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
     : TargetScanner(operatorsInUse, reporter)
 {
     private List<string> _coveredVariableNames = [];
+    private List<BinaryExpr.Opcode> _coveredOperators = [];
     private string _currentMethodScope = "";
     private List<string> _currentMethodOuts = [];
     private List<string> _currentInitMethodOuts = [];
@@ -139,6 +140,7 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
     
     private void VisitStatement(LoopStmt loopStmt) {
         if (loopStmt.Decreases.Expressions == null) return;
+        var previouslyInsideSpec = IsParentSpec;
         IsParentSpec = true;
         foreach (var invariant in loopStmt.Invariants)
             HandleExpression(invariant.E);
@@ -148,7 +150,7 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
             foreach (var modifies in loopStmt.Mod.Expressions)
                 HandleExpression(modifies.E);
         }
-        IsParentSpec = false;
+        IsParentSpec = previouslyInsideSpec;
     }
     
     protected override void VisitStatement(WhileStmt whileStmt) {
@@ -166,10 +168,11 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
     }
     
     protected override void VisitStatement(ForallStmt forStmt) {
+        var previouslyInsideSpec = IsParentSpec;
         IsParentSpec = true;
         foreach (var ensures in forStmt.Ens)
             HandleExpression(ensures.E);
-        IsParentSpec = false;
+        IsParentSpec = previouslyInsideSpec;
         base.VisitStatement(forStmt);
     }
     
@@ -209,23 +212,26 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
     }
     
     protected override void VisitStatement(ModifyStmt mdStmt) {
+        var previouslyInsideSpec = IsParentSpec;
         IsParentSpec = true;
         if (mdStmt.Mod.Expressions != null) {
             foreach (var modifies in mdStmt.Mod.Expressions)
                 HandleExpression(modifies.E);
         }
-        IsParentSpec = false;
+        IsParentSpec = previouslyInsideSpec;
         base.VisitStatement(mdStmt);
     }
     
     protected override void VisitStatement(BlockByProofStmt bBpStmt) {
+        var previouslyInsideSpec = IsParentSpec;
         IsParentSpec = true;
         HandleStatement(bBpStmt.Proof);
-        IsParentSpec = false;
+        IsParentSpec = previouslyInsideSpec;
         base.VisitStatement(bBpStmt);
     }
 
     protected override void VisitStatement(OpaqueBlock opqBlock) {
+        var previouslyInsideSpec = IsParentSpec;
         IsParentSpec = true;
         foreach (var ensures in opqBlock.Ensures)
             HandleExpression(ensures.E);
@@ -233,22 +239,24 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
             foreach (var modifies in opqBlock.Modifies.Expressions)
                 HandleExpression(modifies.E);
         }
-        IsParentSpec = false;
+        IsParentSpec = previouslyInsideSpec;
     }
     
     protected override void VisitStatement(PredicateStmt predStmt) {
+        var previouslyInsideSpec = IsParentSpec;
         IsParentSpec = true;
         HandleExpression(predStmt.Expr);
-        IsParentSpec = false;
+        IsParentSpec = previouslyInsideSpec;
     }
     
     protected override void VisitStatement(CalcStmt calcStmt) {
+        var previouslyInsideSpec = IsParentSpec;
         IsParentSpec = true;
         HandleExprList(calcStmt.Lines);
         foreach (var stmt in calcStmt.Hints) {
             HandleStatement(stmt);
         }
-        IsParentSpec = false;
+        IsParentSpec = previouslyInsideSpec;
     }
 
     /// --------------------------------------
@@ -258,9 +266,13 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
         if (!_replacementList.TryGetValue(bExpr.Op, out var replacementList)) 
             return;
         if (ShouldImplement("BOR")) {
-            foreach (var replacement in replacementList) {
+            foreach (var replacement in replacementList)
                 Targets.Add(($"{bExpr.Center.pos}", "BOR", replacement.ToString()));
-            }
+        }
+        if (ShouldImplement("ODL") && !_coveredOperators.Contains(bExpr.Op)) {
+            _coveredOperators.Add(bExpr.Op);
+            Targets.Add(("-", "ODL", $"{bExpr.Op.ToString()}-left"));
+            Targets.Add(("-", "ODL", $"{bExpr.Op.ToString()}-right"));
         }
     
         List<BinaryExpr.Opcode> relationalOperators = [BinaryExpr.Opcode.Eq, BinaryExpr.Opcode.Neq, 
@@ -351,34 +363,38 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
     }
     
     protected override void VisitExpression(ComprehensionExpr compExpr) {
+        var previouslyInsideSpec = IsParentSpec;
         IsParentSpec = true;
         if (compExpr is LambdaExpr lExpr && lExpr.Reads.Expressions != null) {
             foreach (var reads in lExpr.Reads.Expressions)
                 HandleExpression(reads.E);                
         }
-        IsParentSpec = false;
+        IsParentSpec = previouslyInsideSpec;
         base.VisitExpression(compExpr);
     }
 
     protected override void VisitExpression(OldExpr oldExpr) {
+        var previouslyInsideSpec = IsParentSpec;
         IsParentSpec = true;
         HandleExpression(oldExpr.E);
-        IsParentSpec = false;
+        IsParentSpec = previouslyInsideSpec;
     }
     
     protected override void VisitExpression(UnchangedExpr unchExpr) {
+        var previouslyInsideSpec = IsParentSpec;
         IsParentSpec = true;
         foreach (var unchanged in unchExpr.Frame)
             HandleExpression(unchanged.E);            
-        IsParentSpec = false;
+        IsParentSpec = previouslyInsideSpec;
     }
     
     protected override void VisitExpression(DecreasesToExpr dToExpr) {
+        var previouslyInsideSpec = IsParentSpec;
         IsParentSpec = true;
         foreach (var oldExpr in dToExpr.OldExpressions)
             HandleExpression(oldExpr); 
         foreach (var newExpr in dToExpr.NewExpressions)
             HandleExpression(newExpr); 
-        IsParentSpec = false;
+        IsParentSpec = previouslyInsideSpec;
     }
 }

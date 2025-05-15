@@ -33,8 +33,6 @@ public abstract class ExprReplacementMutator(string mutationTargetPos, ErrorRepo
                     HandleMemberDecls(nNullTpDecl.Class);
                 }
             }
-            
-            if (TargetFound()) return;
         }
     }
     
@@ -52,8 +50,6 @@ public abstract class ExprReplacementMutator(string mutationTargetPos, ErrorRepo
                 if (TargetFound()) // mutate
                     cf.Rhs = CreateMutatedExpression(cf.Rhs);
             }
-
-            if (TargetFound()) return;
         }
     }
     
@@ -74,9 +70,8 @@ public abstract class ExprReplacementMutator(string mutationTargetPos, ErrorRepo
     /// ---------------------------
     protected override void VisitStatement(AssignStatement aStmt) {
         VisitStatement(aStmt as ConcreteAssignStatement);
-        if (TargetFound()) return;
         HandleRhsList(aStmt.Rhss); 
-        if (TargetFound() || aStmt.OriginalInitialLhs == null) 
+        if (aStmt.OriginalInitialLhs == null) 
             return;
         HandleExpression(aStmt.OriginalInitialLhs);
         if (TargetFound()) // mutate
@@ -85,7 +80,6 @@ public abstract class ExprReplacementMutator(string mutationTargetPos, ErrorRepo
 
     protected override void VisitStatement(AssignSuchThatStmt aStStmt) {
         VisitStatement(aStStmt as ConcreteAssignStatement);
-        if (TargetFound()) return;
         HandleExpression(aStStmt.Expr);
         if (TargetFound()) // mutate
             aStStmt.Expr = CreateMutatedExpression(aStStmt.Expr);
@@ -93,7 +87,6 @@ public abstract class ExprReplacementMutator(string mutationTargetPos, ErrorRepo
 
     protected override void VisitStatement(AssignOrReturnStmt aOrRStmt) {
         VisitStatement(aOrRStmt as ConcreteAssignStatement);
-        if (TargetFound()) return;
         HandleExpression(aOrRStmt.Rhs.Expr);
         if (TargetFound()) // mutate
             aOrRStmt.Rhs.Expr = CreateMutatedExpression(aOrRStmt.Rhs.Expr);
@@ -191,7 +184,6 @@ public abstract class ExprReplacementMutator(string mutationTargetPos, ErrorRepo
     
     protected override void VisitStatement(CallStmt callStmt) {
         HandleExprList(callStmt.Lhs);
-        if (TargetFound()) return;
         if (IsWorthVisiting(callStmt.OriginalInitialLhs.StartToken.pos, callStmt.EndToken.pos)) {
             HandleExpression(callStmt.OriginalInitialLhs);
             if (TargetFound()) // mutate
@@ -212,10 +204,8 @@ public abstract class ExprReplacementMutator(string mutationTargetPos, ErrorRepo
     /// ----------------------------
     protected override void VisitExpression(BinaryExpr bExpr) {
         HandleExpression(bExpr.E0);
-        if (TargetFound()) { // mutate
+        if (TargetFound())  // mutate
             bExpr.E0 = CreateMutatedExpression(bExpr.E0);
-            return;
-        }
         HandleExpression(bExpr.E1);
         if (TargetFound()) // mutate
             bExpr.E1 = CreateMutatedExpression(bExpr.E1);
@@ -323,10 +313,8 @@ public abstract class ExprReplacementMutator(string mutationTargetPos, ErrorRepo
     protected override void VisitExpression(NestedMatchExpr nMExpr) {
         foreach (var c in nMExpr.Cases) {
             HandleExpression(c.Body);
-            if (TargetFound()) { // mutate
+            if (TargetFound()) // mutate
                 c.Body = CreateMutatedExpression(c.Body);
-                return;
-            }
         }
         
         // HandleExpression(nMExpr.Source);
@@ -338,24 +326,18 @@ public abstract class ExprReplacementMutator(string mutationTargetPos, ErrorRepo
         foreach (var elem in mDExpr.Elements)
         {
             HandleExpression(elem.A);
-            if (TargetFound()) { // mutate
+            if (TargetFound()) // mutate
                 elem.A = CreateMutatedExpression(elem.A);
-                return;
-            }
             HandleExpression(elem.B);
-            if (TargetFound()) { // mutate
+            if (TargetFound()) // mutate
                 elem.B = CreateMutatedExpression(elem.B);
-                return;
-            }
         }
     }
 
     protected override void VisitExpression(SeqConstructionExpr seqCExpr) {
         HandleExpression(seqCExpr.N);
-        if (TargetFound()) { // mutate
+        if (TargetFound()) // mutate
             seqCExpr.N = CreateMutatedExpression(seqCExpr.N);
-            return;
-        }
         HandleExpression(seqCExpr.Initializer);
         if (TargetFound()) // mutate
             seqCExpr.Initializer = CreateMutatedExpression(seqCExpr.Initializer);
@@ -369,16 +351,12 @@ public abstract class ExprReplacementMutator(string mutationTargetPos, ErrorRepo
     
     protected override void VisitExpression(SeqSelectExpr seqSExpr) {
         HandleExpression(seqSExpr.Seq);
-        if (TargetFound()) { // mutate
+        if (TargetFound()) // mutate
             seqSExpr.Seq = CreateMutatedExpression(seqSExpr.Seq);
-            return;
-        }
         if (seqSExpr.E0 != null) {
             HandleExpression(seqSExpr.E0);
-            if (TargetFound()) { // mutate
+            if (TargetFound()) // mutate
                 seqSExpr.E0 = CreateMutatedExpression(seqSExpr.E0);
-                return;
-            }
         }
         if (seqSExpr.E1 != null) {
             HandleExpression(seqSExpr.E1);
@@ -412,16 +390,12 @@ public abstract class ExprReplacementMutator(string mutationTargetPos, ErrorRepo
     
     protected override void VisitExpression(ComprehensionExpr compExpr) {
         HandleExpression(compExpr.Term);
-        if (TargetFound()) { // mutate
+        if (TargetFound()) // mutate
             compExpr.Term = CreateMutatedExpression(compExpr.Term);
-            return;
-        }
         if (compExpr.Range != null) {
             HandleExpression(compExpr.Range);
-            if (TargetFound()) { // mutate
+            if (TargetFound()) // mutate
                 compExpr.Range = CreateMutatedExpression(compExpr.Range);
-                return;
-            }
         }
 
         if (compExpr is MapComprehension mCompExpr && mCompExpr.TermLeft != null) {
@@ -433,10 +407,8 @@ public abstract class ExprReplacementMutator(string mutationTargetPos, ErrorRepo
     
     protected override void VisitExpression(DatatypeUpdateExpr dtUExpr) {
         HandleExpression(dtUExpr.Root);
-        if (TargetFound()) { // mutate
+        if (TargetFound()) // mutate
             dtUExpr.Root = CreateMutatedExpression(dtUExpr.Root);
-            return;
-        }
 
         for (var i = 0; i < dtUExpr.Updates.Count; i++) {
             var update = dtUExpr.Updates[i];
@@ -445,14 +417,12 @@ public abstract class ExprReplacementMutator(string mutationTargetPos, ErrorRepo
                 var newItem = CreateMutatedExpression(update.Item3);
                 var newUpdate = Tuple.Create(update.Item1, update.Item2, newItem);
                 dtUExpr.Updates[i] = newUpdate;
-                return;
             }
         }
     }
     
     protected override void VisitExpression(StmtExpr stmtExpr) {
         HandleStatement(stmtExpr.S);
-        if (TargetFound()) return;
         HandleExpression(stmtExpr.E);
         if (TargetFound()) // mutate
             stmtExpr.E = CreateMutatedExpression(stmtExpr.E);
@@ -470,7 +440,6 @@ public abstract class ExprReplacementMutator(string mutationTargetPos, ErrorRepo
                 var newExpr = CreateMutatedExpression(expr);
                 var i = exprs.FindIndex(e => e == expr);
                 exprs[i] = newExpr;
-                return;
             }
         }
     }
