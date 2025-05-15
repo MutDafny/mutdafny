@@ -47,6 +47,7 @@ public class Visitor
             {typeof(HideRevealStmt), stmt => VisitStatement((stmt as HideRevealStmt)!)},
             {typeof(BlockByProofStmt), stmt => VisitStatement((stmt as BlockByProofStmt)!)},
             {typeof(SkeletonStatement), stmt => VisitStatement((stmt as SkeletonStatement)!)},
+            {typeof(PrintStmt), stmt => VisitStatement((stmt as PrintStmt)!)},
             // spec statements
             {typeof(OpaqueBlock), stmt => VisitStatement((stmt as OpaqueBlock)!)},
             {typeof(PredicateStmt), stmt => VisitStatement((stmt as PredicateStmt)!)},
@@ -372,6 +373,8 @@ public class Visitor
         if (skStmt.S == null) return;
         HandleStatement(skStmt.S);
     }
+
+    protected virtual void VisitStatement(PrintStmt prtStmt) { }
     
     // statements used specifically in specs
     // by default we don't visit these since we are not mutating them
@@ -601,7 +604,7 @@ public class Visitor
         }
     }
     
-    protected bool IsWorthVisiting(int tokenStartPos, int tokenEndPos) {
+    protected virtual bool IsWorthVisiting(int tokenStartPos, int tokenEndPos) {
         if (int.TryParse(MutationTargetPos, out var position)) {
             return position == -1 || // visit the tree without searching for specific target
                    (tokenStartPos <= position && // specific target

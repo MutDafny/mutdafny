@@ -244,6 +244,8 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
     /// -------------------------------------
     protected override void HandleMemberDecls(TopLevelDeclWithMembers decl) {
         foreach (var member in decl.Members) {
+            if (!ShouldImplement("SDL")) break;
+            
             if (member is not ConstantField cf || cf.Rhs == null) 
                 continue;
             var fieldType = TypeToStr(cf.Type);

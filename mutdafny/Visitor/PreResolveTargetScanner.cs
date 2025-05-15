@@ -2,58 +2,72 @@
 
 namespace MutDafny.Visitor;
 
-public class PreResolveTargetScanner : TargetScanner
+public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter reporter)
+    : TargetScanner(operatorsInUse, reporter)
 {
-    private readonly Dictionary<BinaryExpr.Opcode, List<BinaryExpr.Opcode>> _replacementList;
-    private List<string> _currentMethodOuts;
-    private List<string> _currentInitMethodOuts;
+    private List<string> _coveredVariableNames = [];
+    private string _currentMethodScope = "";
+    private List<string> _currentMethodOuts = [];
+    private List<string> _currentInitMethodOuts = [];
     private bool _isCurrentMethodVoid;
     private bool _isChildIfBlock;
     private bool _isParentVarDeclStmt;
-
-    public PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter reporter): base(operatorsInUse, reporter)
-    {
-       _replacementList = new Dictionary<BinaryExpr.Opcode, List<BinaryExpr.Opcode>> {
-           // arithmetic operators
-           { BinaryExpr.Opcode.Add, [BinaryExpr.Opcode.Sub, BinaryExpr.Opcode.Mul] },
-           { BinaryExpr.Opcode.Sub, [BinaryExpr.Opcode.Add, BinaryExpr.Opcode.Mul] },
-           { BinaryExpr.Opcode.Mul, [BinaryExpr.Opcode.Add, BinaryExpr.Opcode.Sub] },
-           { BinaryExpr.Opcode.Div, [BinaryExpr.Opcode.Add, BinaryExpr.Opcode.Sub, BinaryExpr.Opcode.Mul, BinaryExpr.Opcode.Mod] },
-           { BinaryExpr.Opcode.Mod, [BinaryExpr.Opcode.Add, BinaryExpr.Opcode.Sub, BinaryExpr.Opcode.Mul, BinaryExpr.Opcode.Div] },
-           // relational operators
-           { BinaryExpr.Opcode.Eq, [BinaryExpr.Opcode.Neq, BinaryExpr.Opcode.Lt, BinaryExpr.Opcode.Le, BinaryExpr.Opcode.Gt, BinaryExpr.Opcode.Ge] },
-           { BinaryExpr.Opcode.Neq, [BinaryExpr.Opcode.Eq, BinaryExpr.Opcode.Lt, BinaryExpr.Opcode.Le, BinaryExpr.Opcode.Gt, BinaryExpr.Opcode.Ge] },
-           { BinaryExpr.Opcode.Lt, [BinaryExpr.Opcode.Eq, BinaryExpr.Opcode.Neq, BinaryExpr.Opcode.Le, BinaryExpr.Opcode.Gt, BinaryExpr.Opcode.Ge] },
-           { BinaryExpr.Opcode.Le, [BinaryExpr.Opcode.Eq, BinaryExpr.Opcode.Neq, BinaryExpr.Opcode.Lt, BinaryExpr.Opcode.Gt, BinaryExpr.Opcode.Ge] },
-           { BinaryExpr.Opcode.Gt, [BinaryExpr.Opcode.Eq, BinaryExpr.Opcode.Neq, BinaryExpr.Opcode.Lt, BinaryExpr.Opcode.Le, BinaryExpr.Opcode.Ge] },
-           { BinaryExpr.Opcode.Ge, [BinaryExpr.Opcode.Eq, BinaryExpr.Opcode.Neq, BinaryExpr.Opcode.Lt, BinaryExpr.Opcode.Le, BinaryExpr.Opcode.Gt] },
-           // conditional operators
-           { BinaryExpr.Opcode.And, [BinaryExpr.Opcode.Or, BinaryExpr.Opcode.Iff, BinaryExpr.Opcode.Imp, BinaryExpr.Opcode.Exp] },
-           { BinaryExpr.Opcode.Or, [BinaryExpr.Opcode.And, BinaryExpr.Opcode.Iff, BinaryExpr.Opcode.Imp, BinaryExpr.Opcode.Exp] },
-           { BinaryExpr.Opcode.Iff, [BinaryExpr.Opcode.And, BinaryExpr.Opcode.Or, BinaryExpr.Opcode.Imp, BinaryExpr.Opcode.Exp] },
-           { BinaryExpr.Opcode.Imp, [BinaryExpr.Opcode.And, BinaryExpr.Opcode.Or, BinaryExpr.Opcode.Iff, BinaryExpr.Opcode.Exp] },
-           { BinaryExpr.Opcode.Exp, [BinaryExpr.Opcode.And, BinaryExpr.Opcode.Or, BinaryExpr.Opcode.Iff, BinaryExpr.Opcode.Imp] },
-           // logical operators
-           { BinaryExpr.Opcode.BitwiseAnd, [BinaryExpr.Opcode.BitwiseOr, BinaryExpr.Opcode.BitwiseXor] },
-           { BinaryExpr.Opcode.BitwiseOr, [BinaryExpr.Opcode.BitwiseAnd, BinaryExpr.Opcode.BitwiseXor] },
-           { BinaryExpr.Opcode.BitwiseXor, [BinaryExpr.Opcode.BitwiseAnd, BinaryExpr.Opcode.BitwiseOr] },
-           // shift operators
-           { BinaryExpr.Opcode.LeftShift, [BinaryExpr.Opcode.RightShift] },
-           { BinaryExpr.Opcode.RightShift, [BinaryExpr.Opcode.LeftShift] },
-           // set inclusion operators
-           { BinaryExpr.Opcode.In, [BinaryExpr.Opcode.NotIn] },
-           { BinaryExpr.Opcode.NotIn, [BinaryExpr.Opcode.In] },
-       }; 
-    }
     
+    private readonly Dictionary<BinaryExpr.Opcode, List<BinaryExpr.Opcode>> _replacementList = new()
+    {
+        // arithmetic operators
+        { BinaryExpr.Opcode.Add, [BinaryExpr.Opcode.Sub, BinaryExpr.Opcode.Mul] },
+        { BinaryExpr.Opcode.Sub, [BinaryExpr.Opcode.Add, BinaryExpr.Opcode.Mul] },
+        { BinaryExpr.Opcode.Mul, [BinaryExpr.Opcode.Add, BinaryExpr.Opcode.Sub] },
+        { BinaryExpr.Opcode.Div, [BinaryExpr.Opcode.Add, BinaryExpr.Opcode.Sub, BinaryExpr.Opcode.Mul, BinaryExpr.Opcode.Mod] },
+        { BinaryExpr.Opcode.Mod, [BinaryExpr.Opcode.Add, BinaryExpr.Opcode.Sub, BinaryExpr.Opcode.Mul, BinaryExpr.Opcode.Div] },
+        // relational operators
+        { BinaryExpr.Opcode.Eq, [BinaryExpr.Opcode.Neq, BinaryExpr.Opcode.Lt, BinaryExpr.Opcode.Le, BinaryExpr.Opcode.Gt, BinaryExpr.Opcode.Ge] },
+        { BinaryExpr.Opcode.Neq, [BinaryExpr.Opcode.Eq, BinaryExpr.Opcode.Lt, BinaryExpr.Opcode.Le, BinaryExpr.Opcode.Gt, BinaryExpr.Opcode.Ge] },
+        { BinaryExpr.Opcode.Lt, [BinaryExpr.Opcode.Eq, BinaryExpr.Opcode.Neq, BinaryExpr.Opcode.Le, BinaryExpr.Opcode.Gt, BinaryExpr.Opcode.Ge] },
+        { BinaryExpr.Opcode.Le, [BinaryExpr.Opcode.Eq, BinaryExpr.Opcode.Neq, BinaryExpr.Opcode.Lt, BinaryExpr.Opcode.Gt, BinaryExpr.Opcode.Ge] },
+        { BinaryExpr.Opcode.Gt, [BinaryExpr.Opcode.Eq, BinaryExpr.Opcode.Neq, BinaryExpr.Opcode.Lt, BinaryExpr.Opcode.Le, BinaryExpr.Opcode.Ge] },
+        { BinaryExpr.Opcode.Ge, [BinaryExpr.Opcode.Eq, BinaryExpr.Opcode.Neq, BinaryExpr.Opcode.Lt, BinaryExpr.Opcode.Le, BinaryExpr.Opcode.Gt] },
+        // conditional operators
+        { BinaryExpr.Opcode.And, [BinaryExpr.Opcode.Or, BinaryExpr.Opcode.Iff, BinaryExpr.Opcode.Imp, BinaryExpr.Opcode.Exp] },
+        { BinaryExpr.Opcode.Or, [BinaryExpr.Opcode.And, BinaryExpr.Opcode.Iff, BinaryExpr.Opcode.Imp, BinaryExpr.Opcode.Exp] },
+        { BinaryExpr.Opcode.Iff, [BinaryExpr.Opcode.And, BinaryExpr.Opcode.Or, BinaryExpr.Opcode.Imp, BinaryExpr.Opcode.Exp] },
+        { BinaryExpr.Opcode.Imp, [BinaryExpr.Opcode.And, BinaryExpr.Opcode.Or, BinaryExpr.Opcode.Iff, BinaryExpr.Opcode.Exp] },
+        { BinaryExpr.Opcode.Exp, [BinaryExpr.Opcode.And, BinaryExpr.Opcode.Or, BinaryExpr.Opcode.Iff, BinaryExpr.Opcode.Imp] },
+        // logical operators
+        { BinaryExpr.Opcode.BitwiseAnd, [BinaryExpr.Opcode.BitwiseOr, BinaryExpr.Opcode.BitwiseXor] },
+        { BinaryExpr.Opcode.BitwiseOr, [BinaryExpr.Opcode.BitwiseAnd, BinaryExpr.Opcode.BitwiseXor] },
+        { BinaryExpr.Opcode.BitwiseXor, [BinaryExpr.Opcode.BitwiseAnd, BinaryExpr.Opcode.BitwiseOr] },
+        // shift operators
+        { BinaryExpr.Opcode.LeftShift, [BinaryExpr.Opcode.RightShift] },
+        { BinaryExpr.Opcode.RightShift, [BinaryExpr.Opcode.LeftShift] },
+        // set inclusion operators
+        { BinaryExpr.Opcode.In, [BinaryExpr.Opcode.NotIn] },
+        { BinaryExpr.Opcode.NotIn, [BinaryExpr.Opcode.In] },
+    };
+    
+    protected override void HandleMemberDecls(TopLevelDeclWithMembers decl) {
+        foreach (var member in decl.Members) {
+            if (member is not ConstantField cf) continue;
+            if (!ShouldImplement("VDL")) break;
+            _coveredVariableNames.Add(cf.Name);
+            Targets.Add(("-", "VDL", cf.Name));
+        }
+        base.HandleMemberDecls(decl);
+    }
+
     protected override void HandleMethod(Method method) {
+        var methodIndependentVars = _coveredVariableNames.Select(item => (string)item.Clone()).ToList();
         _isCurrentMethodVoid = method.Outs.Count == 0;
+        _currentMethodScope = $"{method.StartToken.pos}-{method.EndToken.pos}";
         _currentMethodOuts = method.Outs.Select(o => o.Name).ToList();
         _currentInitMethodOuts = [];
         if (ShouldImplement("SDL") && _isCurrentMethodVoid)
             Targets.Add(($"{method.StartToken.pos}-{method.EndToken.pos}", "SDL", ""));
         
         base.HandleMethod(method);
+        _currentMethodScope = "-";
+        _coveredVariableNames = methodIndependentVars;
     }
 
     /// -------------------------------------
@@ -62,8 +76,12 @@ public class PreResolveTargetScanner : TargetScanner
     protected override void VisitStatement(ConcreteAssignStatement cAStmt) {
         var canMutate = true;
         foreach (var lhs in cAStmt.Lhss) {
-            if (lhs is not NameSegment nSegExpr) continue;
-            var name = nSegExpr.Name;
+            string name;
+            if (lhs is NameSegment nSegExpr) {
+                name = nSegExpr.Name;
+            } else if (lhs is IdentifierExpr idExpr) {
+                name = idExpr.Name;
+            } else continue;
             if (_currentMethodOuts.Contains(name) && !_currentInitMethodOuts.Contains(name)) {
                 // output variable is initialized in this statement
                 canMutate = false;
@@ -79,6 +97,13 @@ public class PreResolveTargetScanner : TargetScanner
     
     protected override void VisitStatement(VarDeclStmt vDeclStmt) {
         _isParentVarDeclStmt = true;
+        foreach (var var in vDeclStmt.Locals) {
+            if (!ShouldImplement("VDL")) break;
+            if (_coveredVariableNames.Contains(var.Name)) continue;
+            _coveredVariableNames.Add(var.Name);
+            Targets.Add((_currentMethodScope, "VDL", var.Name));
+        }
+
         base.VisitStatement(vDeclStmt);
         _isParentVarDeclStmt = false;
     }
@@ -112,15 +137,39 @@ public class PreResolveTargetScanner : TargetScanner
         base.VisitStatement(ifStmt);
     }
     
+    private void VisitStatement(LoopStmt loopStmt) {
+        if (loopStmt.Decreases.Expressions == null) return;
+        IsParentSpec = true;
+        foreach (var invariant in loopStmt.Invariants)
+            HandleExpression(invariant.E);
+        foreach (var decreases in loopStmt.Decreases.Expressions)
+            HandleExpression(decreases);
+        if (loopStmt.Mod.Expressions != null) {
+            foreach (var modifies in loopStmt.Mod.Expressions)
+                HandleExpression(modifies.E);
+        }
+        IsParentSpec = false;
+    }
+    
     protected override void VisitStatement(WhileStmt whileStmt) {
         if (ShouldImplement("LBI"))
             Targets.Add(($"{whileStmt.StartToken.pos}-{whileStmt.EndToken.pos}", "LBI", ""));
+        VisitStatement(whileStmt as LoopStmt);
         base.VisitStatement(whileStmt);
     }
     
     protected override void VisitStatement(ForLoopStmt forStmt) {
         if (ShouldImplement("LBI"))
             Targets.Add(($"{forStmt.StartToken.pos}-{forStmt.EndToken.pos}", "LBI", ""));
+        VisitStatement(forStmt as LoopStmt);
+        base.VisitStatement(forStmt);
+    }
+    
+    protected override void VisitStatement(ForallStmt forStmt) {
+        IsParentSpec = true;
+        foreach (var ensures in forStmt.Ens)
+            HandleExpression(ensures.E);
+        IsParentSpec = false;
         base.VisitStatement(forStmt);
     }
     
@@ -145,6 +194,7 @@ public class PreResolveTargetScanner : TargetScanner
                 Targets.Add(($"{alt.Guard.StartToken.pos}-{alt.Guard.EndToken.pos}", "SDL", ""));
             }
         }
+        VisitStatement(altLStmt as LoopStmt);
         base.VisitStatement(altLStmt);
     }
     
@@ -156,6 +206,49 @@ public class PreResolveTargetScanner : TargetScanner
             }
         }
         base.VisitStatement(nMatchStmt);
+    }
+    
+    protected override void VisitStatement(ModifyStmt mdStmt) {
+        IsParentSpec = true;
+        if (mdStmt.Mod.Expressions != null) {
+            foreach (var modifies in mdStmt.Mod.Expressions)
+                HandleExpression(modifies.E);
+        }
+        IsParentSpec = false;
+        base.VisitStatement(mdStmt);
+    }
+    
+    protected override void VisitStatement(BlockByProofStmt bBpStmt) {
+        IsParentSpec = true;
+        HandleStatement(bBpStmt.Proof);
+        IsParentSpec = false;
+        base.VisitStatement(bBpStmt);
+    }
+
+    protected override void VisitStatement(OpaqueBlock opqBlock) {
+        IsParentSpec = true;
+        foreach (var ensures in opqBlock.Ensures)
+            HandleExpression(ensures.E);
+        if (opqBlock.Modifies.Expressions != null) {
+            foreach (var modifies in opqBlock.Modifies.Expressions)
+                HandleExpression(modifies.E);
+        }
+        IsParentSpec = false;
+    }
+    
+    protected override void VisitStatement(PredicateStmt predStmt) {
+        IsParentSpec = true;
+        HandleExpression(predStmt.Expr);
+        IsParentSpec = false;
+    }
+    
+    protected override void VisitStatement(CalcStmt calcStmt) {
+        IsParentSpec = true;
+        HandleExprList(calcStmt.Lines);
+        foreach (var stmt in calcStmt.Hints) {
+            HandleStatement(stmt);
+        }
+        IsParentSpec = false;
     }
 
     /// --------------------------------------
@@ -223,6 +316,21 @@ public class PreResolveTargetScanner : TargetScanner
             base.VisitExpression(nExpr);  
         }
     }
+
+    protected override void VisitExpression(NameSegment nSegExpr) {
+        if (IsParentSpec && _coveredVariableNames.Contains(nSegExpr.Name)) {
+            _coveredVariableNames.Remove(nSegExpr.Name);
+            Targets.RemoveAll(t => t.Item3 == nSegExpr.Name);
+        }
+    }
+    
+    protected override void VisitExpression(SuffixExpr suffixExpr) {
+        if (suffixExpr is not ExprDotName exprDName) return;
+        if (IsParentSpec && _coveredVariableNames.Contains(exprDName.SuffixName)) {
+            _coveredVariableNames.Remove(exprDName.SuffixName);
+            Targets.RemoveAll(t => t.Item3 == exprDName.SuffixName);
+        }
+    }
     
     protected override void VisitExpression(NestedMatchExpr nMExpr) {
         if (ShouldImplement("SDL") && nMExpr.Cases.Count > 1) {
@@ -235,10 +343,42 @@ public class PreResolveTargetScanner : TargetScanner
     }
     
     protected override void VisitExpression(SeqSelectExpr seqSExpr) {
-        if (!seqSExpr.SelectOne && seqSExpr.E0 != null)
+        if (!seqSExpr.SelectOne && seqSExpr.E0 != null && ShouldImplement("SDL"))
             Targets.Add(($"{seqSExpr.E0.Center.pos}", "SDL", ""));
-        if (!seqSExpr.SelectOne && seqSExpr.E1 != null)
+        if (!seqSExpr.SelectOne && seqSExpr.E1 != null && ShouldImplement("SDL"))
             Targets.Add(($"{seqSExpr.E1.Center.pos}", "SDL", ""));
         base.VisitExpression(seqSExpr);
+    }
+    
+    protected override void VisitExpression(ComprehensionExpr compExpr) {
+        IsParentSpec = true;
+        if (compExpr is LambdaExpr lExpr && lExpr.Reads.Expressions != null) {
+            foreach (var reads in lExpr.Reads.Expressions)
+                HandleExpression(reads.E);                
+        }
+        IsParentSpec = false;
+        base.VisitExpression(compExpr);
+    }
+
+    protected override void VisitExpression(OldExpr oldExpr) {
+        IsParentSpec = true;
+        HandleExpression(oldExpr.E);
+        IsParentSpec = false;
+    }
+    
+    protected override void VisitExpression(UnchangedExpr unchExpr) {
+        IsParentSpec = true;
+        foreach (var unchanged in unchExpr.Frame)
+            HandleExpression(unchanged.E);            
+        IsParentSpec = false;
+    }
+    
+    protected override void VisitExpression(DecreasesToExpr dToExpr) {
+        IsParentSpec = true;
+        foreach (var oldExpr in dToExpr.OldExpressions)
+            HandleExpression(oldExpr); 
+        foreach (var newExpr in dToExpr.NewExpressions)
+            HandleExpression(newExpr); 
+        IsParentSpec = false;
     }
 }

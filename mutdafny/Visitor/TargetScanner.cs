@@ -5,9 +5,10 @@ namespace MutDafny.Visitor;
 public abstract class TargetScanner(List<string> operatorsInUse, ErrorReporter reporter) : Visitor("-1", reporter)
 {
     protected List<(string, string, string)> Targets { get; } = [];
+    protected bool IsParentSpec;
     
     protected bool ShouldImplement(string op) {
-        return operatorsInUse.Count == 0 || operatorsInUse.Contains(op);
+        return !IsParentSpec && (operatorsInUse.Count == 0 || operatorsInUse.Contains(op));
     }
     
     public void ExportTargets() {
