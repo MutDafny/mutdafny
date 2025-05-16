@@ -28,6 +28,7 @@ public class MutatorFactory(ErrorReporter reporter)
             "CIR" => mutationArg == null ? 
                 new CollectionInitReplacementMutator(mutationTargetPos, "", reporter) :
                 new CollectionInitReplacementMutator(mutationTargetPos, mutationArg, reporter), 
+            "CBR" => new CaseBlockReplacementMutator(mutationTargetPos, reporter),
             "SDL" => new StmtDeletionMutator(mutationTargetPos, reporter),
             "VDL" => mutationArg == null ? null :
                 new VariableDeletionMutator(mutationTargetPos, mutationArg, reporter),

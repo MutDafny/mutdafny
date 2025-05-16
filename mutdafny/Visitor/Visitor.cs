@@ -13,6 +13,8 @@ public class Visitor
     protected Expression? TargetExpression { get; set; }
     protected AssignmentRhs? TargetAssignmentRhs { get; set; }
     
+    protected NestedMatchCase? TargetNestedMatchCase { get; set; }
+    
     private readonly Dictionary<Type, Action<Statement>> _statementHandlers;
     private readonly Dictionary<Type, Action<Expression>> _expressionHandlers;
     protected readonly string MutationTargetPos;
@@ -617,17 +619,21 @@ public class Visitor
     }
 
     protected bool TargetFound() {
-        return TargetStatement != null || TargetExpression != null || TargetAssignmentRhs != null;
+        return TargetStatement != null || TargetExpression != null || 
+               TargetAssignmentRhs != null || TargetNestedMatchCase != null;
     }
 
     private INode? GetTarget() {
         if (TargetExpression != null) return TargetExpression;
         if (TargetStatement != null) return TargetStatement;
-        return TargetAssignmentRhs;
+        if (TargetAssignmentRhs != null) return TargetAssignmentRhs;
+        return TargetNestedMatchCase;
     }
 
     private string GetTargetType() {
-        return TargetExpression != null ? "expression" : 
-            (TargetStatement != null ? "statement" : "assignment rhs");
+        if (TargetExpression != null) return "expression";
+        if (TargetStatement != null) return "statement";
+        if (TargetAssignmentRhs != null) return "assignment rhs";
+        return "nested match case";
     }
 }

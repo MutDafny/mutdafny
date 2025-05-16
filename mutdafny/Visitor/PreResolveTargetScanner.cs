@@ -202,10 +202,24 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
     }
     
     protected override void VisitStatement(NestedMatchStmt nMatchStmt) {
-        if (ShouldImplement("SDL") && nMatchStmt.Cases.Count > 1) { // stmt must have at least one alternative
+        if (nMatchStmt.Cases.Count <= 1) {
+            base.VisitStatement(nMatchStmt);
+            return;
+        }
+
+        var hasDefaultCase = false;
+        foreach (var cs in nMatchStmt.Cases) {
+            if (cs.Pat is IdPattern idPat && idPat.IsWildcardPattern) {
+                hasDefaultCase = true;
+                continue;
+            }
+            if (ShouldImplement("SDL"))
+                Targets.Add(($"{cs.StartToken.pos}-{cs.EndToken.pos}", "SDL", ""));
+        }
+        if (ShouldImplement("CBR") && hasDefaultCase) {
             foreach (var cs in nMatchStmt.Cases) {
                 if (cs.Pat is IdPattern idPat && idPat.IsWildcardPattern) continue;
-                Targets.Add(($"{cs.StartToken.pos}-{cs.EndToken.pos}", "SDL", ""));
+                Targets.Add(($"{cs.StartToken.pos}-{cs.EndToken.pos}", "CBR", ""));
             }
         }
         base.VisitStatement(nMatchStmt);
@@ -345,10 +359,24 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
     }
     
     protected override void VisitExpression(NestedMatchExpr nMExpr) {
-        if (ShouldImplement("SDL") && nMExpr.Cases.Count > 1) {
+        if (nMExpr.Cases.Count <= 1) {
+            base.VisitExpression(nMExpr);
+            return;
+        }
+
+        var hasDefaultCase = false;
+        foreach (var cs in nMExpr.Cases) {
+            if (cs.Pat is IdPattern idPat && idPat.IsWildcardPattern) {
+                hasDefaultCase = true;
+                continue;
+            }
+            if (ShouldImplement("SDL"))
+                Targets.Add(($"{cs.StartToken.pos}-{cs.EndToken.pos}", "SDL", ""));
+        }
+        if (ShouldImplement("CBR") && hasDefaultCase) {
             foreach (var cs in nMExpr.Cases) {
                 if (cs.Pat is IdPattern idPat && idPat.IsWildcardPattern) continue;
-                Targets.Add(($"{cs.StartToken.pos}-{cs.EndToken.pos}", "SDL", ""));
+                Targets.Add(($"{cs.StartToken.pos}-{cs.EndToken.pos}", "CBR", ""));
             }
         }
         base.VisitExpression(nMExpr);
