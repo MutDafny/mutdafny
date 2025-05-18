@@ -9,6 +9,7 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
 {
     private bool _skipChildUOIMutation;
     private bool _skipChildEVRMutation;
+    private bool _skipChildDCRMutation;
     private bool _typesInferredFromContext;
     private string _childMethodCallPos = "";
     private List<string> _childMethodCallArgTypes = [];
@@ -213,6 +214,39 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
             (TypeToStr(cAStmt.Lhss[0].Type) == TypeToStr(_childExprDotName.Lhs.Type) || _typesInferredFromContext))
             Targets.Add((_childMethodCallPos, "MCR", ""));
     }
+
+    private void ScanDCRTargets(ApplySuffix appSufExpr) {
+        if (!ShouldImplement("DCR") || appSufExpr.Type.AsDatatype == null) return;
+        
+        if (appSufExpr.Lhs is not NameSegment nSegExpr) return;
+        var dtCtor = nSegExpr.Name;
+        var numArgs = appSufExpr.Bindings.ArgumentBindings.Count;
+        var argTypes = appSufExpr.Bindings.ArgumentBindings.Select(a => a.Actual.Type).ToList();
+        
+        foreach (var ctor in appSufExpr.Type.AsDatatype.Ctors) {
+            if (ctor.Name == dtCtor || ctor.Formals.Count != numArgs) continue;
+            var signatureMatches = true;
+            foreach (var (formal, i) in ctor.Formals.Select((f, i) => (f, i))) {
+                if (formal.Type.ToString() == argTypes[i].ToString()) continue;
+                signatureMatches = false;
+                break;
+            }
+            
+            if (signatureMatches)
+                Targets.Add(($"{appSufExpr.Center.pos}", "DCR", $"{ctor.Name}"));
+        }
+    }
+    
+    private void ScanDCRTargets(NameSegment nSegExpr) {
+        if (!ShouldImplement("DCR") || _skipChildDCRMutation || nSegExpr.Type.AsDatatype == null) 
+            return;
+        
+        var dtCtor = nSegExpr.Name;
+        foreach (var ctor in nSegExpr.Type.AsDatatype.Ctors) {
+            if (ctor.Name != dtCtor && ctor.Formals.Count == 0)
+                Targets.Add(($"{nSegExpr.Center.pos}", "DCR", $"{ctor.Name}"));
+        }
+    }
     
     private string PrimitiveTypeToStr(Type type) {
         if (type.IsIntegerType) return "int";
@@ -336,6 +370,7 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
     protected override void VisitExpression(NameSegment nSegExpr) {
         ScanUOITargets(nSegExpr);
         ScanEVRTargets(nSegExpr);
+        ScanDCRTargets(nSegExpr);
     }
     
     protected override void VisitExpression(LetExpr ltExpr) {
@@ -359,6 +394,8 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
     protected override void VisitExpression(SuffixExpr suffixExpr) {
         _childMethodCallPos = $"{suffixExpr.Center.pos}";
         if (suffixExpr is ApplySuffix appSufExpr) {
+            if (appSufExpr.Type.IsDatatype)
+                ScanDCRTargets(appSufExpr);
             foreach (var binding in appSufExpr.Bindings.ArgumentBindings) {
                 _childMethodCallArgTypes.Add(TypeToStr(binding.Actual.Type));
             }
@@ -369,8 +406,10 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
         ScanUOITargets(suffixExpr);
         ScanEVRTargets(suffixExpr);
         _skipChildEVRMutation = true;
+        _skipChildDCRMutation = true;
         base.VisitExpression(suffixExpr);
         _skipChildEVRMutation = false;
+        _skipChildDCRMutation = false;
     }
     
     protected override void VisitExpression(FunctionCallExpr fCallExpr) {

@@ -42,6 +42,7 @@ cd mutdafny && dotnet build
 | MCR (Method Call Replacement) | Replacement of a method call with a default literal, with one of its arguments with the same type as the return value, or with its receiver | NA (for naked receiver mutation), type/list of types (for methods with multiple output variables) or index/list of indexes referring to the position of the argument to be propagated |
 | CIR (Collection Initialization Replacement) | Replacement of non-empty collection initializers with an empty one and of empty initializers with a default non-empty one | NA (for empty initialization) or type of the collection's elements |
 | CBR (Case Block Replacement) | Replacement of match statement cases with the default one and of the default label with one provided by the programmer | NA |
+| DCR (Datatype Constructor Replacement) | Replacement of a datatype constructor with another of the same datatype and with the same signature | The name of the replacement constructor |
 | SDL (Statement Deletion) | Deletion of a statement or of an entire code block | NA |
 | VDL (Variable Deletion) | Deletion of all occurences of a variable | Variable name |
 | ODL (Operator Deletion) | Deletion of all occurences of a binary operator (and of one of its arguments in order to preserve program validity) | Operator code and the argument to delete |
