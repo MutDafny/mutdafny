@@ -394,7 +394,7 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
     protected override void VisitExpression(SuffixExpr suffixExpr) {
         _childMethodCallPos = $"{suffixExpr.Center.pos}";
         if (suffixExpr is ApplySuffix appSufExpr) {
-            if (appSufExpr.Type.IsDatatype)
+            if (appSufExpr.Type != null && appSufExpr.Type.IsDatatype)
                 ScanDCRTargets(appSufExpr);
             foreach (var binding in appSufExpr.Bindings.ArgumentBindings) {
                 _childMethodCallArgTypes.Add(TypeToStr(binding.Actual.Type));

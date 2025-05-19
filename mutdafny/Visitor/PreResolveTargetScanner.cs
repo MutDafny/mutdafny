@@ -6,13 +6,16 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
     : TargetScanner(operatorsInUse, reporter)
 {
     private List<string> _coveredVariableNames = [];
-    private List<BinaryExpr.Opcode> _coveredOperators = [];
+    private readonly List<BinaryExpr.Opcode> _coveredOperators = [];
     private string _currentMethodScope = "";
+    private List<string> _currentMethodIns = [];
     private List<string> _currentMethodOuts = [];
     private List<string> _currentInitMethodOuts = [];
+    private List<string> _currentSourceDeclFields = [];
     private bool _isCurrentMethodVoid;
     private bool _isChildIfBlock;
     private bool _isParentVarDeclStmt;
+    private bool _scanThisKeywordTargets;
     
     private readonly Dictionary<BinaryExpr.Opcode, List<BinaryExpr.Opcode>> _replacementList = new()
     {
@@ -46,17 +49,44 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
         { BinaryExpr.Opcode.In, [BinaryExpr.Opcode.NotIn] },
         { BinaryExpr.Opcode.NotIn, [BinaryExpr.Opcode.In] },
     };
+
+    private void ScanThisKeywordTargets(TopLevelDeclWithMembers decl) {
+        if (!ShouldImplement("THI") && !ShouldImplement("THD")) return;
+        foreach (var member in decl.Members) {
+            if (member.IsGhost) continue; // only searches for mutation targets in non-ghost constructs
+
+            if (member is MethodOrFunction mf) {
+                _currentMethodIns = mf.Ins.Select(i => i.Name).ToList();
+                if (!_currentMethodIns.Intersect(_currentSourceDeclFields).Any())
+                    continue;
+                _scanThisKeywordTargets = true;
+                if (!_scanThisKeywordTargets) continue;
+            }
+            if (member is Method m) {
+                HandleMethod(m);
+            } else if (member is Function f) {
+                HandleFunction(f);
+            }
+        }
+        
+        _currentMethodIns = [];
+    }
     
     protected override void HandleMemberDecls(TopLevelDeclWithMembers decl) {
+        _currentSourceDeclFields = [];
         foreach (var member in decl.Members) {
+            if (member is Field f)
+                _currentSourceDeclFields.Add(f.Name);
+            
             if (member is not ConstantField cf) continue;
             if (!ShouldImplement("VDL")) break;
             _coveredVariableNames.Add(cf.Name);
             Targets.Add(("-", "VDL", cf.Name));
         }
         base.HandleMemberDecls(decl);
+        ScanThisKeywordTargets(decl);
     }
-
+    
     protected override void HandleMethod(Method method) {
         var methodIndependentVars = _coveredVariableNames.Select(item => (string)item.Clone()).ToList();
         _isCurrentMethodVoid = method.Outs.Count == 0;
@@ -93,6 +123,8 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
         if (!_isParentVarDeclStmt && ShouldImplement("SDL") && canMutate) {
             Targets.Add(($"{cAStmt.StartToken.pos}-{cAStmt.EndToken.pos}", "SDL", ""));
         }
+
+        if (_scanThisKeywordTargets) return;
         base.VisitStatement(cAStmt);
     }
     
@@ -347,15 +379,36 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
         if (IsParentSpec && _coveredVariableNames.Contains(nSegExpr.Name)) {
             _coveredVariableNames.Remove(nSegExpr.Name);
             Targets.RemoveAll(t => t.Item3 == nSegExpr.Name);
+        } else if (_scanThisKeywordTargets && 
+                   _currentMethodIns.Contains(nSegExpr.Name) && 
+                   _currentSourceDeclFields.Contains(nSegExpr.Name)) 
+        {
+            if (ShouldImplement("THI"))
+                Targets.Add(($"{nSegExpr.Center.pos}", "THI", ""));
         }
     }
     
     protected override void VisitExpression(SuffixExpr suffixExpr) {
-        if (suffixExpr is not ExprDotName exprDName) return;
+        if (suffixExpr is not ExprDotName exprDName) {
+            base.VisitExpression(suffixExpr);
+            return;
+        }
+
         if (IsParentSpec && _coveredVariableNames.Contains(exprDName.SuffixName)) {
             _coveredVariableNames.Remove(exprDName.SuffixName);
             Targets.RemoveAll(t => t.Item3 == exprDName.SuffixName);
-        }
+        } else if (_scanThisKeywordTargets && exprDName.Lhs is ThisExpr) {
+            var fieldName = exprDName.SuffixName;
+
+            if (!_currentMethodIns.Contains(fieldName)) return;
+            if (ShouldImplement("THD"))
+                Targets.Add(($"{exprDName.Center.pos}", "THD", ""));
+        }      
+
+        var prevScanThisKeywordTargets = _scanThisKeywordTargets;
+        _scanThisKeywordTargets = false;
+        base.VisitExpression(suffixExpr);
+        _scanThisKeywordTargets = prevScanThisKeywordTargets;
     }
     
     protected override void VisitExpression(NestedMatchExpr nMExpr) {
