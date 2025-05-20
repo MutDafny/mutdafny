@@ -48,3 +48,4 @@ cd mutdafny && dotnet build
 | ODL (Operator Deletion) | Deletion of all occurences of a binary operator (and of one of its arguments in order to preserve program validity) | Operator code and the argument to delete |
 | THI (This Keyword Insertion) | Insertion of the `this` keyword in front of the use of a parameter that has the same name as a class field | NA |
 | THD (This Keyword Deletion) | Deletion of the `this` keyword in front of the use of a class field that has the same name as a parameter | NA |
+| SWS (Switch Statement) | Switch a statement with the one either immediately below or above it | NA |

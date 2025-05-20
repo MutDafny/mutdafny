@@ -6,6 +6,7 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
     : TargetScanner(operatorsInUse, reporter)
 {
     private List<string> _coveredVariableNames = [];
+    private List<string> _specCoveredVariableNames = [];
     private readonly List<BinaryExpr.Opcode> _coveredOperators = [];
     private string _currentMethodScope = "";
     private List<string> _currentMethodIns = [];
@@ -71,6 +72,10 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
         
         _currentMethodIns = [];
     }
+
+    private bool ExcludeSWSTarget(Statement stmt) {
+        return stmt is PrintStmt || stmt is OpaqueBlock || stmt is PredicateStmt || stmt is CalcStmt;
+    }
     
     protected override void HandleMemberDecls(TopLevelDeclWithMembers decl) {
         _currentSourceDeclFields = [];
@@ -104,6 +109,31 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
     /// -------------------------------------
     /// Group of overriden statement visitors
     /// -------------------------------------
+    protected override void HandleBlock(List<Statement> statements) {
+        Statement? prevStmt = null;
+        foreach (var stmt in statements) {
+            var prevCoveredVariableNames = _coveredVariableNames;
+            _coveredVariableNames = []; // collect vars used in next statement
+            _specCoveredVariableNames = [];
+            
+            HandleStatement(stmt);
+            _coveredVariableNames = _coveredVariableNames.Concat(_specCoveredVariableNames).ToList();
+            if (!ShouldImplement("SWS")) continue;
+            if (prevStmt == null || ExcludeSWSTarget(prevStmt) || ExcludeSWSTarget(stmt)) {
+                prevStmt = stmt;
+                continue;
+            }
+            
+            if (prevStmt is not VarDeclStmt vDeclStmt) {
+                Targets.Add(($"{stmt.StartToken.pos}-{stmt.EndToken.pos}", "SWS", ""));
+            } else if (!vDeclStmt.Locals.Select(e => e.Name).Intersect(_coveredVariableNames).Any()) {
+                Targets.Add(($"{stmt.StartToken.pos}-{stmt.EndToken.pos}", "SWS", ""));
+            }
+            prevStmt = stmt;
+            _coveredVariableNames = prevCoveredVariableNames.Concat(_coveredVariableNames).Distinct().ToList(); 
+        }
+    }
+    
     protected override void VisitStatement(ConcreteAssignStatement cAStmt) {
         var canMutate = true;
         foreach (var lhs in cAStmt.Lhss) {
@@ -376,13 +406,17 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
     }
 
     protected override void VisitExpression(NameSegment nSegExpr) {
-        if (IsParentSpec && _coveredVariableNames.Contains(nSegExpr.Name)) {
-            _coveredVariableNames.Remove(nSegExpr.Name);
+        if (IsParentSpec) {
+            if (_coveredVariableNames.Contains(nSegExpr.Name))
+                _coveredVariableNames.Remove(nSegExpr.Name);
+            _specCoveredVariableNames.Add(nSegExpr.Name);
             Targets.RemoveAll(t => t.Item3 == nSegExpr.Name);
+        } else if (!_coveredVariableNames.Contains(nSegExpr.Name) && 
+                   !_currentMethodIns.Contains(nSegExpr.Name)) {
+            _coveredVariableNames.Add(nSegExpr.Name);
         } else if (_scanThisKeywordTargets && 
-                   _currentMethodIns.Contains(nSegExpr.Name) && 
-                   _currentSourceDeclFields.Contains(nSegExpr.Name)) 
-        {
+                  _currentMethodIns.Contains(nSegExpr.Name) && 
+                  _currentSourceDeclFields.Contains(nSegExpr.Name)) {
             if (ShouldImplement("THI"))
                 Targets.Add(($"{nSegExpr.Center.pos}", "THI", ""));
         }
@@ -394,8 +428,10 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
             return;
         }
 
-        if (IsParentSpec && _coveredVariableNames.Contains(exprDName.SuffixName)) {
-            _coveredVariableNames.Remove(exprDName.SuffixName);
+        if (IsParentSpec) {
+            if (_coveredVariableNames.Contains(exprDName.SuffixName))
+                _coveredVariableNames.Remove(exprDName.SuffixName);
+            _specCoveredVariableNames.Add(exprDName.SuffixName);
             Targets.RemoveAll(t => t.Item3 == exprDName.SuffixName);
         } else if (_scanThisKeywordTargets && exprDName.Lhs is ThisExpr) {
             var fieldName = exprDName.SuffixName;

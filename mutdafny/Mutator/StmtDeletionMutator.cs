@@ -7,7 +7,7 @@ public class StmtDeletionMutator(string mutationTargetPos, ErrorReporter reporte
     private IfStmt? _parentStmt;
     
     private bool IsTarget(int tokenPos) {
-        return tokenPos == int.Parse(mutationTargetPos);
+        return tokenPos == int.Parse(MutationTargetPos);
     }
     
     private bool IsTarget(int startTokenPos, int endTokenPos) {
