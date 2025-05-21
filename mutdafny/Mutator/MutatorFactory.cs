@@ -38,6 +38,8 @@ public class MutatorFactory(ErrorReporter reporter)
                 new OperatorDeletionMutator(mutationTargetPos, mutationArg, reporter),
             "THI" => new ThisKeywordInsertionMutator(mutationTargetPos, reporter),
             "THD" => new ThisKeywordDeletionMutator(mutationTargetPos, reporter),
+            "PRV" => mutationArg == null ? null :
+                new PolymorphicRefReplacementMutator(mutationTargetPos, mutationArg, reporter),
             "SWS" => new SwitchStmtMutator(mutationTargetPos, reporter),
             _ => null
         };
