@@ -73,10 +73,140 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
         _currentMethodIns = [];
     }
 
+    private void ScanMBRTargets(TopLevelDeclWithMembers decl) {
+        if (!ShouldImplement("AMR") && !ShouldImplement("MMR")) return;
+        
+        var getters = new List<Method>();
+        var setters = new List<Method>();
+        foreach (var member in decl.Members) {
+            if (member is not Method m) continue;
+            if (IsGetter(m))
+                getters.Add(m);
+            if (IsSetter(m))
+                setters.Add(m);
+        }
+
+        if (ShouldImplement("AMR")) 
+            ComputeMethodReplacements(getters, true);
+        if (!ShouldImplement("MMR")) return;
+        ComputeMethodReplacements(setters, false);
+    }
+
+    private void ComputeMethodReplacements(List<Method> methods, bool isGetter) {
+        for (var i = 0; i < methods.Count; i++) {
+            for (var j = i+1; j < methods.Count; j++) {
+                var m1 = methods[i];
+                var m2 = methods[j];
+                
+                if (isGetter) {
+                    var m1OutTypes = m1.Outs.Select(o => o.Type.ToString()).ToList();
+                    var m2OutTypes = m2.Outs.Select(o => o.Type.ToString()).ToList();
+                    if (m1OutTypes.SequenceEqual(m2OutTypes))
+                        Targets.Add(($"{m1.StartToken.pos}-{m1.EndToken.pos}", "AMR", $"{m2.StartToken.pos}-{m2.EndToken.pos}"));
+                } else {
+                    var m1InTypes = m1.Ins.Select(i => i.Type.ToString()).ToList();
+                    var m2InTypes = m2.Ins.Select(i => i.Type.ToString()).ToList();
+                    if (m1InTypes.SequenceEqual(m2InTypes))
+                        Targets.Add(($"{m1.StartToken.pos}-{m1.EndToken.pos}", "MMR", $"{m2.StartToken.pos}-{m2.EndToken.pos}"));
+                }
+            }
+        }
+    }
+
+    private List<string> GetLhsNameList(List<Expression> lhss) {
+        var lhsNameList = new List<string>();
+        foreach (var lhs in lhss) {
+            if (lhs is NameSegment nSegExpr) {
+                lhsNameList.Add(nSegExpr.Name);
+            } else if (lhs is ExprDotName exprDName && exprDName.Lhs is ThisExpr) {
+                lhsNameList.Add(exprDName.SuffixName);
+            } else {
+                return [];
+            }
+        }
+        return lhsNameList;
+    }
+
+    private List<string> GetRhsNameList(List<AssignmentRhs> rhss) {
+        var rhsNameList = new List<string>();
+        foreach (var rhs in rhss) {
+            if (rhs is not ExprRhs exprRhs) return [];
+            if (exprRhs.Expr is NameSegment nSegExpr) {
+                rhsNameList.Add(nSegExpr.Name);
+                continue;
+            }
+            if (exprRhs.Expr is ExprDotName exprDName && exprDName.Lhs is ThisExpr) {
+                rhsNameList.Add(exprDName.SuffixName);
+                continue;
+            }
+            return [];
+        }
+
+        return rhsNameList;
+    }
+    
+    private bool IsGetter(Method method) {
+        if (method.Ins.Count != 0 || method.Body == null) 
+            return false;
+        
+        foreach (var stmt in method.Body.Body) {
+            if (stmt is ReturnStmt rStmt) { // all rhs are fields
+                var rhsNames = GetRhsNameList(rStmt.Rhss);
+                if (rhsNames.Count == 0) return false;
+                if (rhsNames.Any(rhs => !_currentSourceDeclFields.Contains(rhs)))
+                    return false;
+            } 
+            if (stmt is ConcreteAssignStatement cAStmt) { // all lhs are return vars and all rhs are fields
+                if (cAStmt.Lhss.Any(lhs => lhs is not NameSegment))
+                    return false;
+                var lhsNames = cAStmt.Lhss.Select(lhs => (lhs as NameSegment)?.Name).ToList();
+                var outNames = method.Outs.Select(o => o.Name).ToList();
+                if (lhsNames.Any(lhs => lhs != null && !outNames.Contains(lhs)))
+                    return false;
+                
+                List<string> rhsNames = new List<string>();
+                if (cAStmt is AssignSuchThatStmt aStStmt) {
+                    if (aStStmt.Expr is not NameSegment nSegExpr) return false;
+                    rhsNames = [nSegExpr.Name];
+                } else if (cAStmt is AssignStatement aStmt) {
+                    rhsNames = GetRhsNameList(aStmt.Rhss);
+                } else if (cAStmt is AssignOrReturnStmt aOrRStmt) {
+                    rhsNames = GetRhsNameList(aOrRStmt.Rhss);
+                }
+                if (rhsNames.Count == 0) return false;
+                if (rhsNames.Any(rhs => !_currentSourceDeclFields.Contains(rhs)))
+                    return false;
+            } else {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private bool IsSetter(Method method) {
+        if (method.Outs.Count != 0 || method.Body == null) 
+            return false;
+
+        foreach (var stmt in method.Body.Body) {
+            if (stmt is ConcreteAssignStatement cAStmt) {
+                var lhsNames = GetLhsNameList(cAStmt.Lhss);
+                if (lhsNames.Count == 0) return false;
+                if (lhsNames.Any(lhs => !_currentSourceDeclFields.Contains(lhs)))
+                    return false;
+            } else {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private bool ExcludeSWSTarget(Statement stmt) {
         return stmt is PrintStmt || stmt is OpaqueBlock || stmt is PredicateStmt || stmt is CalcStmt;
     }
     
+    /// -------------------------------------
+    /// Group of overriden top level visitors
+    /// -------------------------------------
     protected override void HandleMemberDecls(TopLevelDeclWithMembers decl) {
         _currentSourceDeclFields = [];
         foreach (var member in decl.Members) {
@@ -90,6 +220,7 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
         }
         base.HandleMemberDecls(decl);
         ScanThisKeywordTargets(decl);
+        ScanMBRTargets(decl);
     }
     
     protected override void HandleMethod(Method method) {
