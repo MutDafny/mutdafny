@@ -219,8 +219,10 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
             Targets.Add(("-", "VDL", cf.Name));
         }
         base.HandleMemberDecls(decl);
+        IsFirstVisit = false;
         ScanThisKeywordTargets(decl);
         ScanMBRTargets(decl);
+        IsFirstVisit = true;
     }
     
     protected override void HandleMethod(Method method) {

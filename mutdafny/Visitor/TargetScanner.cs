@@ -6,9 +6,13 @@ public abstract class TargetScanner(List<string> operatorsInUse, ErrorReporter r
 {
     protected List<(string, string, string)> Targets { get; } = [];
     protected bool IsParentSpec;
+    protected bool IsFirstVisit = true;
     
     protected bool ShouldImplement(string op) {
-        return !IsParentSpec && (operatorsInUse.Count == 0 || operatorsInUse.Contains(op));
+        if (op != "THI" && op != "THD" && op != "AMR" && op != "MMR") {
+            return IsFirstVisit && !IsParentSpec && (operatorsInUse.Count == 0 || operatorsInUse.Contains(op));
+        }
+        return !IsFirstVisit && !IsParentSpec && (operatorsInUse.Count == 0 || operatorsInUse.Contains(op));
     }
     
     public void ExportTargets() {
