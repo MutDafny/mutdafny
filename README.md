@@ -50,5 +50,6 @@ cd mutdafny && dotnet build
 | THD (This Keyword Deletion) | Deletion of the `this` keyword in front of the use of a class field that has the same name as a parameter | NA |
 | AMR (Accessor Method Replacement) | Replacement of the body of an accessor (get) method with another with the same signature | The position of the method with the replacement body |
 | MMR (Modifier Method Replacement) | Replacement of the body of a modifier (set) method with another with the same signature | The position of the method with the replacement body |
+| FAR (Field Access Replacement) | Replacement of a class's field access with a different field of the same class | The name of the replacement field |
 | PRV (Polymorphic Reference Replacement) | Replacement of a child reference assignment to a parent with a child reference of a different type | The name of the replacement variable |
 | SWS (Switch Statement) | Switch a statement with the one either immediately below or above it | NA |

@@ -10,11 +10,14 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
     private bool _skipChildUOIMutation;
     private bool _skipChildEVRMutation;
     private bool _skipChildDCRMutation;
+    private bool _skipChildFARMutation;
     private bool _typesInferredFromContext;
     private string _childMethodCallPos = "";
     private List<string> _childMethodCallArgTypes = [];
     private Dictionary<string, Type> _childClassVariables = [];
     private List<(string, int, Type)> _currentScopeChildAccessedVariables = [];
+    private List<(string, ClassLikeDecl, Type)> _classFields = []; // field name, class type, field type
+    private List<ExprDotName> _accessedClassFields = [];
     private ExprDotName? _childExprDotName;
     
     private void ScanUOITargets(Expression expr) {
@@ -270,6 +273,25 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
             }
         }
     }
+
+    private void ScanFARMutations() {
+        if (!ShouldImplement("FAR")) return;
+
+        foreach (var fieldAccess in _accessedClassFields) {
+            var classDecl1 = fieldAccess.Lhs.Type?.AsTopLevelTypeWithMembers;
+            if (classDecl1 == null) continue;
+            var parents = classDecl1.ParentTraitHeads.Select(t => t.ToString()).ToList();
+            
+            foreach (var field in _classFields) {
+                if (field.Item1 == fieldAccess.SuffixName) continue;
+                var classDecl2 = field.Item2;
+                
+                if ((classDecl1.ToString() == classDecl2.ToString() || parents.Contains(classDecl2.ToString())) &&
+                    fieldAccess.Type.ToString() == field.Item3.ToString())
+                    Targets.Add(($"{fieldAccess.Center.pos}", "FAR", field.Item1));
+            }
+        }
+    }
     
     private string PrimitiveTypeToStr(Type type) {
         if (type.IsIntegerType) return "int";
@@ -299,8 +321,16 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
     /// -------------------------------------
     /// Group of overriden top level visitors
     /// -------------------------------------
+    public override void Find(ModuleDefinition module) {
+        base.Find(module);
+        ScanFARMutations();
+    }
+    
     protected override void HandleMemberDecls(TopLevelDeclWithMembers decl) {
         foreach (var member in decl.Members) {
+            if (decl is ClassLikeDecl clDecl && member is Field f)
+                _classFields.Add((f.Name, clDecl, f.Type));
+            
             if (member is not ConstantField cf || cf.Rhs == null) 
                 continue;
             
@@ -475,9 +505,17 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
             foreach (var binding in appSufExpr.Bindings.ArgumentBindings) {
                 _childMethodCallArgTypes.Add(TypeToStr(binding.Actual.Type));
             }
+
+            _skipChildFARMutation = true;
         }
-        if (suffixExpr.Lhs is ExprDotName exprDName)
-            _childExprDotName = exprDName;
+        if (suffixExpr.Lhs is ExprDotName exprDNameLhs)
+            _childExprDotName = exprDNameLhs;
+
+        if (!_skipChildFARMutation && suffixExpr is ExprDotName exprDName && exprDName.Lhs is NameSegment nSegExpr && 
+            nSegExpr.Type.AsTopLevelTypeWithMembers != null && nSegExpr.Type.AsTopLevelTypeWithMembers is ClassLikeDecl)
+        {
+            _accessedClassFields.Add(exprDName);
+        }
         
         ScanUOITargets(suffixExpr);
         ScanEVRTargets(suffixExpr);
@@ -486,6 +524,7 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
         base.VisitExpression(suffixExpr);
         _skipChildEVRMutation = false;
         _skipChildDCRMutation = false;
+        _skipChildFARMutation = false;
     }
     
     protected override void VisitExpression(FunctionCallExpr fCallExpr) {
