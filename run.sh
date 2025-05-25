@@ -69,4 +69,3 @@ do
 done
 
 rm targets.csv
-rm helpers.txt

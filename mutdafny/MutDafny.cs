@@ -16,8 +16,6 @@ public class MutDafny : PluginConfiguration
     private string MutationOperator { get; set; } = "";
     private string? MutationArg { get; set; }
     
-    public static List<string> SpecHelpers { get; set; } = [];
-
     public override void ParseArguments(string[] args) {
         if (args.Length == 0) return;
         if (args[0] == "scan") {
@@ -49,8 +47,6 @@ public class MutationTargetScanner(List<string> operatorsInUse, ErrorReporter re
     public override void PreResolve(ModuleDefinition module) {
         var specHelperFinder = new SpecHelperFinder(Reporter);
         specHelperFinder.Find(module);
-        specHelperFinder.ExportHelpers();
-        MutDafny.SpecHelpers = specHelperFinder.SpecHelpers;
         
         var targetScanner = new PreResolveTargetScanner(operatorsInUse, Reporter);
         targetScanner.Find(module);
@@ -67,8 +63,6 @@ public class MutationTargetScanner(List<string> operatorsInUse, ErrorReporter re
 public class MutantGenerator(string mutationTargetPos, string mutationOperator, string? mutationArg, ErrorReporter reporter) : Rewriter(reporter)
 {
     public override void PreResolve(ModuleDefinition module) {
-        MutDafny.SpecHelpers = new List<string>(File.ReadAllLines("helpers.txt"));
-        
         if (mutationOperator == "VDL" || mutationOperator == "ODL") return;
         var mutatorFactory = new MutatorFactory(Reporter);
         var mutator = mutatorFactory.Create(mutationTargetPos, mutationOperator, mutationArg);

@@ -149,7 +149,7 @@ public class Visitor
                 HandleMethod(m);  
             } else if (member is Function func) { // includes predicate
                 // only searches for mutation targets in functions/predciates not used in spec
-                var specHelpers = MutDafny.SpecHelpers;                
+                var specHelpers = SpecHelperFinder.SpecHelpers;                
                 if (specHelpers.Contains(func.Name)) continue;
                 HandleFunction(func);
             } else if (member is ConstantField cf) {
