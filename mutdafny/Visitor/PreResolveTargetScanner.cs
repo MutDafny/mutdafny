@@ -518,6 +518,15 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
                     Targets.Add(($"{e.Center.pos}", "BOR", replacement.ToString()));
                 }
             }
+
+            if (ShouldImplement("THI") && e is NameSegment nSegExpr && _scanThisKeywordTargets &&
+                _currentMethodIns.Contains(nSegExpr.Name) && _currentSourceDeclFields.Contains(nSegExpr.Name)) {
+                Targets.Add(($"{nSegExpr.Center.pos}", "THI", ""));
+            }
+            if (ShouldImplement("THD") && e is ExprDotName exprDName && _scanThisKeywordTargets &&
+                exprDName.Lhs is ThisExpr && _currentMethodIns.Contains(exprDName.SuffixName)) {
+                Targets.Add(($"{exprDName.Center.pos}", "THD", ""));
+            }
         }
     }
     

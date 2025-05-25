@@ -8,6 +8,7 @@ public class OperatorDeletionMutator : ExprReplacementMutator
     private BinaryExpr.Opcode _op;
     private readonly bool _shouldDeleteLhs;
     private Type? _currentTypeRestriction;
+    private ConcreteAssignStatement? _parentAssignStmt;
         
     public OperatorDeletionMutator(string mutationTargetPos, string val, ErrorReporter reporter) : base(mutationTargetPos, reporter)
     {
@@ -23,7 +24,7 @@ public class OperatorDeletionMutator : ExprReplacementMutator
             return originalExpr;
         
         var mutatedExpr = _shouldDeleteLhs ? bExpr.E1 : bExpr.E0;
-        if (_currentTypeRestriction != null && mutatedExpr.GetType() != _currentTypeRestriction.GetType())
+        if (_currentTypeRestriction != null && mutatedExpr.Type.ToString() != _currentTypeRestriction.ToString())
             return originalExpr;
         return mutatedExpr;
     }
@@ -31,10 +32,28 @@ public class OperatorDeletionMutator : ExprReplacementMutator
     private bool IsTarget(BinaryExpr expr) {
         return expr.Op == _op;
     }
-    
+
     /// ---------------------------
     /// Group of overriden visitors
     /// ---------------------------
+    protected override void VisitStatement(AssignStatement aStmt) {
+        _parentAssignStmt = aStmt;
+        base.VisitStatement(aStmt);
+        _parentAssignStmt = null;
+    }
+    
+    protected override void VisitStatement(AssignSuchThatStmt aStStmt) {
+        _parentAssignStmt = aStStmt;
+        base.VisitStatement(aStStmt);
+        _parentAssignStmt = null;
+    }
+    
+    protected override void VisitStatement(AssignOrReturnStmt aOrRStmt) {
+        _parentAssignStmt = aOrRStmt;
+        base.VisitStatement(aOrRStmt);
+        _parentAssignStmt = null;
+    }
+    
     protected override void VisitExpression(BinaryExpr bExpr) {
         base.VisitExpression(bExpr);
         if (IsTarget(bExpr))
@@ -74,6 +93,16 @@ public class OperatorDeletionMutator : ExprReplacementMutator
                 alt.Guard = CreateMutatedExpression(alt.Guard);
             _currentTypeRestriction = null;
             HandleBlock(alt.Body);  
+        }
+    }
+    
+    protected override void HandleRhsList(List<AssignmentRhs> rhss) {
+        foreach (var (rhs, i) in rhss.Select((rhs, i) => (rhs, i))) {
+            if (!IsWorthVisiting(rhs.StartToken.pos, rhs.EndToken.pos))
+                continue;
+            _currentTypeRestriction = _parentAssignStmt?.Lhss[i].Type;
+            HandleAssignmentRhs(rhs);
+            _currentTypeRestriction = null;
         }
     }
 

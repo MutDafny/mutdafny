@@ -8,10 +8,10 @@ namespace MutDafny.Mutator;
 public class ExprValueReplacementMutator(string mutationTargetPos, string val, ErrorReporter reporter) 
     : ExprReplacementMutator(mutationTargetPos, reporter)
 {
-    protected override Expression CreateMutatedExpression(Expression originalExpr) {
-        TargetExpression = null;
+    private ChainingExpression? _chainingExpressionParent;
 
-        return val switch {
+    protected override Expression CreateMutatedExpression(Expression originalExpr) {
+        Expression mutatedExpr = val switch {
             "int" => new LiteralExpr(originalExpr.Origin, 0),
             "real" => new LiteralExpr(originalExpr.Origin, BigDec.ZERO),
             "bv" => new LiteralExpr(originalExpr.Origin, BigInteger.Zero),
@@ -23,6 +23,20 @@ public class ExprValueReplacementMutator(string mutationTargetPos, string val, E
             "map" => new MapDisplayExpr(originalExpr.Origin, true, []),
             _ => new LiteralExpr(originalExpr.Origin, null)
         };
+        
+        if (_chainingExpressionParent != null) {
+            var operands = _chainingExpressionParent.Operands;
+            foreach (var (e, i) in operands.Select((e, i) => (e, i)).ToList()) {
+                if (e != TargetExpression) continue;
+                operands[i] = mutatedExpr;
+            }
+            mutatedExpr = new ChainingExpression(_chainingExpressionParent.Origin, operands, 
+                _chainingExpressionParent.Operators, _chainingExpressionParent.OperatorLocs, 
+                _chainingExpressionParent.PrefixLimits);
+        }
+
+        TargetExpression = null;
+        return mutatedExpr;
     }
     
     private TypeRhs CreateArrayInit(AssignmentRhs originalRhs) {
@@ -106,6 +120,7 @@ public class ExprValueReplacementMutator(string mutationTargetPos, string val, E
         foreach (var operand in cExpr.Operands) {
             if (IsTarget(operand)) {
                 TargetExpression = operand;
+                _chainingExpressionParent = cExpr;
                 return;
             }
         }

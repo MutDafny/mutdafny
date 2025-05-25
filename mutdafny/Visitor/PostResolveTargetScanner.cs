@@ -453,7 +453,6 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
     
     protected override void VisitExpression(NegationExpression nExpr) {
         _skipChildUOIMutation = true;
-        ScanEVRTargets(nExpr);
         base.VisitExpression(nExpr);
     }
     
@@ -463,6 +462,19 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
         foreach (var operand in cExpr.Operands) {
             if (operand is not NegationExpression)
                 ScanUOITargets(operand);
+            
+            if (operand is LiteralExpr litExpr) {
+                ScanLVRTargets(litExpr);
+            } else if (operand is not NegationExpression) {
+                ScanEVRTargets(operand);
+            }
+            
+            if (operand is SuffixExpr suffixExpr && !_skipChildFARMutation && 
+                suffixExpr is ExprDotName exprDName && exprDName.Lhs is NameSegment nSegExpr && 
+                nSegExpr.Type.AsTopLevelTypeWithMembers != null && nSegExpr.Type.AsTopLevelTypeWithMembers is ClassLikeDecl)
+            {
+                _accessedClassFields.Add(exprDName);
+            }
         }
     }
 

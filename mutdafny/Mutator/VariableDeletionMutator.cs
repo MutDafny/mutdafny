@@ -597,20 +597,9 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
         foreach (var (e, i) in cExpr.Operands.Select((e, i) => (e, i)).ToList()) {
             HandleExpression(e);
             if (!TargetFound()) continue;
-            cExpr.Operands.RemoveAt(i);
-            cExpr.Operators.RemoveAt(i);
+            TargetExpression = cExpr;
+            return;
         }
-
-        if (cExpr.E is not BinaryExpr bExpr || bExpr.Op != BinaryExpr.Opcode.And) return;
-        HandleExpression(bExpr.E0);
-        if (TargetFound()) { // mutate
-            var replacement = HandleTarget(cExpr);
-            if (replacement == null) return;
-            bExpr.E0 = replacement;
-        }
-        HandleExpression(bExpr.E1);
-        if (TargetFound()) // mutate
-            bExpr.E1 = HandleTarget(cExpr) ?? bExpr.E1;
     }
     
     protected override void VisitExpression(LetExpr ltExpr) {
