@@ -13,12 +13,14 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
     private bool _skipChildFARMutation;
     private bool _typesInferredFromContext;
     private string _childMethodCallPos = "";
+    private ExprDotName? _childExprDotName;
     private List<string> _childMethodCallArgTypes = [];
     private Dictionary<string, Type> _childClassVariables = [];
     private List<(string, int, Type)> _currentScopeChildAccessedVariables = [];
-    private List<(string, ClassLikeDecl, Type)> _classFields = []; // field name, class type, field type
-    private List<ExprDotName> _accessedClassFields = [];
-    private ExprDotName? _childExprDotName;
+    private readonly List<(string, ClassLikeDecl, Type)> _classFields = []; // field name, class type, field type
+    private readonly List<ExprDotName> _accessedClassFields = [];
+    private readonly List<MethodOrFunction> _declaredMethods = [];
+    private readonly List<ApplySuffix> _methodCalls = [];
     
     private void ScanUOITargets(Expression expr) {
         if (!ShouldImplement("UOI")) return;
@@ -178,6 +180,36 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
         Targets.Add((exprLocation, "CIR", arg));
     }
 
+    private void ScanMCRTargets() {
+        if (!ShouldImplement("MCR")) return;
+        
+        foreach (var methodCall in _methodCalls) {
+            if (methodCall.Lhs is not NameSegment nSegExpr) continue;
+            var methodName = nSegExpr.Name;
+            var method = _declaredMethods.First(m => m.Name == methodName);
+
+            foreach (var m in _declaredMethods) {
+                if (m == method) continue;
+                
+                var m1InTypes = method.Ins.Select(o => o.Type.ToString()).ToList();
+                var m2InTypes = m.Ins.Select(o => o.Type.ToString()).ToList();
+                if (!m1InTypes.SequenceEqual(m2InTypes)) continue;
+                
+                if (method is Method m1 && m is Method m2) { // functions don't support a list of outputs
+                    var m1OutTypes = m1.Outs.Select(o => o.Type.ToString()).ToList();
+                    var m2OutTypes = m2.Outs.Select(o => o.Type.ToString()).ToList();
+                    if (!m1OutTypes.SequenceEqual(m2OutTypes)) continue;
+                } else if (method is Function f1 && m is Function f2) {
+                    if (f1.ResultType.ToString() != f2.ResultType.ToString()) continue;
+                } else {
+                    continue;
+                }
+                
+                Targets.Add(($"{methodCall.Center.pos}", "MCR", $"{m.Name}"));
+            }
+        }
+    }
+
     private void ScanMCRTargets(ConcreteAssignStatement cAStmt) {
         if (!ShouldImplement("MCR")) return;
         var typeArg = "";
@@ -323,6 +355,7 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
     /// -------------------------------------
     public override void Find(ModuleDefinition module) {
         base.Find(module);
+        ScanMCRTargets();
         ScanFARMutations();
     }
     
@@ -353,6 +386,8 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
     }
     
     protected override void HandleMethod(Method method) {
+        _declaredMethods.Add(method);
+        
         var methodIndependentVars = new Dictionary<string, Type>(_childClassVariables);
         foreach (var formal in method.Ins) {
             var classDecl = formal.Type.AsTopLevelTypeWithMembers;
@@ -368,7 +403,11 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
         _childClassVariables = methodIndependentVars;
         _currentScopeChildAccessedVariables = [];
     }
-
+    
+    protected override void HandleFunction(Function function) {
+        _declaredMethods.Add(function);
+        base.HandleFunction(function);
+    }
 
     /// -------------------------------------
     /// Group of overriden statement visitors
@@ -512,6 +551,8 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
     protected override void VisitExpression(SuffixExpr suffixExpr) {
         _childMethodCallPos = $"{suffixExpr.Center.pos}";
         if (suffixExpr is ApplySuffix appSufExpr) {
+            if (appSufExpr.Lhs is NameSegment)
+                _methodCalls.Add(appSufExpr);
             if (appSufExpr.Type != null && appSufExpr.Type.IsDatatype)
                 ScanDCRTargets(appSufExpr);
             foreach (var binding in appSufExpr.Bindings.ArgumentBindings) {

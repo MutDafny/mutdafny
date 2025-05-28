@@ -10,33 +10,61 @@ public class MethodCallReplacementMutator : Mutator
 {
     private readonly List<string> _types = [];
     private readonly List<int> _replacementArgsPos = [];
+    private readonly string _replacementMethodName = "";
     private SuffixExpr? _childSuffixExpr;
     
     public MethodCallReplacementMutator(string mutationTargetPos, string val, ErrorReporter reporter) : base(mutationTargetPos, reporter)
     {
-        var  args = val.Split('-').ToList();
-        if (int.TryParse(args[0], out _)) {
-            _replacementArgsPos = args.Select(int.Parse).ToList();
+        if (val.Contains('-')) {
+            var  args = val.Split('-').ToList();
+            if (int.TryParse(args[0], out _)) {
+                _replacementArgsPos = args.Select(int.Parse).ToList();
+            } else {
+                _types = args;
+            }
+        } else if (int.TryParse(val, out _)) {
+            _replacementArgsPos = [int.Parse(val)];
+        } else if (val == "int" || val == "real" || val == "bv" || val == "bool" || val == "char" || 
+                   val == "string" || val == "set" || val == "multiset" || val == "seq" || val == "map") {
+            _types = [val];
         } else if (val != "") {
-            _types = args;
+            _replacementMethodName = val;
         }
     }
 
     private Expression CreateMutatedExpression(Expression originalExpr) {
+        // replacement with default value
         if (_types.Count != 0 || _childSuffixExpr == null || _childSuffixExpr is not ApplySuffix appSufExpr)
             return CreateDefaultExpression(_types[0], originalExpr);
+        // replacement with different method
+        if (_types.Count == 0 && _replacementArgsPos.Count == 0 && 
+            _replacementMethodName != "" && appSufExpr.Lhs is NameSegment nSegExpr) {
+            nSegExpr.Name = _replacementMethodName;
+            return appSufExpr;
+        }
+        // naked receiver
         if (_types.Count == 0 && _replacementArgsPos.Count == 0 &&
-            _childSuffixExpr is ExprDotName exprDName) // naked receiver
+            _replacementMethodName == "" && _childSuffixExpr is ExprDotName exprDName)
             return exprDName.Lhs;
-        return appSufExpr.Bindings.ArgumentBindings[_replacementArgsPos[0]].Actual; // argument propagation
+        // argument propagation
+        return appSufExpr.Bindings.ArgumentBindings[_replacementArgsPos[0]].Actual;
     }
     
     private List<AssignmentRhs> CreateMutatedRhss(Expression originalRhs) {
+        // replacement with default value
         if (_types.Count != 0)
             return CreateDefaultRhss(originalRhs);
+        // replacement with different method
+        if (_types.Count == 0 && _replacementArgsPos.Count == 0 && _replacementMethodName != "" && 
+            originalRhs is ApplySuffix appSufExpr && appSufExpr.Lhs is NameSegment nSegExpr) {
+            nSegExpr.Name = _replacementMethodName;
+            return [new ExprRhs(appSufExpr)];
+        }
+        // naked receiver
         if (_types.Count == 0 && _replacementArgsPos.Count == 0 &&
-            _childSuffixExpr is ExprDotName exprDName) // naked receiver
+            _replacementMethodName == "" && _childSuffixExpr is ExprDotName exprDName)
             return [new ExprRhs(exprDName.Lhs)];
+        // argument propagation
         return CreateArgumentPropagationRhss();
     }
 
@@ -81,9 +109,9 @@ public class MethodCallReplacementMutator : Mutator
         return expr.Center.pos == int.Parse(MutationTargetPos);
     }
     
-    /// -----------------
+    /// --------------------------
     /// Group of overriden visitor
-    /// -----------------
+    /// --------------------------
     protected override void HandleMemberDecls(TopLevelDeclWithMembers decl) {
         foreach (var member in decl.Members) {
             if (member is not ConstantField cf)
