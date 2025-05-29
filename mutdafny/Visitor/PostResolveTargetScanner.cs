@@ -252,6 +252,20 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
             Targets.Add((_childMethodCallPos, "MCR", ""));
     }
 
+    private void ScanSARTargets(ApplySuffix appSufExpr) {
+        if (!ShouldImplement("SAR")) return;
+
+        for (var i = 0; i < appSufExpr.Bindings.ArgumentBindings.Count; i++) {
+            for (var j = i + 1; j < appSufExpr.Bindings.ArgumentBindings.Count; j++) {
+                var b1 = appSufExpr.Bindings.ArgumentBindings[i];
+                var b2 = appSufExpr.Bindings.ArgumentBindings[j];
+                if (b1.Actual.Type.ToString() != b2.Actual.Type.ToString()) 
+                    continue;
+                Targets.Add(($"{b1.Actual.Center.pos}", "SAR", $"{b2.Actual.Center.pos}"));
+            }
+        }
+    }
+
     private void ScanDCRTargets(ApplySuffix appSufExpr) {
         if (!ShouldImplement("DCR") || appSufExpr.Type.AsDatatype == null) return;
         
@@ -558,6 +572,7 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
             foreach (var binding in appSufExpr.Bindings.ArgumentBindings) {
                 _childMethodCallArgTypes.Add(TypeToStr(binding.Actual.Type));
             }
+            ScanSARTargets(appSufExpr);
 
             _skipChildFARMutation = true;
         }

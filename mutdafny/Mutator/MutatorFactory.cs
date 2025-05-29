@@ -25,6 +25,8 @@ public class MutatorFactory(ErrorReporter reporter)
             "MCR" => mutationArg == null ? 
                 new MethodCallReplacementMutator(mutationTargetPos, "", reporter) :
                 new MethodCallReplacementMutator(mutationTargetPos, mutationArg, reporter),
+            "SAR" => mutationArg == null ? null :
+                new SwitchArgMutator(mutationTargetPos, mutationArg, reporter),
             "CIR" => mutationArg == null ? 
                 new CollectionInitReplacementMutator(mutationTargetPos, "", reporter) :
                 new CollectionInitReplacementMutator(mutationTargetPos, mutationArg, reporter), 

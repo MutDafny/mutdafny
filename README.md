@@ -40,6 +40,7 @@ cd mutdafny && dotnet build
 | LSR (Loop Statement Replacement) | Replacement of `continue` with `break` and of `break` with ether `continue` or `return` | Type of replacement statement (`continue`, `break` or `return`) |
 | LBI (Loop Break Insertion) | Insertion of a `break` statement at the beggining of the body of a loop | NA |
 | MCR (Method Call Replacement) | Replacement of a method call with a default literal, with another method with the same signature, with one of its arguments with the same type as the return value, or with its receiver | NA (for naked receiver mutation), type/list of types (for methods with multiple output variables), the name of the replacement method, or index/list of indexes referring to the position of the argument to be propagated |
+| SAR (Switch Argument) | Switch a method call argument with another used in the same method call with the same type | The position of the replacement argument |
 | CIR (Collection Initialization Replacement) | Replacement of non-empty collection initializers with an empty one and of empty initializers with a default non-empty one | NA (for empty initialization) or type of the collection's elements |
 | CBR (Case Block Replacement) | Replacement of match statement cases with the default one and of the default label with one provided by the programmer | NA |
 | DCR (Datatype Constructor Replacement) | Replacement of a datatype constructor with another of the same datatype and with the same signature | The name of the replacement constructor |
