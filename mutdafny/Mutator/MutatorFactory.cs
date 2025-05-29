@@ -49,7 +49,7 @@ public class MutatorFactory(ErrorReporter reporter)
             "FAR" => mutationArg == null ? null :
                 new FieldAccessReplacementMutator(mutationTargetPos, mutationArg, reporter),
             "PRV" => mutationArg == null ? null :
-                new PolymorphicRefReplacementMutator(mutationTargetPos, mutationArg, reporter),
+                new VariableExprReplacementMutator(mutationTargetPos, mutationArg, reporter),
             "SWS" => new SwitchStmtMutator(mutationTargetPos, reporter),
             _ => null
         };
