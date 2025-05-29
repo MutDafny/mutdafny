@@ -9,18 +9,20 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
 {
     private bool _skipChildUOIMutation;
     private bool _skipChildEVRMutation;
+    private bool _skipChildVERMutation;
     private bool _skipChildDCRMutation;
     private bool _skipChildFARMutation;
     private bool _typesInferredFromContext;
     private string _childMethodCallPos = "";
     private ExprDotName? _childExprDotName;
     private List<string> _childMethodCallArgTypes = [];
-    private Dictionary<string, Type> _childClassVariables = [];
-    private List<(string, int, Type)> _currentScopeChildAccessedVariables = [];
-    private readonly List<(string, ClassLikeDecl, Type)> _classFields = []; // field name, class type, field type
-    private readonly List<ExprDotName> _accessedClassFields = [];
+    private Dictionary<string, Type> _currentScopeVars = [];
     private readonly List<MethodOrFunction> _declaredMethods = [];
     private readonly List<ApplySuffix> _methodCalls = [];
+    private readonly List<(string, ClassLikeDecl, Type)> _classFields = []; // field name, class type, field type
+    private readonly List<ExprDotName> _accessedClassFields = [];
+    private Dictionary<string, Type> _currentScopeChildClassVariables = [];
+    private List<(string, int, Type)> _childClassAccessedVariables = [];
     
     private void ScanUOITargets(Expression expr) {
         if (!ShouldImplement("UOI")) return;
@@ -143,6 +145,16 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
         if (tpRhs.Type is UserDefinedType uType && uType.ResolvedClass is NonNullTypeDecl nnTypeDecl && 
             nnTypeDecl.Class != null) {
             Targets.Add(($"{tpRhs.StartToken.pos}-{tpRhs.EndToken.pos}", "EVR", "null"));
+        }
+    }
+    
+    private void ScanVERTargets(NameSegment nSegExpr) {
+        if (!ShouldImplement("VER")) return;
+
+        foreach (var var in _currentScopeVars) {
+            if (nSegExpr.Name == var.Key) continue;
+            if (nSegExpr.Type.ToString() == var.Value.ToString())
+                Targets.Add(($"{nSegExpr.Center.pos}", "VER", var.Key));
         }
     }
     
@@ -302,8 +314,8 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
     private void ScanPRVTargets() {
         if (!ShouldImplement("PRV")) return;
         
-        foreach (var childClassVar1 in _currentScopeChildAccessedVariables) {
-            foreach (var childClassVar2 in _childClassVariables) {
+        foreach (var childClassVar1 in _childClassAccessedVariables) {
+            foreach (var childClassVar2 in _currentScopeChildClassVariables) {
                 if (childClassVar1.Item1 == childClassVar2.Key) continue;
                 
                 var var1Class = childClassVar1.Item3.AsTopLevelTypeWithMembers.Name;
@@ -386,36 +398,44 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
                 if (fieldType != "")
                     Targets.Add(($"{cf.Center.pos}", "SDL", ""));
             }
+            
+            if (!_currentScopeVars.ContainsKey(cf.Name)) 
+                _currentScopeVars.Add(cf.Name, cf.Type);
             var classDecl = cf.Type.AsTopLevelTypeWithMembers;
             if (classDecl != null && classDecl is ClassDecl &&
                 classDecl.ParentTraitHeads.Count > 0 &&
-                !_childClassVariables.ContainsKey(cf.Name)) 
+                !_currentScopeChildClassVariables.ContainsKey(cf.Name)) 
             {
-                _childClassVariables.Add(cf.Name, cf.Type);
+                _currentScopeChildClassVariables.Add(cf.Name, cf.Type);
             }
         }
         base.HandleMemberDecls(decl);
         ScanPRVTargets();
-        _currentScopeChildAccessedVariables = [];
+        _childClassAccessedVariables = [];
     }
     
     protected override void HandleMethod(Method method) {
         _declaredMethods.Add(method);
         
-        var methodIndependentVars = new Dictionary<string, Type>(_childClassVariables);
+        var methodIndependentVars = new Dictionary<string, Type>(_currentScopeVars);
+        var methodIndependentChildClassVars = new Dictionary<string, Type>(_currentScopeChildClassVariables);
         foreach (var formal in method.Ins) {
+            if (!_currentScopeVars.ContainsKey(formal.Name))
+                _currentScopeVars.Add(formal.Name, formal.Type);
+            
             var classDecl = formal.Type.AsTopLevelTypeWithMembers;
             if (classDecl != null && classDecl is ClassDecl && 
                 classDecl.ParentTraitHeads.Count > 0 && 
-                !_childClassVariables.ContainsKey(formal.Name))
+                !_currentScopeChildClassVariables.ContainsKey(formal.Name))
             {
-                _childClassVariables.Add(formal.Name, formal.Type);
+                _currentScopeChildClassVariables.Add(formal.Name, formal.Type);
             }
         }
         base.HandleMethod(method);
         ScanPRVTargets();
-        _childClassVariables = methodIndependentVars;
-        _currentScopeChildAccessedVariables = [];
+        _currentScopeVars = methodIndependentVars;
+        _currentScopeChildClassVariables = methodIndependentChildClassVars;
+        _childClassAccessedVariables = [];
     }
     
     protected override void HandleFunction(Function function) {
@@ -427,17 +447,28 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
     /// Group of overriden statement visitors
     /// -------------------------------------
     protected override void HandleBlock(List<Statement> statements) {
-        var blockIndependentVars = new Dictionary<string, Type>(_childClassVariables);
+        var blockIndependentVars = new Dictionary<string, Type>(_currentScopeVars);
+        var blockIndependentChildClassVars = new Dictionary<string, Type>(_currentScopeChildClassVariables);
         base.HandleBlock(statements);
         ScanPRVTargets();
-        _childClassVariables = blockIndependentVars;
-        _currentScopeChildAccessedVariables = [];
+        _currentScopeVars = blockIndependentVars;
+        _currentScopeChildClassVariables = blockIndependentChildClassVars;
+        _childClassAccessedVariables = [];
     }
-
+    
     protected override void VisitStatement(ConcreteAssignStatement cAStmt) { }
+
+    private void VisitLhss(ConcreteAssignStatement cAStmt) {
+        foreach (var lhs in cAStmt.Lhss) {
+            if (lhs is NameSegment nSegExpr && !_currentScopeVars.ContainsKey(nSegExpr.Name))
+                _currentScopeVars.Add(nSegExpr.Name, nSegExpr.Type);
+        }
+    }
     
     protected override void VisitStatement(AssignStatement aStmt) {
         base.VisitStatement(aStmt);
+        VisitLhss(aStmt);
+        
         if (_childMethodCallPos != "") // rhs is method call
             ScanMCRTargets(aStmt);
         _childMethodCallPos = "";
@@ -447,6 +478,8 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
     
     protected override void VisitStatement(AssignSuchThatStmt aStStmt) {
         base.VisitStatement(aStStmt);
+        VisitLhss(aStStmt);
+
         if (_childMethodCallPos != "") // rhs is method call
             ScanMCRTargets(aStStmt);
         _childMethodCallPos = "";
@@ -460,18 +493,21 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
 
     protected override void VisitStatement(VarDeclStmt vDeclStmt) {
         if (vDeclStmt.IsGhost) return;
+        _typesInferredFromContext = vDeclStmt.Locals[0].SafeSyntacticType is InferredTypeProxy;
+        base.VisitStatement(vDeclStmt);
+        
         foreach (var var in vDeclStmt.Locals) {
+            if (!_currentScopeVars.ContainsKey(var.Name))
+                _currentScopeVars.Add(var.Name, var.Type);
+            
             var classDecl = var.Type.AsTopLevelTypeWithMembers;
             if (classDecl != null && classDecl is ClassDecl && 
                 classDecl.ParentTraitHeads.Count > 0 && 
-                !_childClassVariables.ContainsKey(var.Name))
+                !_currentScopeChildClassVariables.ContainsKey(var.Name))
             {
-                _childClassVariables.Add(var.Name, var.Type);
+                _currentScopeChildClassVariables.Add(var.Name, var.Type);
             }
         }
-        
-        _typesInferredFromContext = vDeclStmt.Locals[0].SafeSyntacticType is InferredTypeProxy;
-        base.VisitStatement(vDeclStmt);
         _typesInferredFromContext = false;
     }
 
@@ -522,9 +558,11 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
                 ScanEVRTargets(operand);
             }
             
+            if (operand is NameSegment nSegExpr)
+                ScanVERTargets(nSegExpr);
             if (operand is SuffixExpr suffixExpr && !_skipChildFARMutation && 
-                suffixExpr is ExprDotName exprDName && exprDName.Lhs is NameSegment nSegExpr && 
-                nSegExpr.Type.AsTopLevelTypeWithMembers != null && nSegExpr.Type.AsTopLevelTypeWithMembers is ClassLikeDecl)
+                suffixExpr is ExprDotName exprDName && exprDName.Lhs is NameSegment nSegExprLhs && 
+                nSegExprLhs.Type.AsTopLevelTypeWithMembers != null && nSegExprLhs.Type.AsTopLevelTypeWithMembers is ClassLikeDecl)
             {
                 _accessedClassFields.Add(exprDName);
             }
@@ -532,13 +570,17 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
     }
 
     protected override void VisitExpression(NameSegment nSegExpr) {
+        if (!_skipChildVERMutation)
+            ScanVERTargets(nSegExpr);
+        
         var classDecl = nSegExpr.Type.AsTopLevelTypeWithMembers;
         if (classDecl != null && classDecl is ClassDecl && 
             classDecl.ParentTraitHeads.Count > 0 && 
-            !_currentScopeChildAccessedVariables.Contains((nSegExpr.Name, nSegExpr.Center.pos, nSegExpr.Type)))
+            !_childClassAccessedVariables.Contains((nSegExpr.Name, nSegExpr.Center.pos, nSegExpr.Type)))
         {
-            _currentScopeChildAccessedVariables.Add((nSegExpr.Name, nSegExpr.Center.pos, nSegExpr.Type));
+            _childClassAccessedVariables.Add((nSegExpr.Name, nSegExpr.Center.pos, nSegExpr.Type));
         }
+        
         ScanUOITargets(nSegExpr);
         ScanEVRTargets(nSegExpr);
         ScanDCRTargets(nSegExpr);
@@ -588,9 +630,11 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
         ScanUOITargets(suffixExpr);
         ScanEVRTargets(suffixExpr);
         _skipChildEVRMutation = true;
+        _skipChildVERMutation = true;
         _skipChildDCRMutation = true;
         base.VisitExpression(suffixExpr);
         _skipChildEVRMutation = false;
+        _skipChildVERMutation = false;
         _skipChildDCRMutation = false;
         _skipChildFARMutation = false;
     }

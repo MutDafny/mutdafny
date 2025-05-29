@@ -37,6 +37,7 @@ cd mutdafny && dotnet build
 | UOD (Unary Operator Deletion) | Deletion of a unary minus or not operator in front of an expression | NA |
 | LVR (Literal Value Replacement) | Replacement of a numerical literal value with its increment, decrement and zero and of a string literal value either an empty one, a default one, or a mutation of the original | Replacement value |
 | EVR (Expression Value Replacement) | Replacement of an expression with a default literal value of its type  | Type |
+| VER (Variable Expression Replacement) | Replacement of a variable with another of the same type | The name of the replacement variable |
 | LSR (Loop Statement Replacement) | Replacement of `continue` with `break` and of `break` with ether `continue` or `return` | Type of replacement statement (`continue`, `break` or `return`) |
 | LBI (Loop Break Insertion) | Insertion of a `break` statement at the beggining of the body of a loop | NA |
 | MCR (Method Call Replacement) | Replacement of a method call with a default literal, with another method with the same signature, with one of its arguments with the same type as the return value, or with its receiver | NA (for naked receiver mutation), type/list of types (for methods with multiple output variables), the name of the replacement method, or index/list of indexes referring to the position of the argument to be propagated |
