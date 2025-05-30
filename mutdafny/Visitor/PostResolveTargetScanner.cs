@@ -763,4 +763,20 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
             }
         }
     }
+    
+    protected override void HandleActualBindings(ActualBindings bindings) {
+        var prevSkipEVRMutation = _skipChildEVRMutation;
+        var prevSkipVERMutattion = _skipChildVERMutation;
+        _skipChildEVRMutation = false;
+        _skipChildVERMutation = false;
+        
+        foreach (var binding in bindings.ArgumentBindings) {
+            if (!IsWorthVisiting(binding.Actual.StartToken.pos, binding.Actual.EndToken.pos))
+                continue;
+            HandleExpression(binding.Actual);
+        }
+        
+        _skipChildEVRMutation = prevSkipEVRMutation;
+        _skipChildVERMutation = prevSkipVERMutattion;
+    }
 }
