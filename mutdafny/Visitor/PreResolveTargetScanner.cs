@@ -329,6 +329,12 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
                 _isChildIfBlock = false;
             }
         }
+        
+        if (ShouldImplement("CBE")) {
+            Targets.Add(($"{ifStmt.Thn.StartToken.pos}-{ifStmt.Thn.EndToken.pos}", "CBE", ""));
+            if (ifStmt.Els != null && ifStmt.Els is BlockStmt)
+                Targets.Add(($"{ifStmt.Els.StartToken.pos}-{ifStmt.Els.EndToken.pos}", "CBE", ""));
+        }
 
         base.VisitStatement(ifStmt);
     }
@@ -587,6 +593,14 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
         _scanThisKeywordTargets = false;
         base.VisitExpression(suffixExpr);
         _scanThisKeywordTargets = prevScanThisKeywordTargets;
+    }
+    
+    protected override void VisitExpression(ITEExpr iteExpr) {
+        if (ShouldImplement("CBE")) {
+            Targets.Add(($"{iteExpr.Thn.StartToken.pos}-{iteExpr.Thn.EndToken.pos}", "CBE", ""));
+            Targets.Add(($"{iteExpr.Els.StartToken.pos}-{iteExpr.Els.EndToken.pos}", "CBE", ""));
+        }
+        base.VisitExpression(iteExpr);
     }
     
     protected override void VisitExpression(NestedMatchExpr nMExpr) {

@@ -44,6 +44,7 @@ cd mutdafny && dotnet build
 | SAR (Switch Argument) | Switch a method call argument with another used in the same method call with the same type | The position of the replacement argument |
 | CIR (Collection Initialization Replacement) | Replacement of non-empty collection initializers with an empty one and of empty initializers with a default non-empty one | NA (for empty initialization) or type of the collection's elements |
 | CBR (Case Block Replacement) | Replacement of match statement cases with the default one and of the default label with one provided by the programmer | NA |
+| CBE (Case Block Extraction) | Extraction of one of the blocks of an if or if-then-else statement to the outside scope and deletion of the remaining ones  | NA |
 | DCR (Datatype Constructor Replacement) | Replacement of a datatype constructor with another of the same datatype and with the same signature | The name of the replacement constructor |
 | SDL (Statement Deletion) | Deletion of a statement or of an entire code block | NA |
 | VDL (Variable Deletion) | Deletion of all occurences of a variable | Variable name |

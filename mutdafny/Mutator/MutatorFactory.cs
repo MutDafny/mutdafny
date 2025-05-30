@@ -33,6 +33,7 @@ public class MutatorFactory(ErrorReporter reporter)
                 new CollectionInitReplacementMutator(mutationTargetPos, "", reporter) :
                 new CollectionInitReplacementMutator(mutationTargetPos, mutationArg, reporter), 
             "CBR" => new CaseBlockReplacementMutator(mutationTargetPos, reporter),
+            "CBE" => new ConditionalBlockExtractionMutator(mutationTargetPos, reporter),
             "DCR" => mutationArg == null ? null :
                 new DatatypeCtorReplacementMutator(mutationTargetPos, mutationArg, reporter),
             "SDL" => new StmtDeletionMutator(mutationTargetPos, reporter),
