@@ -200,8 +200,9 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
         foreach (var methodCall in _methodCalls) {
             if (methodCall.Lhs is not NameSegment nSegExpr) continue;
             var methodName = nSegExpr.Name;
-            var method = _declaredMethods.First(m => m.Name == methodName);
-
+            var method = _declaredMethods.FirstOrDefault(m => m.Name == methodName);
+            if (method == null) continue;
+            
             foreach (var m in _declaredMethods) {
                 if (m == method) continue;
                 
