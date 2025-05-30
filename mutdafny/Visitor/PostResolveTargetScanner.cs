@@ -126,7 +126,9 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
             case MapType:
                 Targets.Add((exprLocation, "EVR", "map")); break;
             case UserDefinedType uType:
-                if (uType.Name == "string") { // string type
+                if (uType.Name == "nat") {
+                    Targets.Add((exprLocation, "EVR", "int"));
+                } else if (uType.Name == "string") { // string type
                     Targets.Add((exprLocation, "EVR", "string"));
                 } else if (expr.Type.IsArrayType) {
                     Targets.Add((exprLocation, "EVR", "array"));
