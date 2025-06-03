@@ -4,7 +4,7 @@ using Statement = Microsoft.Dafny.Statement;
 
 namespace MutDafny.Mutator;
 
-public class SwitchStmtMutator(string mutationTargetPos, ErrorReporter reporter) : Mutator(mutationTargetPos, reporter)
+public class SwapStmtMutator(string mutationTargetPos, ErrorReporter reporter) : Mutator(mutationTargetPos, reporter)
 {
     private bool IsTarget(Statement stmt) {
         var positions = MutationTargetPos.Split("-");

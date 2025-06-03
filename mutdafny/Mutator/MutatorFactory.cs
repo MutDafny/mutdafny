@@ -28,7 +28,7 @@ public class MutatorFactory(ErrorReporter reporter)
                 new MethodCallReplacementMutator(mutationTargetPos, "", reporter) :
                 new MethodCallReplacementMutator(mutationTargetPos, mutationArg, reporter),
             "SAR" => mutationArg == null ? null :
-                new SwitchArgMutator(mutationTargetPos, mutationArg, reporter),
+                new SwapArgMutator(mutationTargetPos, mutationArg, reporter),
             "CIR" => mutationArg == null ? 
                 new CollectionInitReplacementMutator(mutationTargetPos, "", reporter) :
                 new CollectionInitReplacementMutator(mutationTargetPos, mutationArg, reporter), 
@@ -51,7 +51,7 @@ public class MutatorFactory(ErrorReporter reporter)
                 new FieldAccessReplacementMutator(mutationTargetPos, mutationArg, reporter),
             "PRV" => mutationArg == null ? null :
                 new VariableExprReplacementMutator(mutationTargetPos, mutationArg, reporter),
-            "SWS" => new SwitchStmtMutator(mutationTargetPos, reporter),
+            "SWS" => new SwapStmtMutator(mutationTargetPos, reporter),
             _ => null
         };
     }

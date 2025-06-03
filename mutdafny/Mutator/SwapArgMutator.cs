@@ -2,7 +2,7 @@
 
 namespace MutDafny.Mutator;
 
-public class SwitchArgMutator(string mutationTargetPos, string newArgPos, ErrorReporter reporter) : Mutator(mutationTargetPos, reporter)
+public class SwapArgMutator(string mutationTargetPos, string newArgPos, ErrorReporter reporter) : Mutator(mutationTargetPos, reporter)
 {
     private int _targetBindingPos = -1;
     private int _replacementBindingPos = -1;
