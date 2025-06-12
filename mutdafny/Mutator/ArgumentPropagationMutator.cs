@@ -1,25 +1,32 @@
-﻿using System.Numerics;
-using Microsoft.BaseTypes;
-using Microsoft.Dafny;
-using Expression = Microsoft.Dafny.Expression;
-using LiteralExpr = Microsoft.Dafny.LiteralExpr;
+﻿using Microsoft.Dafny;
 
 namespace MutDafny.Mutator;
 
-public class MethodCallReplacementMutator(string mutationTargetPos, string replacementMethodName, ErrorReporter reporter) : Mutator(mutationTargetPos, reporter)
+public class ArgumentPropagationMutator(string mutationTargetPos, string val, ErrorReporter reporter) : Mutator(mutationTargetPos, reporter)
 {
+    private readonly List<int> _replacementArgsPos = val.Split('-').Select(int.Parse).ToList();
     private SuffixExpr? _childSuffixExpr;
-    
-    private Expression CreateMutatedExpression(Expression originalExpr) {
-        if (_childSuffixExpr is ApplySuffix appSufExpr && appSufExpr.Lhs is NameSegment nSegExpr) {
-            nSegExpr.Name = replacementMethodName;
-            return appSufExpr;
-        }
-        return originalExpr;
-    }
     
     private bool IsTarget(Expression expr) {
         return expr.Center.pos == int.Parse(MutationTargetPos);
+    }
+    
+    private Expression CreateMutatedExpression(Expression originalExpr) {
+        if (_replacementArgsPos.Count == 0 || _childSuffixExpr == null || _childSuffixExpr is not ApplySuffix appSufExpr)
+            return originalExpr;
+        return appSufExpr.Bindings.ArgumentBindings[_replacementArgsPos[0]].Actual;
+    }
+    
+    private List<AssignmentRhs> CreateArgumentPropagationRhss() {
+        if (_childSuffixExpr == null || _childSuffixExpr is not ApplySuffix appSufExpr)
+            return [];
+        
+        var rhss = new List<AssignmentRhs>();
+        foreach (var argPos in _replacementArgsPos) {
+            var newExprRhs = new ExprRhs(appSufExpr.Bindings.ArgumentBindings[argPos].Actual);
+            rhss.Add(newExprRhs);
+        }
+        return rhss; 
     }
     
     /// --------------------------
@@ -40,7 +47,7 @@ public class MethodCallReplacementMutator(string mutationTargetPos, string repla
     protected override void VisitStatement(AssignStatement aStmt) {
         base.VisitStatement(aStmt);
         if (TargetExpression == null) return; // target not found
-        aStmt.Rhss = [new ExprRhs(CreateMutatedExpression(TargetExpression))];
+        aStmt.Rhss = CreateArgumentPropagationRhss();
         TargetExpression = null;
         _childSuffixExpr = null;
     }

@@ -160,16 +160,4 @@ public class StmtDeletionMutator(string mutationTargetPos, ErrorReporter reporte
         }
         base.VisitExpression(nMExpr);
     }
-    
-    protected override void VisitExpression(SeqSelectExpr seqSExpr) {
-        if (seqSExpr.E0 != null && IsTarget(seqSExpr.E0.Center.pos)) {
-            seqSExpr.E0 = null;
-            return;
-        }
-        if (seqSExpr.E1 != null && IsTarget(seqSExpr.E1.Center.pos)) {
-            seqSExpr.E1 = null;
-            return;
-        }
-        base.VisitExpression(seqSExpr);
-    }
 }

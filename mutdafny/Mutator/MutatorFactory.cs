@@ -24,6 +24,11 @@ public class MutatorFactory(ErrorReporter reporter)
             "LSR" => mutationArg == null ? null : 
                 new LoopStmtReplacementMutator(mutationTargetPos, mutationArg, reporter),
             "LBI" => new BreakInsertionMutator(mutationTargetPos, reporter),
+            "MRR" => mutationArg == null ? null :
+                new MethodReturnReplacementMutator(mutationTargetPos, mutationArg, reporter),
+            "MAP" => mutationArg == null ? null :
+                new ArgumentPropagationMutator(mutationTargetPos, mutationArg, reporter),
+            "MNR" => new NakedReceiverMutator(mutationTargetPos, reporter),
             "MCR" => mutationArg == null ? 
                 new MethodCallReplacementMutator(mutationTargetPos, "", reporter) :
                 new MethodCallReplacementMutator(mutationTargetPos, mutationArg, reporter),
@@ -39,6 +44,7 @@ public class MutatorFactory(ErrorReporter reporter)
             "SDL" => new StmtDeletionMutator(mutationTargetPos, reporter),
             "VDL" => mutationArg == null ? null :
                 new VariableDeletionMutator(mutationTargetPos, mutationArg, reporter),
+            "SLD" => new SubseqLimitDeletionMutator(mutationTargetPos, reporter),
             "ODL" => mutationArg == null ? null :
                 new OperatorDeletionMutator(mutationTargetPos, mutationArg, reporter),
             "THI" => new ThisKeywordInsertionMutator(mutationTargetPos, reporter),

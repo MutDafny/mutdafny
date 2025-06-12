@@ -628,10 +628,10 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
     }
     
     protected override void VisitExpression(SeqSelectExpr seqSExpr) {
-        if (!seqSExpr.SelectOne && seqSExpr.E0 != null && ShouldImplement("SDL"))
-            Targets.Add(($"{seqSExpr.E0.Center.pos}", "SDL", ""));
-        if (!seqSExpr.SelectOne && seqSExpr.E1 != null && ShouldImplement("SDL"))
-            Targets.Add(($"{seqSExpr.E1.Center.pos}", "SDL", ""));
+        if (!seqSExpr.SelectOne && seqSExpr.E0 != null && ShouldImplement("SLD"))
+            Targets.Add(($"{seqSExpr.E0.Center.pos}", "SLD", ""));
+        if (!seqSExpr.SelectOne && seqSExpr.E1 != null && ShouldImplement("SLD"))
+            Targets.Add(($"{seqSExpr.E1.Center.pos}", "SLD", ""));
         base.VisitExpression(seqSExpr);
     }
     

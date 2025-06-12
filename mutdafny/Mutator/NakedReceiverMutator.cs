@@ -1,25 +1,25 @@
-﻿using System.Numerics;
-using Microsoft.BaseTypes;
-using Microsoft.Dafny;
-using Expression = Microsoft.Dafny.Expression;
-using LiteralExpr = Microsoft.Dafny.LiteralExpr;
+﻿using Microsoft.Dafny;
 
 namespace MutDafny.Mutator;
 
-public class MethodCallReplacementMutator(string mutationTargetPos, string replacementMethodName, ErrorReporter reporter) : Mutator(mutationTargetPos, reporter)
+public class NakedReceiverMutator(string mutationTargetPos, ErrorReporter reporter) : Mutator(mutationTargetPos, reporter)
 {
     private SuffixExpr? _childSuffixExpr;
+
+    private bool IsTarget(Expression expr) {
+        return expr.Center.pos == int.Parse(MutationTargetPos);
+    }
     
     private Expression CreateMutatedExpression(Expression originalExpr) {
-        if (_childSuffixExpr is ApplySuffix appSufExpr && appSufExpr.Lhs is NameSegment nSegExpr) {
-            nSegExpr.Name = replacementMethodName;
-            return appSufExpr;
-        }
+        if (_childSuffixExpr is ExprDotName exprDName)
+            return exprDName.Lhs;
         return originalExpr;
     }
     
-    private bool IsTarget(Expression expr) {
-        return expr.Center.pos == int.Parse(MutationTargetPos);
+    private List<AssignmentRhs> CreateMutatedRhss(Expression originalRhs) {
+        if (_childSuffixExpr is ExprDotName exprDName)
+            return [new ExprRhs(exprDName.Lhs)];
+        return [new ExprRhs(originalRhs)];
     }
     
     /// --------------------------
@@ -40,7 +40,7 @@ public class MethodCallReplacementMutator(string mutationTargetPos, string repla
     protected override void VisitStatement(AssignStatement aStmt) {
         base.VisitStatement(aStmt);
         if (TargetExpression == null) return; // target not found
-        aStmt.Rhss = [new ExprRhs(CreateMutatedExpression(TargetExpression))];
+        aStmt.Rhss = CreateMutatedRhss(TargetExpression);
         TargetExpression = null;
         _childSuffixExpr = null;
     }

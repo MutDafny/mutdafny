@@ -194,6 +194,54 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
         Targets.Add((exprLocation, "CIR", arg));
     }
 
+    private void ScanMethodTargets(ConcreteAssignStatement cAStmt) {
+        ScanMRRTargets(cAStmt);
+        ScanMAPTargets(cAStmt);
+        ScanMNRTargets(cAStmt);
+    }
+    
+    private void ScanMRRTargets(ConcreteAssignStatement cAStmt) {
+        if (!ShouldImplement("MRR")) return;
+        
+        var typeArg = "";
+        foreach (var lhs in cAStmt.Lhss) {
+            var type = TypeToStr(lhs.Type);
+            if (type == "") {
+                typeArg = "";
+                break;
+            }
+            typeArg = typeArg == "" ? type : $"{typeArg}-{type}";
+        }
+        if (typeArg != "")
+            Targets.Add((_childMethodCallPos, "MRR", typeArg));
+    }
+
+    private void ScanMAPTargets(ConcreteAssignStatement cAStmt) {
+        if (!ShouldImplement("MAP")) return;
+
+        var argProp = "";
+        foreach (var lhs in cAStmt.Lhss) {
+            var type = TypeToStr(lhs.Type);
+            var methodArgPos = _childMethodCallArgTypes.IndexOf(type);
+            if (methodArgPos == -1) {
+                argProp = "";
+                break;
+            }
+            argProp = argProp == "" ? $"{methodArgPos}" : $"{argProp}-{methodArgPos}";
+        }
+        if (argProp != "")
+            Targets.Add((_childMethodCallPos, "MAP", argProp));
+    }
+
+    private void ScanMNRTargets(ConcreteAssignStatement cAStmt) {
+        if (!ShouldImplement("MNR") || _childExprDotName == null) 
+            return;
+
+        if (cAStmt.Lhss.Count == 1 && // naked receiver can be applied if the types match or if they are inferred from context
+            (TypeToStr(cAStmt.Lhss[0].Type) == TypeToStr(_childExprDotName.Lhs.Type) || _typesInferredFromContext))
+            Targets.Add((_childMethodCallPos, "MNR", ""));
+    }
+    
     private void ScanMCRTargets() {
         if (!ShouldImplement("MCR")) return;
         
@@ -223,48 +271,6 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
                 Targets.Add(($"{methodCall.Center.pos}", "MCR", $"{m.Name}"));
             }
         }
-    }
-
-    private void ScanMCRTargets(ConcreteAssignStatement cAStmt) {
-        if (!ShouldImplement("MCR")) return;
-        var typeArg = "";
-        
-        // default replacement
-        foreach (var lhs in cAStmt.Lhss) {
-            var type = TypeToStr(lhs.Type);
-            if (type == "") {
-                typeArg = "";
-                break;
-            }
-            typeArg = typeArg == "" ? type : $"{typeArg}-{type}";
-        }
-        if (typeArg != "")
-            Targets.Add((_childMethodCallPos, "MCR", typeArg));
-        
-        ScanArgPropagationTargets(cAStmt);
-        ScanNakedReceiverTargets(cAStmt);
-    }
-
-    private void ScanArgPropagationTargets(ConcreteAssignStatement cAStmt) {
-        var argProp = "";
-        foreach (var lhs in cAStmt.Lhss) {
-            var type = TypeToStr(lhs.Type);
-            var methodArgPos = _childMethodCallArgTypes.IndexOf(type);
-            if (methodArgPos == -1) {
-                argProp = "";
-                break;
-            }
-            argProp = argProp == "" ? $"{methodArgPos}" : $"{argProp}-{methodArgPos}";
-        }
-        if (argProp != "")
-            Targets.Add((_childMethodCallPos, "MCR", argProp));
-    }
-
-    private void ScanNakedReceiverTargets(ConcreteAssignStatement cAStmt) {
-        if (_childExprDotName == null) return;
-        if (cAStmt.Lhss.Count == 1 && // naked receiver can be applied if the types match or if they are inferred from context
-            (TypeToStr(cAStmt.Lhss[0].Type) == TypeToStr(_childExprDotName.Lhs.Type) || _typesInferredFromContext))
-            Targets.Add((_childMethodCallPos, "MCR", ""));
     }
 
     private void ScanSARTargets(ApplySuffix appSufExpr) {
@@ -473,7 +479,7 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
         VisitLhss(aStmt);
         
         if (_childMethodCallPos != "") // rhs is method call
-            ScanMCRTargets(aStmt);
+            ScanMethodTargets(aStmt);
         _childMethodCallPos = "";
         _childMethodCallArgTypes = [];
         _childExprDotName = null;
@@ -484,7 +490,7 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
         VisitLhss(aStStmt);
 
         if (_childMethodCallPos != "") // rhs is method call
-            ScanMCRTargets(aStStmt);
+            ScanMethodTargets(aStStmt);
         _childMethodCallPos = "";
         _childMethodCallArgTypes = [];
         _childExprDotName = null;

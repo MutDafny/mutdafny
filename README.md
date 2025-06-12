@@ -32,7 +32,7 @@ cd mutdafny && dotnet build
 | **Operator**    | **Description** | **Argument** |
 | -------- | ------- | ------- |
 | BOR (Binary Operator Replacement) | Replacement of an arithmetic, relational, conditional, logical or shift operator with another of the same category | Replacement operator code |
-| BBR (Boolean-Binary Expression Repalcement) | Replacement of a relational or conditional expression with `true` or `false` | Replacement value (`true` or `false`) |
+| BBR (Boolean-Binary Expression Replacement) | Replacement of a relational or conditional expression with `true` or `false` | Replacement value (`true` or `false`) |
 | UOI (Unary Operator Insertion) | Insertion of a unary minus or not operator in front of an expression | Insertion operator code |
 | UOD (Unary Operator Deletion) | Deletion of a unary minus or not operator in front of an expression | NA |
 | LVR (Literal Value Replacement) | Replacement of a numerical literal value with its increment, decrement and zero and of a string literal value either an empty one, a default one, or a mutation of the original | Replacement value |
@@ -40,7 +40,10 @@ cd mutdafny && dotnet build
 | VER (Variable Expression Replacement) | Replacement of a variable with another of the same type | The name of the replacement variable |
 | LSR (Loop Statement Replacement) | Replacement of `continue` with `break` and of `break` with ether `continue` or `return` | Type of replacement statement (`continue`, `break` or `return`) |
 | LBI (Loop Break Insertion) | Insertion of a `break` statement at the beggining of the body of a loop | NA |
-| MCR (Method Call Replacement) | Replacement of a method call with a default literal, with another method with the same signature, with one of its arguments with the same type as the return value, or with its receiver | NA (for naked receiver mutation), type/list of types (for methods with multiple output variables), the name of the replacement method, or index/list of indexes referring to the position of the argument to be propagated |
+| MRR (Method Return Value Replacement) | Replacement of a method call with a default literal of its return type | Type/list of types (for methods with multiple output variables) |
+| MAP (Method Argument Propagation) | Replacement of a method call with one of its arguments with the same type as the return value | Index/list of indexes (for methods with multiple output variables) referring to the position of the argument to be propagated |
+| MNR (Method Naked Receiver) | Deletion of a class method call, its receiver being mantained | NA |
+| MCR (Method Call Replacement) | Replacement of a method call with another method with the same signature | The name of the replacement method |
 | SAR (Swap Argument) | Swap a method call argument with another used in the same method call with the same type | The position of the replacement argument |
 | CIR (Collection Initialization Replacement) | Replacement of non-empty collection initializers with an empty one and of empty initializers with a default non-empty one | NA (for empty initialization) or type of the collection's elements |
 | CBR (Case Block Replacement) | Replacement of match statement cases with the default one and of the default label with one provided by the programmer | NA |
@@ -48,6 +51,7 @@ cd mutdafny && dotnet build
 | DCR (Datatype Constructor Replacement) | Replacement of a datatype constructor with another of the same datatype and with the same signature | The name of the replacement constructor |
 | SDL (Statement Deletion) | Deletion of a statement or of an entire code block | NA |
 | VDL (Variable Deletion) | Deletion of all occurences of a variable | Variable name |
+| SLD (Subsequence Limit Deletion) | Deletion of either the bottom or top limit of a subsequence selection expression | NA |
 | ODL (Operator Deletion) | Deletion of all occurences of a binary operator (and of one of its arguments in order to preserve program validity) | Operator code and the argument to delete |
 | THI (This Keyword Insertion) | Insertion of the `this` keyword in front of the use of a parameter that has the same name as a class field | NA |
 | THD (This Keyword Deletion) | Deletion of the `this` keyword in front of the use of a class field that has the same name as a parameter | NA |
