@@ -14,6 +14,7 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
     private List<string> _currentInitMethodOuts = [];
     private List<string> _currentSourceDeclFields = [];
     private bool _isCurrentMethodVoid;
+    private bool _parentBlockHasStmt;
     private bool _isChildIfBlock;
     private bool _isParentVarDeclStmt;
     private bool _scanThisKeywordTargets;
@@ -231,10 +232,12 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
         _currentMethodScope = $"{method.StartToken.pos}-{method.EndToken.pos}";
         _currentMethodOuts = method.Outs.Select(o => o.Name).ToList();
         _currentInitMethodOuts = [];
-        if (ShouldImplement("SDL") && _isCurrentMethodVoid)
-            Targets.Add(($"{method.StartToken.pos}-{method.EndToken.pos}", "SDL", ""));
+        _parentBlockHasStmt = false;
         
         base.HandleMethod(method);
+        if (ShouldImplement("SDL") && _isCurrentMethodVoid && _parentBlockHasStmt)
+            Targets.Add(($"{method.StartToken.pos}-{method.EndToken.pos}", "SDL", ""));
+
         _currentMethodScope = "-";
         _coveredVariableNames = methodIndependentVars;
     }
@@ -248,6 +251,9 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
             var prevCoveredVariableNames = _coveredVariableNames;
             _coveredVariableNames = []; // collect vars used in next statement
             _specCoveredVariableNames = [];
+
+            if (stmt is not PredicateStmt && stmt is not CalcStmt)
+                _parentBlockHasStmt = true;
             
             HandleStatement(stmt);
             _coveredVariableNames = _coveredVariableNames.Concat(_specCoveredVariableNames).ToList();
