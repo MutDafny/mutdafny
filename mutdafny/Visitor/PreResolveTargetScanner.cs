@@ -146,7 +146,7 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
     }
     
     private bool IsGetter(Method method) {
-        if (method.Ins.Count != 0 || method.Body == null) 
+        if (method.Ins.Count != 0 || method.Body == null || method.Body.Body.Count == 0) 
             return false;
         
         foreach (var stmt in method.Body.Body) {
@@ -184,7 +184,7 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
     }
 
     private bool IsSetter(Method method) {
-        if (method.Outs.Count != 0 || method.Body == null) 
+        if (method.Outs.Count != 0 || method.Body == null || method.Body.Body.Count == 0) 
             return false;
 
         foreach (var stmt in method.Body.Body) {
