@@ -432,7 +432,7 @@ public abstract class ExprReplacementMutator(string mutationTargetPos, ErrorRepo
     /// Group of visitor utils
     /// ----------------------
     protected override void HandleExprList(List<Expression> exprs) {
-        foreach (var expr in exprs) {
+        foreach (var expr in exprs.ToList()) {
             if (!IsWorthVisiting(expr.StartToken.pos, expr.EndToken.pos)) 
                 continue;
             HandleExpression(expr);
