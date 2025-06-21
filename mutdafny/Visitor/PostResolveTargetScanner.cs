@@ -12,7 +12,6 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
     private bool _skipChildVERMutation;
     private bool _skipChildDCRMutation;
     private bool _skipChildFARMutation;
-    private bool _typesInferredFromContext;
     private string _childMethodCallPos = "";
     private ExprDotName? _childExprDotName;
     private List<string> _childMethodCallArgTypes = [];
@@ -238,7 +237,7 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
             return;
 
         if (cAStmt.Lhss.Count == 1 && // naked receiver can be applied if the types match or if they are inferred from context
-            (TypeToStr(cAStmt.Lhss[0].Type) == TypeToStr(_childExprDotName.Lhs.Type) || _typesInferredFromContext))
+            TypeToStr(cAStmt.Lhss[0].Type) == TypeToStr(_childExprDotName.Lhs.Type))
             Targets.Add((_childMethodCallPos, "MNR", ""));
     }
     
@@ -502,7 +501,6 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
 
     protected override void VisitStatement(VarDeclStmt vDeclStmt) {
         if (vDeclStmt.IsGhost) return;
-        _typesInferredFromContext = vDeclStmt.Locals[0].SafeSyntacticType is InferredTypeProxy;
         base.VisitStatement(vDeclStmt);
         
         foreach (var var in vDeclStmt.Locals) {
@@ -517,7 +515,6 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
                 _currentScopeChildClassVariables.Add(var.Name, var.Type);
             }
         }
-        _typesInferredFromContext = false;
     }
 
     /// --------------------------------------
