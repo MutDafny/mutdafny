@@ -32,8 +32,20 @@ public class MethodBodyReplacementMutator(string mutationTargetPos, string repla
 
         var cloner = new Cloner();
         var targetMethodBody = _targetMethod.Body.Clone(cloner);
-        _targetMethod.Body = _replacementMethod.Body;
-        _replacementMethod.Body = targetMethodBody;
+        if (_targetMethod.Body is DividedBlockStmt dBlockStmt1) {
+            dBlockStmt1.Body = _replacementMethod.Body.Body;
+            dBlockStmt1.BodyInit = [];
+            dBlockStmt1.BodyProper = _replacementMethod.Body.Body;
+        } else {
+            _targetMethod.Body = _replacementMethod.Body;
+        }
+        if (_replacementMethod.Body is DividedBlockStmt dBlockStmt2) {
+            dBlockStmt2.Body = targetMethodBody.Body;
+            dBlockStmt2.BodyInit = [];
+            dBlockStmt2.BodyProper = targetMethodBody.Body;
+        } else {
+            _replacementMethod.Body = targetMethodBody;
+        }
     }
     
     /// -----------------
