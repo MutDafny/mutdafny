@@ -638,7 +638,9 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
         _skipChildEVRMutation = true;
         _skipChildVERMutation = true;
         _skipChildDCRMutation = true;
+        var prevChildMethodCallPos = _childMethodCallPos;
         base.VisitExpression(suffixExpr);
+        _childMethodCallPos = prevChildMethodCallPos;
         _skipChildEVRMutation = false;
         _skipChildVERMutation = false;
         _skipChildDCRMutation = false;
