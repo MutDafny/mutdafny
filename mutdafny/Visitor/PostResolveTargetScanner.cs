@@ -197,6 +197,7 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
         ScanMRRTargets(cAStmt);
         ScanMAPTargets(cAStmt);
         ScanMNRTargets(cAStmt);
+        ScanMVRTargets(cAStmt);
     }
     
     private void ScanMRRTargets(ConcreteAssignStatement cAStmt) {
@@ -270,6 +271,26 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
                 Targets.Add(($"{methodCall.Center.pos}", "MCR", $"{m.Name}"));
             }
         }
+    }
+
+    private void ScanMVRTargets(ConcreteAssignStatement cAStmt) {
+        if (!ShouldImplement("MVR")) return;
+
+        var varsArg = "";
+        foreach (var lhs in cAStmt.Lhss) {
+            var selectedVar = "";
+            foreach (var var in _currentScopeVars) {
+                if (var.Value.ToString() != lhs.Type.ToString())
+                    continue;
+                selectedVar = var.Key;
+                break;
+            }
+
+            if (selectedVar == "") return;
+            varsArg = varsArg == "" ? $"{selectedVar}" : $"{varsArg}-{selectedVar}";
+        }
+        
+        Targets.Add((_childMethodCallPos, "MVR", varsArg));
     }
 
     private void ScanSARTargets(ApplySuffix appSufExpr) {

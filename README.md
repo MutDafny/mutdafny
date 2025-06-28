@@ -44,6 +44,7 @@ cd mutdafny && dotnet build
 | MAP (Method Argument Propagation) | Replacement of a method call with one of its arguments with the same type as the return value | Index/list of indexes (for methods with multiple output variables) referring to the position of the argument to be propagated |
 | MNR (Method Naked Receiver) | Deletion of a class method call, its receiver being mantained | NA |
 | MCR (Method Call Replacement) | Replacement of a method call with another method with the same signature | The name of the replacement method |
+| MRV (Method-Variable Replacement) | Replacement of a method call with a variable of the same type | The name/list of names (for methods with multiple outputs) of the replacement variable(s) |
 | SAR (Swap Argument) | Swap a method call argument with another used in the same method call with the same type | The position of the replacement argument |
 | CIR (Collection Initialization Replacement) | Replacement of non-empty collection initializers with an empty one and of empty initializers with a default non-empty one | NA (for empty initialization) or type of the collection's elements |
 | CBR (Case Block Replacement) | Replacement of match statement cases with the default one and of the default label with one provided by the programmer | NA |
