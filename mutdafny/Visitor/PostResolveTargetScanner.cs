@@ -339,6 +339,42 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
                 Targets.Add(($"{nSegExpr.Center.pos}", "DCR", $"{ctor.Name}"));
         }
     }
+    
+    private void ScanFARMutations() {
+        if (!ShouldImplement("FAR")) return;
+
+        foreach (var fieldAccess in _accessedClassFields) {
+            var classDecl1 = fieldAccess.Lhs.Type?.AsTopLevelTypeWithMembers;
+            if (classDecl1 == null) continue;
+            var parents = classDecl1.ParentTraitHeads.Select(t => t.ToString()).ToList();
+            
+            foreach (var field in _classFields) {
+                if (field.Item1 == fieldAccess.SuffixName) continue;
+                var classDecl2 = field.Item2;
+                
+                if ((classDecl1.ToString() == classDecl2.ToString() || parents.Contains(classDecl2.ToString())) &&
+                    fieldAccess.Type.ToString() == field.Item3.ToString())
+                    Targets.Add(($"{fieldAccess.Center.pos}", "FAR", field.Item1));
+            }
+        }
+    }
+
+    private void ScanTARTargets(ExprDotName exprDName) {
+        if (!ShouldImplement("TAR")) return;
+
+        if (!(exprDName.Lhs is NameSegment nSegExpr && nSegExpr.Type is UserDefinedType uType &&
+              uType.ResolvedClass != null && uType.ResolvedClass is TupleTypeDecl tupleDecl))
+            return;
+        var dims = tupleDecl.Dims;
+        if (!int.TryParse(exprDName.SuffixName, out var indexAccess)) 
+            return;
+
+        for (int i = 0; i < dims; i++) {
+            if (i == indexAccess)
+                continue;
+            Targets.Add(($"{exprDName.Center.pos}", "TAR", $"{i}"));
+        }
+    }
 
     private void ScanPRVTargets() {
         if (!ShouldImplement("PRV")) return;
@@ -357,25 +393,6 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
                 {
                     Targets.Add(($"{childClassVar1.Item2}", "PRV", childClassVar2.Key));
                 }
-            }
-        }
-    }
-
-    private void ScanFARMutations() {
-        if (!ShouldImplement("FAR")) return;
-
-        foreach (var fieldAccess in _accessedClassFields) {
-            var classDecl1 = fieldAccess.Lhs.Type?.AsTopLevelTypeWithMembers;
-            if (classDecl1 == null) continue;
-            var parents = classDecl1.ParentTraitHeads.Select(t => t.ToString()).ToList();
-            
-            foreach (var field in _classFields) {
-                if (field.Item1 == fieldAccess.SuffixName) continue;
-                var classDecl2 = field.Item2;
-                
-                if ((classDecl1.ToString() == classDecl2.ToString() || parents.Contains(classDecl2.ToString())) &&
-                    fieldAccess.Type.ToString() == field.Item3.ToString())
-                    Targets.Add(($"{fieldAccess.Center.pos}", "FAR", field.Item1));
             }
         }
     }
@@ -648,10 +665,16 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
         if (suffixExpr.Lhs is ExprDotName exprDNameLhs)
             _childExprDotName = exprDNameLhs;
 
-        if (!_skipChildFARMutation && suffixExpr is ExprDotName exprDName && exprDName.Lhs is NameSegment nSegExpr && 
-            nSegExpr.Type.AsTopLevelTypeWithMembers != null && nSegExpr.Type.AsTopLevelTypeWithMembers is ClassLikeDecl)
+        if (suffixExpr is ExprDotName exprDName)
         {
-            _accessedClassFields.Add(exprDName);
+            ScanTARTargets(exprDName);
+            
+            if (!_skipChildFARMutation && exprDName.Lhs is NameSegment nSegExpr && 
+                nSegExpr.Type.AsTopLevelTypeWithMembers != null && 
+                nSegExpr.Type.AsTopLevelTypeWithMembers is ClassLikeDecl)
+            {
+                _accessedClassFields.Add(exprDName);
+            }
         }
         
         ScanUOITargets(suffixExpr);

@@ -41,8 +41,12 @@ public class MutatorFactory(ErrorReporter reporter)
                 new CollectionInitReplacementMutator(mutationTargetPos, mutationArg, reporter), 
             "CBR" => new CaseBlockReplacementMutator(mutationTargetPos, reporter),
             "CBE" => new ConditionalBlockExtractionMutator(mutationTargetPos, reporter),
+            "TAR" => mutationArg == null ? null :
+                new TupleAccessReplacementMutator(mutationTargetPos, mutationArg, reporter),
             "DCR" => mutationArg == null ? null :
                 new DatatypeCtorReplacementMutator(mutationTargetPos, mutationArg, reporter),
+            "FAR" => mutationArg == null ? null :
+                new FieldAccessReplacementMutator(mutationTargetPos, mutationArg, reporter),
             "SDL" => new StmtDeletionMutator(mutationTargetPos, reporter),
             "VDL" => mutationArg == null ? null :
                 new VariableDeletionMutator(mutationTargetPos, mutationArg, reporter),
@@ -55,8 +59,6 @@ public class MutatorFactory(ErrorReporter reporter)
                 new MethodBodyReplacementMutator(mutationTargetPos, mutationArg, reporter),
             "MMR" => mutationArg == null ? null :
                 new MethodBodyReplacementMutator(mutationTargetPos, mutationArg, reporter),
-            "FAR" => mutationArg == null ? null :
-                new FieldAccessReplacementMutator(mutationTargetPos, mutationArg, reporter),
             "PRV" => mutationArg == null ? null :
                 new VariableExprReplacementMutator(mutationTargetPos, mutationArg, reporter),
             "SWS" => new SwapStmtMutator(mutationTargetPos, reporter),

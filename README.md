@@ -49,7 +49,9 @@ cd mutdafny && dotnet build
 | CIR (Collection Initialization Replacement) | Replacement of non-empty collection initializers with an empty one and of empty initializers with a default non-empty one | NA (for empty initialization) or type of the collection's elements |
 | CBR (Case Block Replacement) | Replacement of match statement cases with the default one and of the default label with one provided by the programmer | NA |
 | CBE (Case Block Extraction) | Extraction of one of the blocks of an if or if-then-else statement to the outside scope and deletion of the remaining ones  | NA |
+| TAR (Tuple Access Repalcement) | Replacement of the index used in a tuple element access | The replacement index |
 | DCR (Datatype Constructor Replacement) | Replacement of a datatype constructor with another of the same datatype and with the same signature | The name of the replacement constructor |
+| FAR (Field Access Replacement) | Replacement of a class's field access with a different field of the same class | The name of the replacement field |
 | SDL (Statement Deletion) | Deletion of a statement or of an entire code block | NA |
 | VDL (Variable Deletion) | Deletion of all occurences of a variable | Variable name |
 | SLD (Subsequence Limit Deletion) | Deletion of either the bottom or top limit of a subsequence selection expression | NA |
@@ -58,6 +60,5 @@ cd mutdafny && dotnet build
 | THD (This Keyword Deletion) | Deletion of the `this` keyword in front of the use of a class field that has the same name as a parameter | NA |
 | AMR (Accessor Method Replacement) | Replacement of the body of an accessor (get) method with another with the same signature | The position of the method with the replacement body |
 | MMR (Modifier Method Replacement) | Replacement of the body of a modifier (set) method with another with the same signature | The position of the method with the replacement body |
-| FAR (Field Access Replacement) | Replacement of a class's field access with a different field of the same class | The name of the replacement field |
 | PRV (Polymorphic Reference Replacement) | Replacement of a child reference assignment to a parent with a child reference of a different type | The name of the replacement variable |
 | SWS (Swap Statement) | Swap a statement with the one either immediately below or above it | NA |
