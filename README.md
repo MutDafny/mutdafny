@@ -62,3 +62,4 @@ cd mutdafny && dotnet build
 | MMR (Modifier Method Replacement) | Replacement of the body of a modifier (set) method with another with the same signature | The position of the method with the replacement body |
 | PRV (Polymorphic Reference Replacement) | Replacement of a child reference assignment to a parent with a child reference of a different type | The name of the replacement variable |
 | SWS (Swap Statement) | Swap a statement with the one either immediately below or above it | NA |
+| SWV (Swap Variable Declaration) | Swap the RHS of a variable declaration statement with the one from the variable declaration immediately below or above it | The position of the variable declaration with the replacement RHS |

@@ -62,6 +62,8 @@ public class MutatorFactory(ErrorReporter reporter)
             "PRV" => mutationArg == null ? null :
                 new VariableExprReplacementMutator(mutationTargetPos, mutationArg, reporter),
             "SWS" => new SwapStmtMutator(mutationTargetPos, reporter),
+            "SWV" => mutationArg == null ? null :
+                new SwapVarDeclMutator(mutationTargetPos, mutationArg, reporter),
             _ => null
         };
     }

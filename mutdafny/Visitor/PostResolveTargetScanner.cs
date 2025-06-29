@@ -13,6 +13,7 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
     private bool _skipChildDCRMutation;
     private bool _skipChildFARMutation;
     private string _childMethodCallPos = "";
+    private VarDeclStmt? _prevVarDeclStmt = null;
     private ExprDotName? _childExprDotName;
     private List<string> _childMethodCallArgTypes = [];
     private Dictionary<string, Type> _currentScopeVars = [];
@@ -482,6 +483,7 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
         _currentScopeVars = methodIndependentVars;
         _currentScopeChildClassVariables = methodIndependentChildClassVars;
         _childClassAccessedVariables = [];
+        _prevVarDeclStmt = null;
     }
     
     protected override void HandleFunction(Function function) {
@@ -495,10 +497,13 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
     protected override void HandleBlock(List<Statement> statements) {
         var blockIndependentVars = new Dictionary<string, Type>(_currentScopeVars);
         var blockIndependentChildClassVars = new Dictionary<string, Type>(_currentScopeChildClassVariables);
+        var blockIndependentPrevVarDecl = _prevVarDeclStmt;
+        _prevVarDeclStmt = null;
         base.HandleBlock(statements);
         ScanPRVTargets();
         _currentScopeVars = blockIndependentVars;
         _currentScopeChildClassVariables = blockIndependentChildClassVars;
+        _prevVarDeclStmt = blockIndependentPrevVarDecl;
         _childClassAccessedVariables = [];
     }
     
@@ -540,8 +545,15 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
     protected override void VisitStatement(VarDeclStmt vDeclStmt) {
         if (vDeclStmt.IsGhost) return;
         base.VisitStatement(vDeclStmt);
+
+        bool canApplySWV = _prevVarDeclStmt != null && vDeclStmt.Assign is AssignStatement && 
+                           _prevVarDeclStmt.Assign is AssignStatement && 
+                           vDeclStmt.Locals.Count == _prevVarDeclStmt.Locals.Count;
         
-        foreach (var var in vDeclStmt.Locals) {
+        foreach (var (var, i) in vDeclStmt.Locals.Select((var, i) => (var, i)).ToList()) {
+            if (canApplySWV && var.Type.ToString() != _prevVarDeclStmt?.Locals[i].Type.ToString())
+                canApplySWV = false;
+            
             if (!_currentScopeVars.ContainsKey(var.Name))
                 _currentScopeVars.Add(var.Name, var.Type);
             
@@ -553,6 +565,10 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
                 _currentScopeChildClassVariables.Add(var.Name, var.Type);
             }
         }
+        
+        if (canApplySWV && ShouldImplement("SWV"))
+            Targets.Add(($"{vDeclStmt.Center.pos}", "SWV", $"{_prevVarDeclStmt?.Center.pos}"));
+        _prevVarDeclStmt = vDeclStmt;
     }
 
     /// --------------------------------------
