@@ -10,6 +10,7 @@ public class MutDafny : PluginConfiguration
 {
     private bool _mutate;
     private bool _scan;
+    private bool _analyze;
 
     private List<string> OperatorsInUse { get; set; } = [];
     private string MutationTargetPos { get; set; } = "";
@@ -32,13 +33,16 @@ public class MutDafny : PluginConfiguration
                 4 => args[3],
                 _ => string.Join(" ", new List<string>(args[new Range(3, args.Length)]))
             };
+        } else if (args[0] == "analyze") {
+            _analyze = true;
         }
     }
 
     public override Rewriter[] GetRewriters(ErrorReporter reporter) {
         return _mutate ? 
             [new MutantGenerator(MutationTargetPos, MutationOperator, MutationArg, reporter)] : 
-            (_scan ? [new MutationTargetScanner(OperatorsInUse, reporter)] : []);
+            (_scan ? [new MutationTargetScanner(OperatorsInUse, reporter)] : 
+             _analyze ? [new Analyzer(reporter)] : []);
     }
 }
 
@@ -88,5 +92,14 @@ public class MutantGenerator(string mutationTargetPos, string mutationOperator, 
             $"_{mutationTargetPos}_{mutationOperator}_{mutationArg}.dfy" : 
             $"_{mutationTargetPos}_{mutationOperator}.dfy";
         File.WriteAllText(filename, programText);
+    }
+}
+
+public class Analyzer(ErrorReporter reporter) : Rewriter(reporter)
+{
+    public override void PreResolve(ModuleDefinition module) {
+        var analyzer = new Visitor.Analyzer(reporter);
+        analyzer.Find(module);
+        analyzer.ExportData();
     }
 }
