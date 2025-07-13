@@ -5,7 +5,8 @@ using Type = Microsoft.Dafny.Type;
 
 namespace MutDafny.Visitor;
 
-public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter reporter) : TargetScanner(operatorsInUse, reporter)
+public class PostResolveTargetScanner(string mutationTargetURI, List<string> operatorsInUse, ErrorReporter reporter) 
+    : TargetScanner(mutationTargetURI, operatorsInUse, reporter)
 {
     private bool _skipChildUOIMutation;
     private bool _skipChildEVRMutation;
@@ -434,6 +435,9 @@ public class PostResolveTargetScanner(List<string> operatorsInUse, ErrorReporter
     
     protected override void HandleMemberDecls(TopLevelDeclWithMembers decl) {
         foreach (var member in decl.Members) {
+            if (mutationTargetURI != "" && !member.Origin.Uri.LocalPath.Contains(mutationTargetURI))
+                continue;
+            
             if (decl is ClassLikeDecl clDecl && member is Field f)
                 _classFields.Add((f.Name, clDecl, f.Type));
             

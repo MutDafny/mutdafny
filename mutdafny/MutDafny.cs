@@ -13,6 +13,7 @@ public class MutDafny : PluginConfiguration
     private bool _analyze;
 
     private List<string> OperatorsInUse { get; set; } = [];
+    private string MutationTargetURI { get; set; } = "";
     private string MutationTargetPos { get; set; } = "";
     private string MutationOperator { get; set; } = "";
     private string? MutationArg { get; set; }
@@ -22,7 +23,13 @@ public class MutDafny : PluginConfiguration
         if (args[0] == "scan") {
             _scan = true;
             if (args.Length == 1) return;
-            OperatorsInUse = new List<string>(args[1..]);
+            if (args[1].EndsWith(".dfy")) {
+                MutationTargetURI = args[1];
+                if (args.Length == 2) return;
+                OperatorsInUse = new List<string>(args[2..]);   
+            } else { 
+                OperatorsInUse = new List<string>(args[1..]);   
+            }
         } 
         else if (args[0] == "mut" && args.Length >= 3) {
             _mutate = true;
@@ -35,32 +42,37 @@ public class MutDafny : PluginConfiguration
             };
         } else if (args[0] == "analyze") {
             _analyze = true;
+            if (args.Length == 1) return;
+            MutationTargetURI = args[1];
         }
     }
 
     public override Rewriter[] GetRewriters(ErrorReporter reporter) {
         return _mutate ? 
             [new MutantGenerator(MutationTargetPos, MutationOperator, MutationArg, reporter)] : 
-            (_scan ? [new MutationTargetScanner(OperatorsInUse, reporter)] : 
-             _analyze ? [new Analyzer(reporter)] : []);
+            (_scan ? [new MutationTargetScanner(MutationTargetURI, OperatorsInUse, reporter)] : 
+             _analyze ? [new ProgramAnalyzer(MutationTargetURI, reporter)] : []);
     }
 }
 
-public class MutationTargetScanner(List<string> operatorsInUse, ErrorReporter reporter) : Rewriter(reporter)
+public class MutationTargetScanner(string mutationTargetURI, List<string> operatorsInUse, ErrorReporter reporter) : Rewriter(reporter)
 {
+    public static bool FirstCall = true;
+    
     public override void PreResolve(ModuleDefinition module) {
         var specHelperFinder = new SpecHelperFinder(Reporter);
         specHelperFinder.Find(module);
         
-        var targetScanner = new PreResolveTargetScanner(operatorsInUse, Reporter);
+        var targetScanner = new PreResolveTargetScanner(mutationTargetURI, operatorsInUse, Reporter);
         targetScanner.Find(module);
         targetScanner.ExportTargets();
     }
 
     public override void PostResolve(ModuleDefinition module) {
-        var targetScanner = new PostResolveTargetScanner(operatorsInUse, Reporter);
+        var targetScanner = new PostResolveTargetScanner(mutationTargetURI, operatorsInUse, Reporter);
         targetScanner.Find(module);
         targetScanner.ExportTargets();
+        FirstCall = false;
     }
 }
 
@@ -95,11 +107,14 @@ public class MutantGenerator(string mutationTargetPos, string mutationOperator, 
     }
 }
 
-public class Analyzer(ErrorReporter reporter) : Rewriter(reporter)
+public class ProgramAnalyzer(string mutationTargetURI, ErrorReporter reporter) : Rewriter(reporter)
 {
+    public static bool FirstCall = true;
+
     public override void PreResolve(ModuleDefinition module) {
-        var analyzer = new Visitor.Analyzer(reporter);
+        var analyzer = new Analyzer(mutationTargetURI, Reporter);
         analyzer.Find(module);
         analyzer.ExportData();
+        FirstCall = false;
     }
 }

@@ -2,8 +2,8 @@
 
 namespace MutDafny.Visitor;
 
-public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter reporter)
-    : TargetScanner(operatorsInUse, reporter)
+public class PreResolveTargetScanner(string mutationTargetURI, List<string> operatorsInUse, ErrorReporter reporter)
+    : TargetScanner(mutationTargetURI, operatorsInUse, reporter)
 {
     private List<string> _coveredVariableNames = [];
     private List<string> _specCoveredVariableNames = [];
@@ -211,6 +211,9 @@ public class PreResolveTargetScanner(List<string> operatorsInUse, ErrorReporter 
     protected override void HandleMemberDecls(TopLevelDeclWithMembers decl) {
         _currentSourceDeclFields = [];
         foreach (var member in decl.Members) {
+            if (mutationTargetURI != "" && !member.Origin.Uri.LocalPath.Contains(mutationTargetURI))
+                continue;
+            
             if (member is Field f)
                 _currentSourceDeclFields.Add(f.Name);
             
