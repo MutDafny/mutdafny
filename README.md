@@ -31,7 +31,11 @@ cd mutdafny && dotnet build
 
 | **Operator**    | **Description** | **Argument** |
 | -------- | ------- | ------- |
-| BOR (Binary Operator Replacement) | Replacement of an arithmetic, relational, conditional, logical or shift operator with another of the same category | Replacement operator code |
+| AOR (Arithmetic Operator Replacement) | Replacement of an arithmetic operator with another | Replacement operator code |
+| ROR (Relational Operator Replacement) | Replacement of a relational operator with another | Replacement operator code |
+| COR (Conditional Operator Replacement) | Replacement of a conditional operator with another | Replacement operator code |
+| LOR (Logical Operator Replacement) | Replacement of a logical operator with another | Replacement operator code |
+| SOR (Shift Operator Replacement) | Replacement of a shift operator with another | Replacement operator code |
 | BBR (Boolean-Binary Expression Replacement) | Replacement of a relational or conditional expression with `true` or `false` | Replacement value (`true` or `false`) |
 | UOI (Unary Operator Insertion) | Insertion of a unary minus or not operator in front of an expression | Insertion operator code |
 | UOD (Unary Operator Deletion) | Deletion of a unary minus or not operator in front of an expression | NA |

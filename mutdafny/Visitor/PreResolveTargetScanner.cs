@@ -47,9 +47,23 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
         // shift operators
         { BinaryExpr.Opcode.LeftShift, [BinaryExpr.Opcode.RightShift] },
         { BinaryExpr.Opcode.RightShift, [BinaryExpr.Opcode.LeftShift] },
-        // set inclusion operators
-        { BinaryExpr.Opcode.In, [BinaryExpr.Opcode.NotIn] },
-        { BinaryExpr.Opcode.NotIn, [BinaryExpr.Opcode.In] },
+    };
+    private readonly Dictionary<BinaryExpr.Opcode, string> _replacementOpType = new()
+    {
+        // arithmetic operators
+        { BinaryExpr.Opcode.Add, "AOR" }, { BinaryExpr.Opcode.Sub, "AOR" },
+        { BinaryExpr.Opcode.Mul, "AOR" }, { BinaryExpr.Opcode.Div, "AOR" }, { BinaryExpr.Opcode.Mod, "AOR" },
+        // relational operators
+        { BinaryExpr.Opcode.Eq, "ROR" }, { BinaryExpr.Opcode.Neq, "ROR" },
+        { BinaryExpr.Opcode.Lt, "ROR" }, { BinaryExpr.Opcode.Le, "ROR" },
+        { BinaryExpr.Opcode.Gt, "ROR" }, { BinaryExpr.Opcode.Ge, "ROR" },
+        // conditional operators
+        { BinaryExpr.Opcode.And, "COR" }, { BinaryExpr.Opcode.Or, "COR" },
+        { BinaryExpr.Opcode.Iff, "COR" }, { BinaryExpr.Opcode.Imp, "COR" }, { BinaryExpr.Opcode.Exp, "COR" },
+        // logical operators
+        { BinaryExpr.Opcode.BitwiseAnd, "LOR" }, { BinaryExpr.Opcode.BitwiseOr, "LOR" }, { BinaryExpr.Opcode.BitwiseXor, "LOR" },
+        // shift operators
+        { BinaryExpr.Opcode.LeftShift, "SOR" }, { BinaryExpr.Opcode.RightShift, "SOR" },
     };
 
     private void ScanThisKeywordTargets(TopLevelDeclWithMembers decl) {
@@ -489,10 +503,13 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
     protected override void VisitExpression(BinaryExpr bExpr) {
         if (!_replacementList.TryGetValue(bExpr.Op, out var replacementList)) 
             return;
-        if (ShouldImplement("BOR")) {
+        if (!_replacementOpType.TryGetValue(bExpr.Op, out var opName))
+            return;
+        if (ShouldImplement(opName)) {
             foreach (var replacement in replacementList)
-                Targets.Add(($"{bExpr.Center.pos}", "BOR", replacement.ToString()));
+                Targets.Add(($"{bExpr.Center.pos}", opName, replacement.ToString()));
         }
+        
         if (ShouldImplement("ODL") && !_coveredOperators.Contains(bExpr.Op)) {
             _coveredOperators.Add(bExpr.Op);
             Targets.Add(("-", "ODL", $"{bExpr.Op.ToString()}-left"));
@@ -528,9 +545,11 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
             
             if (!_replacementList.TryGetValue(op, out var replacementList)) 
                 return;
-            if (ShouldImplement("BOR")) {
+            if (!_replacementOpType.TryGetValue(op, out var opName))
+                return;
+            if (ShouldImplement(opName)) {
                 foreach (var replacement in replacementList) {
-                    Targets.Add(($"{e.Center.pos}", "BOR", replacement.ToString()));
+                    Targets.Add(($"{e.Center.pos}", opName, replacement.ToString()));
                 }
             }
 

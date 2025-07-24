@@ -7,7 +7,7 @@ public class MutatorFactory(ErrorReporter reporter)
     public Mutator? Create(string mutationTargetPos, string mutationOperator, string? mutationArg)
     {
         return mutationOperator switch {
-            "BOR" => mutationArg == null ? null : 
+            "AOR" or "ROR" or "COR" or "LOR" or "SOR" => mutationArg == null ? null : 
                 new BinaryOpMutator(mutationTargetPos, mutationArg, reporter),
             "BBR" => mutationArg == null ? null : 
                 new BinaryOpBoolMutator(mutationTargetPos, mutationArg, reporter),
