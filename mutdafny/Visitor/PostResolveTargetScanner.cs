@@ -26,7 +26,6 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     private List<(string, int, Type)> _childClassAccessedVariables = [];
     
     private void ScanUOITargets(Expression expr) {
-        if (!ShouldImplement("UOI")) return;
         if (_skipChildUOIMutation) {
             _skipChildUOIMutation = false;
             return;
@@ -36,11 +35,16 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
         switch (expr.Type) {
             case IntType:
             case RealType:
-                Targets.Add((exprLocation, "UOI", "Minus")); 
+                if (ShouldImplement("AOI"))
+                    Targets.Add((exprLocation, "AOI", "")); 
                 break;
             case BoolType:
+                if (ShouldImplement("COI"))
+                    Targets.Add((exprLocation, "COI", "")); 
+                break;
             case BitvectorType:
-                Targets.Add((exprLocation, "UOI", UnaryOpExpr.Opcode.Not.ToString()));
+                if (ShouldImplement("LOI"))
+                    Targets.Add((exprLocation, "LOI", "")); 
                 break;
         }
     }

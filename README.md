@@ -37,7 +37,9 @@ cd mutdafny && dotnet build
 | LOR (Logical Operator Replacement) | Replacement of a logical operator with another | Replacement operator code |
 | SOR (Shift Operator Replacement) | Replacement of a shift operator with another | Replacement operator code |
 | BBR (Boolean-Binary Expression Replacement) | Replacement of a relational or conditional expression with `true` or `false` | Replacement value (`true` or `false`) |
-| UOI (Unary Operator Insertion) | Insertion of a unary minus or not operator in front of an expression | Insertion operator code |
+| AOI (Arithmetic Operator Insertion) | Insertion of a unary minus in front of an arithmetic expression | NA |
+| COI (Conditional Operator Insertion) | Insertion of a not operator in front of a conditional expression | NA |
+| LOI (Logical Operator Insertion) | Insertion of a unary minus in front of a logical expression | NA |
 | UOD (Unary Operator Deletion) | Deletion of a unary minus or not operator in front of an expression | NA |
 | LVR (Literal Value Replacement) | Replacement of a numerical literal value with its increment, decrement and zero and of a string literal value either an empty one, a default one, or a mutation of the original | Replacement value |
 | EVR (Expression Value Replacement) | Replacement of an expression with a default literal value of its type  | Type |
