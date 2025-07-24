@@ -13,7 +13,7 @@ public class MutatorFactory(ErrorReporter reporter)
                 new BinaryOpBoolMutator(mutationTargetPos, mutationArg, reporter),
             "AOI" => new UnaryOpInsertionMutator(mutationTargetPos, "Minus", reporter),
             "COI" or "LOI" => new UnaryOpInsertionMutator(mutationTargetPos, "Not", reporter),
-            "UOD" => new UnaryOpDeletionMutator(mutationTargetPos, reporter),
+            "AOD" or "COD" or "LOD" => new UnaryOpDeletionMutator(mutationTargetPos, reporter),
             "LVR" => mutationArg == null ? 
                 new LiteralValueReplacementMutator(mutationTargetPos, "", reporter) :
                 new LiteralValueReplacementMutator(mutationTargetPos, mutationArg, reporter),

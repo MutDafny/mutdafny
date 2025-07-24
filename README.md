@@ -39,8 +39,10 @@ cd mutdafny && dotnet build
 | BBR (Boolean-Binary Expression Replacement) | Replacement of a relational or conditional expression with `true` or `false` | Replacement value (`true` or `false`) |
 | AOI (Arithmetic Operator Insertion) | Insertion of a unary minus in front of an arithmetic expression | NA |
 | COI (Conditional Operator Insertion) | Insertion of a not operator in front of a conditional expression | NA |
-| LOI (Logical Operator Insertion) | Insertion of a unary minus in front of a logical expression | NA |
-| UOD (Unary Operator Deletion) | Deletion of a unary minus or not operator in front of an expression | NA |
+| LOI (Logical Operator Insertion) | Insertion of a not operator in front of a logical expression | NA |
+| AOD (Arithmetic Operator Deletion) | Deletion of a unary minus in front of an arithmetic expression | NA |
+| COD (Conditional Operator Deletion) | Deletion of a not operator in front of a conditional expression | NA |
+| LOD (Logical Operator Deletion) | Deletion of a not operator in front of a logical expression | NA |
 | LVR (Literal Value Replacement) | Replacement of a numerical literal value with its increment, decrement and zero and of a string literal value either an empty one, a default one, or a mutation of the original | Replacement value |
 | EVR (Expression Value Replacement) | Replacement of an expression with a default literal value of its type  | Type |
 | VER (Variable Expression Replacement) | Replacement of a variable with another of the same type | The name of the replacement variable |

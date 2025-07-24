@@ -534,8 +534,8 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
 
     protected override void VisitExpression(ChainingExpression cExpr) {
         foreach (var (e, i) in cExpr.Operands.Select((e, i) => (e, i))) {
-            if (ShouldImplement("UOD") && e is NegationExpression nExpr) {
-                Targets.Add(($"{nExpr.Center.pos}", "UOD", ""));
+            if (ShouldImplement("AOD") && e is NegationExpression nExpr) {
+                Targets.Add(($"{nExpr.Center.pos}", "AOD", ""));
             }
             
             if (i == cExpr.Operators.Count) return;
@@ -564,19 +564,10 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
         }
     }
     
-    protected override void VisitExpression(UnaryExpr uExpr) {
-        if (ShouldImplement("UOD") && uExpr is UnaryOpExpr uOpExpr && uOpExpr.Op == UnaryOpExpr.Opcode.Not) {
-            // conditional/logical operator deletion
-            Targets.Add(($"{uOpExpr.Center.pos}", "UOD", ""));
-        }
-        
-        base.VisitExpression(uExpr);
-    }
-    
     protected override void VisitExpression(NegationExpression nExpr) {
-        if (ShouldImplement("UOD")) {
+        if (ShouldImplement("AOD")) {
             // arithmetic operator deletion
-            Targets.Add(($"{nExpr.Center.pos}", "UOD", ""));
+            Targets.Add(($"{nExpr.Center.pos}", "AOD", ""));
             base.VisitExpression(nExpr);  
         }
     }

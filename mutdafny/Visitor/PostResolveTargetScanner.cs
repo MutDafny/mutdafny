@@ -49,6 +49,22 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
         }
     }
 
+    private void ScanUODTargets(UnaryExpr uExpr) {
+        if (!(uExpr is UnaryOpExpr uOpExpr) || uOpExpr.Op != UnaryOpExpr.Opcode.Not)
+            return;
+        
+        switch (uExpr.Type) {
+            case BoolType:
+                if (ShouldImplement("COD"))
+                    Targets.Add(($"{uOpExpr.Center.pos}", "COD", ""));
+                break;
+            case BitvectorType:
+                if (ShouldImplement("LOD"))
+                    Targets.Add(($"{uOpExpr.Center.pos}", "LOD", ""));
+                break;
+        }
+    }
+
     private void ScanLVRTargets(LiteralExpr litExpr) {
         if (!ShouldImplement("LVR")) return;
         
@@ -598,6 +614,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     
     protected override void VisitExpression(UnaryExpr uExpr) {
         _skipChildUOIMutation = true;
+        ScanUODTargets(uExpr);
         ScanEVRTargets(uExpr);
         base.VisitExpression(uExpr);
     }
