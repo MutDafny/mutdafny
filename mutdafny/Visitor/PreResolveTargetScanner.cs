@@ -7,7 +7,7 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
 {
     private List<string> _coveredVariableNames = [];
     private List<string> _specCoveredVariableNames = [];
-    private readonly List<BinaryExpr.Opcode> _coveredOperators = [];
+    private static readonly List<BinaryExpr.Opcode> _coveredOperators = [];
     private string _currentMethodScope = "";
     private List<string> _currentMethodIns = [];
     private List<string> _currentMethodOuts = [];
