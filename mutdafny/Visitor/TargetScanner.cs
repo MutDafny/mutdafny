@@ -7,6 +7,8 @@ public abstract class TargetScanner(string MutationTargetURI, List<string> opera
     protected List<(string, string, string)> Targets { get; } = [];
     protected bool IsParentSpec;
     protected bool IsFirstVisit = true;
+    protected static List<Statement> OriginalStmts { get; } = [];
+    protected static List<ConstantField> OriginalFields { get; } = [];
     
     protected bool ShouldImplement(string op) {
         if (op != "THI" && op != "THD" && op != "AMR" && op != "MMR") {
@@ -21,6 +23,26 @@ public abstract class TargetScanner(string MutationTargetURI, List<string> opera
             var line = target.Item1 + "," + target.Item2 + "," + target.Item3;
             sw.WriteLine(line);
         }
+    }
+
+    protected bool IsStatementOriginal(Statement stmt) {
+        foreach (var originalStmt in OriginalStmts) {
+            if (stmt.GetType() != originalStmt.GetType())
+                continue;
+            if (stmt.StartToken.pos == originalStmt.StartToken.pos &&
+                stmt.EndToken.pos == originalStmt.EndToken.pos)
+                return true;
+        }
+        return false;
+    }
+    
+    protected bool IsFieldOriginal(ConstantField cf) {
+        foreach (var originalField in OriginalFields) {
+            if (cf.StartToken.pos == originalField.StartToken.pos &&
+                cf.EndToken.pos == originalField.EndToken.pos)
+                return true;
+        }
+        return false;
     }
     
     /// -----------------

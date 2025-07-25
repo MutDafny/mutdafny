@@ -230,8 +230,9 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
             
             if (member is Field f)
                 _currentSourceDeclFields.Add(f.Name);
-            
             if (member is not ConstantField cf) continue;
+            OriginalFields.Add(cf);
+            
             if (!ShouldImplement("VDL")) break;
             _coveredVariableNames.Add(cf.Name);
             Targets.Add(("-", "VDL", cf.Name));
@@ -262,6 +263,11 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
     /// -------------------------------------
     /// Group of overriden statement visitors
     /// -------------------------------------
+    protected override void HandleStatement(Statement stmt) {
+        OriginalStmts.Add(stmt);
+        base.HandleStatement(stmt);
+    }
+    
     protected override void HandleBlock(List<Statement> statements) {
         Statement? prevStmt = null;
         foreach (var stmt in statements) {

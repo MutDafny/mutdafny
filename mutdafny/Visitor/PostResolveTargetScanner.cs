@@ -461,7 +461,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
             if (decl is ClassLikeDecl clDecl && member is Field f)
                 _classFields.Add((f.Name, clDecl, f.Type));
             
-            if (member is not ConstantField cf || cf.Rhs == null) 
+            if (member is not ConstantField cf || cf.Rhs == null || !IsFieldOriginal(cf)) 
                 continue;
             
             if (ShouldImplement("SDL")) {
@@ -518,6 +518,12 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     /// -------------------------------------
     /// Group of overriden statement visitors
     /// -------------------------------------
+    protected override void HandleStatement(Statement stmt) {
+        if (!IsStatementOriginal(stmt))
+            return;
+        base.HandleStatement(stmt);
+    }
+    
     protected override void HandleBlock(List<Statement> statements) {
         var blockIndependentVars = new Dictionary<string, Type>(_currentScopeVars);
         var blockIndependentChildClassVars = new Dictionary<string, Type>(_currentScopeChildClassVariables);
