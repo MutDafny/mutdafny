@@ -7,7 +7,7 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
 {
     private readonly List<Statement> _toDelete = [];
     private Type? _currentTypeRestriction;
-    private string _currentMethodScope = "";
+    private string _currentScope = "-";
     private readonly List<(string, string)> _sideEffectVarsToDelete = [];
 
     private Expression? HandleTarget() {
@@ -74,11 +74,12 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
     
     private bool IsTarget(string name, int tokenPos) {
         var positions = MutationTargetPos.Split("-");
+        var currentPositions = _currentScope.Split("-");
 
         return name == var && 
                (MutationTargetPos == "-" || 
-               (int.Parse(positions[0]) <= tokenPos && 
-                tokenPos <= int.Parse(positions[1])));
+               (int.Parse(positions[0]) == int.Parse(currentPositions[0]) && 
+                int.Parse(positions[1]) == int.Parse(currentPositions[1])));
     }
     
     private bool IsTarget(ConstantField cf) {
@@ -135,9 +136,7 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             // only visit members that may contain the mutation target
             if (!IsWorthVisiting(member.StartToken.pos, member.EndToken.pos)) continue;
             if (member is Method m) { // includes constructor
-                _currentMethodScope = $"{m.StartToken.pos}-{m.EndToken.pos}";
                 HandleMethod(m);  
-                _currentMethodScope = "-";
             } else if (member is Function func) { // includes predicate
                 HandleFunction(func);
             } else if (member is ConstantField cf) {
@@ -164,10 +163,17 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             TargetExpression = null;
         }
     }
-    
+
     /// ---------------------------
     /// Group of statement visitors
     /// ---------------------------
+    protected override void HandleBlock(BlockStmt blockStmt) {
+        var prevCurrentScope = _currentScope;
+        _currentScope = $"{blockStmt.StartToken.pos}-{blockStmt.EndToken.pos}";
+        base.HandleBlock(blockStmt);
+        _currentScope = prevCurrentScope;
+    }
+    
     protected override void HandleBlock(List<Statement> statements) {
         foreach (var stmt in statements.ToList()) {
             HandleStatement(stmt);
@@ -351,7 +357,7 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
     private void CollectSideEffectVarsToDelete(VarDeclStmt vDeclStmt) {
         foreach (var localVar in vDeclStmt.Locals) {
             if (localVar.Name == var) continue;
-            _sideEffectVarsToDelete.Add((_currentMethodScope, localVar.Name));
+            _sideEffectVarsToDelete.Add((_currentScope, localVar.Name));
         }
     }
     

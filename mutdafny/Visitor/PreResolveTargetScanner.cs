@@ -8,7 +8,7 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
     private List<string> _coveredVariableNames = [];
     private List<string> _specCoveredVariableNames = [];
     private static readonly List<BinaryExpr.Opcode> _coveredOperators = [];
-    private string _currentMethodScope = "";
+    private string _currentScope = "-";
     private List<string> _currentMethodIns = [];
     private List<string> _currentMethodOuts = [];
     private List<string> _currentInitMethodOuts = [];
@@ -247,7 +247,6 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
     protected override void HandleMethod(Method method) {
         var methodIndependentVars = _coveredVariableNames.Select(item => (string)item.Clone()).ToList();
         _isCurrentMethodVoid = method.Outs.Count == 0;
-        _currentMethodScope = $"{method.StartToken.pos}-{method.EndToken.pos}";
         _currentMethodOuts = method.Outs.Select(o => o.Name).ToList();
         _currentInitMethodOuts = [];
         _parentBlockHasStmt = false;
@@ -256,7 +255,6 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
         if (ShouldImplement("SDL") && _isCurrentMethodVoid && _parentBlockHasStmt)
             Targets.Add(($"{method.StartToken.pos}-{method.EndToken.pos}", "SDL", ""));
 
-        _currentMethodScope = "-";
         _coveredVariableNames = methodIndependentVars;
     }
 
@@ -266,6 +264,13 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
     protected override void HandleStatement(Statement stmt) {
         OriginalStmts.Add(stmt);
         base.HandleStatement(stmt);
+    }
+
+    protected override void HandleBlock(BlockStmt blockStmt) {
+        var prevCurrentScope = _currentScope;
+        _currentScope = $"{blockStmt.StartToken.pos}-{blockStmt.EndToken.pos}";
+        base.HandleBlock(blockStmt);
+        _currentScope = prevCurrentScope;
     }
     
     protected override void HandleBlock(List<Statement> statements) {
@@ -326,7 +331,7 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
             if (!ShouldImplement("VDL")) break;
             if (_coveredVariableNames.Contains(var.Name)) continue;
             _coveredVariableNames.Add(var.Name);
-            Targets.Add((_currentMethodScope, "VDL", var.Name));
+            Targets.Add((_currentScope, "VDL", var.Name));
         }
 
         base.VisitStatement(vDeclStmt);
