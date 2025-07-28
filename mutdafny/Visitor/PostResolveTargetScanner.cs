@@ -18,8 +18,8 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     private ExprDotName? _childExprDotName;
     private List<string> _childMethodCallArgTypes = [];
     private Dictionary<string, Type> _currentScopeVars = [];
-    private readonly List<MethodOrFunction> _declaredMethods = [];
-    private readonly List<ApplySuffix> _methodCalls = [];
+    private List<MethodOrFunction> _declaredMethods = [];
+    private List<ApplySuffix> _methodCalls = [];
     private readonly List<(string, ClassLikeDecl, Type)> _classFields = []; // field name, class type, field type
     private readonly List<ExprDotName> _accessedClassFields = [];
     private Dictionary<string, Type> _currentScopeChildClassVariables = [];
@@ -293,6 +293,9 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
                 Targets.Add(($"{methodCall.Center.pos}", "MCR", $"{m.Name}"));
             }
         }
+        
+        _methodCalls = [];
+        _declaredMethods = [];
     }
 
     private void ScanMVRTargets(ConcreteAssignStatement cAStmt) {
@@ -363,7 +366,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
         }
     }
     
-    private void ScanFARMutations() {
+    private void ScanFARTargets() {
         if (!ShouldImplement("FAR")) return;
 
         foreach (var fieldAccess in _accessedClassFields) {
@@ -444,14 +447,18 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
             _ => "",
         };
     }
-    
+
     /// -------------------------------------
     /// Group of overriden top level visitors
     /// -------------------------------------
     public override void Find(ModuleDefinition module) {
         base.Find(module);
+        ScanFARTargets();
+    }
+
+    protected override void HandleDefaultClassDecl(ModuleDefinition module) {
+        base.HandleDefaultClassDecl(module);       
         ScanMCRTargets();
-        ScanFARMutations();
     }
     
     protected override void HandleMemberDecls(TopLevelDeclWithMembers decl) {
@@ -482,6 +489,8 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
             }
         }
         base.HandleMemberDecls(decl);
+        
+        ScanMCRTargets();
         ScanPRVTargets();
         _childClassAccessedVariables = [];
     }
