@@ -296,7 +296,8 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     }
 
     private void ScanMVRTargets(ConcreteAssignStatement cAStmt) {
-        if (!ShouldImplement("MVR")) return;
+        if (!ShouldImplement("MVR") || cAStmt.Lhss.Count == 0) 
+            return;
 
         var varsArg = "";
         foreach (var lhs in cAStmt.Lhss) {
