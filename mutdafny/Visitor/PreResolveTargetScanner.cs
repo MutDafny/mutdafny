@@ -6,7 +6,7 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
     : TargetScanner(mutationTargetURI, operatorsInUse, reporter)
 {
     private List<string> _coveredVariableNames = [];
-    private List<string> _specCoveredVariableNames = [];
+    private List<string> _varsToDelete = [];
     private static readonly List<BinaryExpr.Opcode> _coveredOperators = [];
     private string _currentScope = "-";
     private List<string> _currentMethodIns = [];
@@ -234,7 +234,7 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
             OriginalFields.Add(cf);
             
             if (!ShouldImplement("VDL")) break;
-            _coveredVariableNames.Add(cf.Name);
+            _varsToDelete.Add(cf.Name);
             Targets.Add(("-", "VDL", cf.Name));
         }
         base.HandleMemberDecls(decl);
@@ -242,10 +242,10 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
         ScanThisKeywordTargets(decl);
         ScanMBRTargets(decl);
         IsFirstVisit = true;
+        _varsToDelete = [];
     }
     
     protected override void HandleMethod(Method method) {
-        var methodIndependentVars = _coveredVariableNames.Select(item => (string)item.Clone()).ToList();
         _isCurrentMethodVoid = method.Outs.Count == 0;
         _currentMethodOuts = method.Outs.Select(o => o.Name).ToList();
         _currentInitMethodOuts = [];
@@ -254,8 +254,6 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
         base.HandleMethod(method);
         if (ShouldImplement("SDL") && _isCurrentMethodVoid && _parentBlockHasStmt)
             Targets.Add(($"{method.StartToken.pos}-{method.EndToken.pos}", "SDL", ""));
-
-        _coveredVariableNames = methodIndependentVars;
     }
 
     /// -------------------------------------
@@ -269,22 +267,24 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
     protected override void HandleBlock(BlockStmt blockStmt) {
         var prevCurrentScope = _currentScope;
         _currentScope = $"{blockStmt.StartToken.pos}-{blockStmt.EndToken.pos}";
+        var prevVarsToDelete = _varsToDelete.Select(item => (string)item.Clone()).ToList();
+        
         base.HandleBlock(blockStmt);
+        
         _currentScope = prevCurrentScope;
+        _varsToDelete = prevVarsToDelete;
     }
     
     protected override void HandleBlock(List<Statement> statements) {
         Statement? prevStmt = null;
+        var allCoveredVariableNames = _coveredVariableNames;
+            
         foreach (var stmt in statements) {
-            var prevCoveredVariableNames = _coveredVariableNames;
             _coveredVariableNames = []; // collect vars used in next statement
-            _specCoveredVariableNames = [];
-
             if (stmt is not PredicateStmt && stmt is not CalcStmt)
                 _parentBlockHasStmt = true;
             
             HandleStatement(stmt);
-            _coveredVariableNames = _coveredVariableNames.Concat(_specCoveredVariableNames).ToList();
             if (!ShouldImplement("SWS")) continue;
             if (prevStmt == null || ExcludeSWSTarget(prevStmt) || ExcludeSWSTarget(stmt)) {
                 prevStmt = stmt;
@@ -297,8 +297,9 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
                 Targets.Add(($"{stmt.StartToken.pos}-{stmt.EndToken.pos}", "SWS", ""));
             }
             prevStmt = stmt;
-            _coveredVariableNames = prevCoveredVariableNames.Concat(_coveredVariableNames).Distinct().ToList(); 
+            allCoveredVariableNames = allCoveredVariableNames.Concat(_coveredVariableNames).ToList();
         }
+        _coveredVariableNames = allCoveredVariableNames;
     }
     
     protected override void VisitStatement(ConcreteAssignStatement cAStmt) {
@@ -325,12 +326,12 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
         base.VisitStatement(cAStmt);
     }
     
-    protected override void VisitStatement(VarDeclStmt vDeclStmt) {
+    protected override void VisitStatement(VarDeclStmt vDeclStmt) {        
         _isParentVarDeclStmt = true;
         foreach (var var in vDeclStmt.Locals) {
             if (!ShouldImplement("VDL")) break;
-            if (_coveredVariableNames.Contains(var.Name)) continue;
-            _coveredVariableNames.Add(var.Name);
+            if (_varsToDelete.Contains(var.Name)) continue;
+            _varsToDelete.Add(var.Name);
             Targets.Add((_currentScope, "VDL", var.Name));
         }
 
@@ -584,13 +585,10 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
     }
 
     protected override void VisitExpression(NameSegment nSegExpr) {
-        if (IsParentSpec) {
-            if (_coveredVariableNames.Contains(nSegExpr.Name))
-                _coveredVariableNames.Remove(nSegExpr.Name);
-            _specCoveredVariableNames.Add(nSegExpr.Name);
+        if (IsParentSpec)
             Targets.RemoveAll(t => t.Item3 == nSegExpr.Name);
-        } else if (!_coveredVariableNames.Contains(nSegExpr.Name) && 
-                   !_currentMethodIns.Contains(nSegExpr.Name)) {
+        if (!_coveredVariableNames.Contains(nSegExpr.Name) && 
+            !_currentMethodIns.Contains(nSegExpr.Name)) {
             _coveredVariableNames.Add(nSegExpr.Name);
         } else if (_scanThisKeywordTargets && 
                   _currentMethodIns.Contains(nSegExpr.Name) && 
@@ -606,14 +604,8 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
             return;
         }
 
-        if (IsParentSpec) {
-            if (_coveredVariableNames.Contains(exprDName.SuffixName))
-                _coveredVariableNames.Remove(exprDName.SuffixName);
-            _specCoveredVariableNames.Add(exprDName.SuffixName);
-            Targets.RemoveAll(t => t.Item3 == exprDName.SuffixName);
-        } else if (_scanThisKeywordTargets && exprDName.Lhs is ThisExpr) {
+        if (_scanThisKeywordTargets && exprDName.Lhs is ThisExpr) {
             var fieldName = exprDName.SuffixName;
-
             if (!_currentMethodIns.Contains(fieldName)) return;
             if (ShouldImplement("THD"))
                 Targets.Add(($"{exprDName.Center.pos}", "THD", ""));
