@@ -7,11 +7,15 @@ public class ConditionalBlockExtractionMutator(string mutationTargetPos, ErrorRe
 {
     private bool _isElseBlock;
 
-    private List<Statement> CreateMutatedStatement(Statement originalStmt) {
+    private List<Statement> CreateMutatedStatement() {
+        List<Statement> statements = new List<Statement>();
+        if (TargetStatement is BlockStmt bStmt) {
+            statements = bStmt.Body;
+        } else if (TargetStatement != null) {
+            statements.Add(TargetStatement);
+        }
         TargetStatement = null;
-        if (originalStmt is not IfStmt ifStmt || (_isElseBlock && ifStmt.Els is not BlockStmt))
-            return [originalStmt];
-        return _isElseBlock && ifStmt.Els is BlockStmt bStmt ? bStmt.Body : ifStmt.Thn.Body;
+        return statements;
     }
     
     protected override Expression CreateMutatedExpression(Expression originalExpr) {
@@ -40,7 +44,7 @@ public class ConditionalBlockExtractionMutator(string mutationTargetPos, ErrorRe
             
             HandleStatement(stmt);
             if (!TargetFound()) continue; // else mutate
-            var newStmts = CreateMutatedStatement(statements[i]);
+            var newStmts = CreateMutatedStatement();
             statements.RemoveAt(i);
             statements.InsertRange(i, newStmts);
             return;
@@ -49,7 +53,7 @@ public class ConditionalBlockExtractionMutator(string mutationTargetPos, ErrorRe
     
     protected override void VisitStatement(IfStmt ifStmt) {
         if (IsTarget(ifStmt.Thn.StartToken.pos, ifStmt.Thn.EndToken.pos)) {
-            TargetStatement = ifStmt;
+            TargetStatement = ifStmt.Thn;
             return;
         }
         if (ifStmt.Els != null && IsTarget(ifStmt.Els.StartToken.pos, ifStmt.Els.EndToken.pos)) {
