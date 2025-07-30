@@ -222,8 +222,17 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
     /// -------------------------------------
     /// Group of overriden top level visitors
     /// -------------------------------------
+    public override void Find(ModuleDefinition module) {
+        if (module.EndToken.pos != 0)
+            _currentScope = $"{module.StartToken.pos}-{module.EndToken.pos}";
+        base.Find(module);
+    }
+    
     protected override void HandleMemberDecls(TopLevelDeclWithMembers decl) {
+        var prevCurrentScope = _currentScope;
+        _currentScope = $"{decl.StartToken.pos}-{decl.EndToken.pos}";
         _currentSourceDeclFields = [];
+        
         foreach (var member in decl.Members) {
             if (mutationTargetURI != "" && !member.Origin.Uri.LocalPath.Contains(mutationTargetURI))
                 continue;
@@ -235,13 +244,14 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
             
             if (!ShouldImplement("VDL")) break;
             _varsToDelete.Add(cf.Name);
-            Targets.Add(("-", "VDL", cf.Name));
+            Targets.Add((_currentScope, "VDL", cf.Name));
         }
         base.HandleMemberDecls(decl);
         IsFirstVisit = false;
         ScanThisKeywordTargets(decl);
         ScanMBRTargets(decl);
         IsFirstVisit = true;
+        _currentScope = prevCurrentScope;
         _varsToDelete = [];
     }
     
