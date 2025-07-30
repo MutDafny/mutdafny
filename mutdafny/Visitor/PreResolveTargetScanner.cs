@@ -117,12 +117,12 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
                     var m1OutTypes = m1.Outs.Select(o => o.Type.ToString()).ToList();
                     var m2OutTypes = m2.Outs.Select(o => o.Type.ToString()).ToList();
                     if (m1OutTypes.SequenceEqual(m2OutTypes))
-                        Targets.Add(($"{m1.StartToken.pos}-{m1.EndToken.pos}", "AMR", $"{m2.StartToken.pos}-{m2.EndToken.pos}"));
+                        AddTarget(($"{m1.StartToken.pos}-{m1.EndToken.pos}", "AMR", $"{m2.StartToken.pos}-{m2.EndToken.pos}"));
                 } else {
                     var m1InTypes = m1.Ins.Select(i => i.Type.ToString()).ToList();
                     var m2InTypes = m2.Ins.Select(i => i.Type.ToString()).ToList();
                     if (m1InTypes.SequenceEqual(m2InTypes))
-                        Targets.Add(($"{m1.StartToken.pos}-{m1.EndToken.pos}", "MMR", $"{m2.StartToken.pos}-{m2.EndToken.pos}"));
+                        AddTarget(($"{m1.StartToken.pos}-{m1.EndToken.pos}", "MMR", $"{m2.StartToken.pos}-{m2.EndToken.pos}"));
                 }
             }
         }
@@ -244,7 +244,7 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
             
             if (!ShouldImplement("VDL")) break;
             _varsToDelete.Add(cf.Name);
-            Targets.Add((_currentScope, "VDL", cf.Name));
+            AddTarget((_currentScope, "VDL", cf.Name));
         }
         base.HandleMemberDecls(decl);
         IsFirstVisit = false;
@@ -263,7 +263,7 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
         
         base.HandleMethod(method);
         if (ShouldImplement("SDL") && _isCurrentMethodVoid && _parentBlockHasStmt)
-            Targets.Add(($"{method.StartToken.pos}-{method.EndToken.pos}", "SDL", ""));
+            AddTarget(($"{method.StartToken.pos}-{method.EndToken.pos}", "SDL", ""));
     }
 
     /// -------------------------------------
@@ -302,9 +302,9 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
             }
             
             if (prevStmt is not VarDeclStmt vDeclStmt) {
-                Targets.Add(($"{stmt.StartToken.pos}-{stmt.EndToken.pos}", "SWS", ""));
+                AddTarget(($"{stmt.StartToken.pos}-{stmt.EndToken.pos}", "SWS", ""));
             } else if (!vDeclStmt.Locals.Select(e => e.Name).Intersect(_coveredVariableNames).Any()) {
-                Targets.Add(($"{stmt.StartToken.pos}-{stmt.EndToken.pos}", "SWS", ""));
+                AddTarget(($"{stmt.StartToken.pos}-{stmt.EndToken.pos}", "SWS", ""));
             }
             prevStmt = stmt;
             allCoveredVariableNames = allCoveredVariableNames.Concat(_coveredVariableNames).ToList();
@@ -329,7 +329,7 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
         }
         
         if (!_isParentVarDeclStmt && ShouldImplement("SDL") && canMutate) {
-            Targets.Add(($"{cAStmt.StartToken.pos}-{cAStmt.EndToken.pos}", "SDL", ""));
+            AddTarget(($"{cAStmt.StartToken.pos}-{cAStmt.EndToken.pos}", "SDL", ""));
         }
 
         if (_scanThisKeywordTargets) return;
@@ -342,7 +342,7 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
             if (!ShouldImplement("VDL")) break;
             if (_varsToDelete.Contains(var.Name)) continue;
             _varsToDelete.Add(var.Name);
-            Targets.Add((_currentScope, "VDL", var.Name));
+            AddTarget((_currentScope, "VDL", var.Name));
         }
 
         base.VisitStatement(vDeclStmt);
@@ -353,7 +353,7 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
         if (ShouldImplement("SDL") && pStmt is ReturnStmt && 
             (_currentInitMethodOuts.SequenceEqual(_currentMethodOuts) || _isCurrentMethodVoid)) {
             // only mutate if method is void or if outputs have been initialized
-            Targets.Add(($"{pStmt.StartToken.pos}-{pStmt.EndToken.pos}", "SDL", ""));
+            AddTarget(($"{pStmt.StartToken.pos}-{pStmt.EndToken.pos}", "SDL", ""));
         }
         base.VisitStatement(pStmt);
     }
@@ -361,24 +361,24 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
     protected override void VisitStatement(IfStmt ifStmt) {
         if (ShouldImplement("SDL")) {
             if (ifStmt.Els == null) {
-                Targets.Add(($"{ifStmt.StartToken.pos}-{ifStmt.EndToken.pos}", "SDL", ""));
+                AddTarget(($"{ifStmt.StartToken.pos}-{ifStmt.EndToken.pos}", "SDL", ""));
                 _isChildIfBlock = false;
             } else if (_isChildIfBlock) {
-                Targets.Add(($"{ifStmt.Thn.StartToken.pos}-{ifStmt.Thn.EndToken.pos}", "SDL", ""));
+                AddTarget(($"{ifStmt.Thn.StartToken.pos}-{ifStmt.Thn.EndToken.pos}", "SDL", ""));
             } else { // first block
                 _isChildIfBlock = true;
             }
 
             if (ifStmt.Els is BlockStmt) { // last block
-                Targets.Add(($"{ifStmt.Els.StartToken.pos}-{ifStmt.Els.EndToken.pos}", "SDL", ""));
+                AddTarget(($"{ifStmt.Els.StartToken.pos}-{ifStmt.Els.EndToken.pos}", "SDL", ""));
                 _isChildIfBlock = false;
             }
         }
         
         if (ShouldImplement("CBE")) {
-            Targets.Add(($"{ifStmt.Thn.StartToken.pos}-{ifStmt.Thn.EndToken.pos}", "CBE", ""));
+            AddTarget(($"{ifStmt.Thn.StartToken.pos}-{ifStmt.Thn.EndToken.pos}", "CBE", ""));
             if (ifStmt.Els != null && ifStmt.Els is BlockStmt)
-                Targets.Add(($"{ifStmt.Els.StartToken.pos}-{ifStmt.Els.EndToken.pos}", "CBE", ""));
+                AddTarget(($"{ifStmt.Els.StartToken.pos}-{ifStmt.Els.EndToken.pos}", "CBE", ""));
         }
 
         base.VisitStatement(ifStmt);
@@ -401,14 +401,14 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
     
     protected override void VisitStatement(WhileStmt whileStmt) {
         if (ShouldImplement("LBI"))
-            Targets.Add(($"{whileStmt.StartToken.pos}-{whileStmt.EndToken.pos}", "LBI", ""));
+            AddTarget(($"{whileStmt.StartToken.pos}-{whileStmt.EndToken.pos}", "LBI", ""));
         VisitStatement(whileStmt as LoopStmt);
         base.VisitStatement(whileStmt);
     }
     
     protected override void VisitStatement(ForLoopStmt forStmt) {
         if (ShouldImplement("LBI"))
-            Targets.Add(($"{forStmt.StartToken.pos}-{forStmt.EndToken.pos}", "LBI", ""));
+            AddTarget(($"{forStmt.StartToken.pos}-{forStmt.EndToken.pos}", "LBI", ""));
         VisitStatement(forStmt as LoopStmt);
         base.VisitStatement(forStmt);
     }
@@ -425,22 +425,22 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
     protected override void VisitStatement(BreakOrContinueStmt bcStmt) {
         if (ShouldImplement("LSR")) {
             if (bcStmt.IsContinue) {
-                Targets.Add(($"{bcStmt.Center.pos}", "LSR", "break"));
+                AddTarget(($"{bcStmt.Center.pos}", "LSR", "break"));
             } else {
-                Targets.Add(($"{bcStmt.Center.pos}", "LSR", "continue"));
+                AddTarget(($"{bcStmt.Center.pos}", "LSR", "continue"));
                 if (!_isCurrentMethodVoid) return;
-                Targets.Add(($"{bcStmt.Center.pos}", "LSR", "return"));
+                AddTarget(($"{bcStmt.Center.pos}", "LSR", "return"));
             }
         }
         if (ShouldImplement("SDL")) {
-            Targets.Add(($"{bcStmt.StartToken.pos}-{bcStmt.EndToken.pos}", "SDL", ""));
+            AddTarget(($"{bcStmt.StartToken.pos}-{bcStmt.EndToken.pos}", "SDL", ""));
         }
     }
     
     protected override void VisitStatement(AlternativeLoopStmt altLStmt) {
         if (ShouldImplement("SDL") && altLStmt.Alternatives.Count > 1) { // stmt must have at least one alternative
             foreach (var alt in altLStmt.Alternatives) {
-                Targets.Add(($"{alt.Guard.StartToken.pos}-{alt.Guard.EndToken.pos}", "SDL", ""));
+                AddTarget(($"{alt.Guard.StartToken.pos}-{alt.Guard.EndToken.pos}", "SDL", ""));
             }
         }
         VisitStatement(altLStmt as LoopStmt);
@@ -460,12 +460,12 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
                 continue;
             }
             if (ShouldImplement("SDL"))
-                Targets.Add(($"{cs.StartToken.pos}-{cs.EndToken.pos}", "SDL", ""));
+                AddTarget(($"{cs.StartToken.pos}-{cs.EndToken.pos}", "SDL", ""));
         }
         if (ShouldImplement("CBR") && hasDefaultCase) {
             foreach (var cs in nMatchStmt.Cases) {
                 if (cs.Pat is IdPattern idPat && idPat.IsWildcardPattern) continue;
-                Targets.Add(($"{cs.StartToken.pos}-{cs.EndToken.pos}", "CBR", ""));
+                AddTarget(($"{cs.StartToken.pos}-{cs.EndToken.pos}", "CBR", ""));
             }
         }
         base.VisitStatement(nMatchStmt);
@@ -529,13 +529,13 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
             return;
         if (ShouldImplement(opName)) {
             foreach (var replacement in replacementList)
-                Targets.Add(($"{bExpr.Center.pos}", opName, replacement.ToString()));
+                AddTarget(($"{bExpr.Center.pos}", opName, replacement.ToString()));
         }
         
         if (ShouldImplement("ODL") && !_coveredOperators.Contains(bExpr.Op)) {
             _coveredOperators.Add(bExpr.Op);
-            Targets.Add(("-", "ODL", $"{bExpr.Op.ToString()}-left"));
-            Targets.Add(("-", "ODL", $"{bExpr.Op.ToString()}-right"));
+            AddTarget(("-", "ODL", $"{bExpr.Op.ToString()}-left"));
+            AddTarget(("-", "ODL", $"{bExpr.Op.ToString()}-right"));
         }
     
         List<BinaryExpr.Opcode> relationalOperators = [BinaryExpr.Opcode.Eq, BinaryExpr.Opcode.Neq, 
@@ -547,8 +547,8 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
         if (ShouldImplement("BBR") && 
             (relationalOperators.Contains(bExpr.Op) || conditionalOperators.Contains(bExpr.Op))) {
             // relational and conditional expressions can be replaced with true/false 
-            Targets.Add(($"{bExpr.Center.pos}", "BBR", "true"));
-            Targets.Add(($"{bExpr.Center.pos}", "BBR", "false"));
+            AddTarget(($"{bExpr.Center.pos}", "BBR", "true"));
+            AddTarget(($"{bExpr.Center.pos}", "BBR", "false"));
         }
         
         base.VisitExpression(bExpr);
@@ -557,7 +557,7 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
     protected override void VisitExpression(ChainingExpression cExpr) {
         foreach (var (e, i) in cExpr.Operands.Select((e, i) => (e, i))) {
             if (ShouldImplement("AOD") && e is NegationExpression nExpr) {
-                Targets.Add(($"{nExpr.Center.pos}", "AOD", ""));
+                AddTarget(($"{nExpr.Center.pos}", "AOD", ""));
             }
             
             if (i == cExpr.Operators.Count) return;
@@ -571,17 +571,17 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
                 return;
             if (ShouldImplement(opName)) {
                 foreach (var replacement in replacementList) {
-                    Targets.Add(($"{e.Center.pos}", opName, replacement.ToString()));
+                    AddTarget(($"{e.Center.pos}", opName, replacement.ToString()));
                 }
             }
 
             if (ShouldImplement("THI") && e is NameSegment nSegExpr && _scanThisKeywordTargets &&
                 _currentMethodIns.Contains(nSegExpr.Name) && _currentSourceDeclFields.Contains(nSegExpr.Name)) {
-                Targets.Add(($"{nSegExpr.Center.pos}", "THI", ""));
+                AddTarget(($"{nSegExpr.Center.pos}", "THI", ""));
             }
             if (ShouldImplement("THD") && e is ExprDotName exprDName && _scanThisKeywordTargets &&
                 exprDName.Lhs is ThisExpr && _currentMethodIns.Contains(exprDName.SuffixName)) {
-                Targets.Add(($"{exprDName.Center.pos}", "THD", ""));
+                AddTarget(($"{exprDName.Center.pos}", "THD", ""));
             }
         }
     }
@@ -589,7 +589,7 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
     protected override void VisitExpression(NegationExpression nExpr) {
         if (ShouldImplement("AOD")) {
             // arithmetic operator deletion
-            Targets.Add(($"{nExpr.Center.pos}", "AOD", ""));
+            AddTarget(($"{nExpr.Center.pos}", "AOD", ""));
             base.VisitExpression(nExpr);  
         }
     }
@@ -604,7 +604,7 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
                   _currentMethodIns.Contains(nSegExpr.Name) && 
                   _currentSourceDeclFields.Contains(nSegExpr.Name)) {
             if (ShouldImplement("THI"))
-                Targets.Add(($"{nSegExpr.Center.pos}", "THI", ""));
+                AddTarget(($"{nSegExpr.Center.pos}", "THI", ""));
         }
     }
     
@@ -618,7 +618,7 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
             var fieldName = exprDName.SuffixName;
             if (!_currentMethodIns.Contains(fieldName)) return;
             if (ShouldImplement("THD"))
-                Targets.Add(($"{exprDName.Center.pos}", "THD", ""));
+                AddTarget(($"{exprDName.Center.pos}", "THD", ""));
         }      
 
         var prevScanThisKeywordTargets = _scanThisKeywordTargets;
@@ -629,8 +629,8 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
     
     protected override void VisitExpression(ITEExpr iteExpr) {
         if (ShouldImplement("CBE")) {
-            Targets.Add(($"{iteExpr.Thn.StartToken.pos}-{iteExpr.Thn.EndToken.pos}", "CBE", ""));
-            Targets.Add(($"{iteExpr.Els.StartToken.pos}-{iteExpr.Els.EndToken.pos}", "CBE", ""));
+            AddTarget(($"{iteExpr.Thn.StartToken.pos}-{iteExpr.Thn.EndToken.pos}", "CBE", ""));
+            AddTarget(($"{iteExpr.Els.StartToken.pos}-{iteExpr.Els.EndToken.pos}", "CBE", ""));
         }
         base.VisitExpression(iteExpr);
     }
@@ -648,12 +648,12 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
                 continue;
             }
             if (ShouldImplement("SDL"))
-                Targets.Add(($"{cs.StartToken.pos}-{cs.EndToken.pos}", "SDL", ""));
+                AddTarget(($"{cs.StartToken.pos}-{cs.EndToken.pos}", "SDL", ""));
         }
         if (ShouldImplement("CBR") && hasDefaultCase) {
             foreach (var cs in nMExpr.Cases) {
                 if (cs.Pat is IdPattern idPat && idPat.IsWildcardPattern) continue;
-                Targets.Add(($"{cs.StartToken.pos}-{cs.EndToken.pos}", "CBR", ""));
+                AddTarget(($"{cs.StartToken.pos}-{cs.EndToken.pos}", "CBR", ""));
             }
         }
         base.VisitExpression(nMExpr);
@@ -661,9 +661,9 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
     
     protected override void VisitExpression(SeqSelectExpr seqSExpr) {
         if (!seqSExpr.SelectOne && seqSExpr.E0 != null && ShouldImplement("SLD"))
-            Targets.Add(($"{seqSExpr.E0.Center.pos}", "SLD", ""));
+            AddTarget(($"{seqSExpr.E0.Center.pos}", "SLD", ""));
         if (!seqSExpr.SelectOne && seqSExpr.E1 != null && ShouldImplement("SLD"))
-            Targets.Add(($"{seqSExpr.E1.Center.pos}", "SLD", ""));
+            AddTarget(($"{seqSExpr.E1.Center.pos}", "SLD", ""));
         base.VisitExpression(seqSExpr);
     }
     

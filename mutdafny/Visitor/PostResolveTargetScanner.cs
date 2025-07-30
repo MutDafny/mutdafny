@@ -36,15 +36,15 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
             case IntType:
             case RealType:
                 if (ShouldImplement("AOI"))
-                    Targets.Add((exprLocation, "AOI", "")); 
+                    AddTarget((exprLocation, "AOI", "")); 
                 break;
             case BoolType:
                 if (ShouldImplement("COI"))
-                    Targets.Add((exprLocation, "COI", "")); 
+                    AddTarget((exprLocation, "COI", "")); 
                 break;
             case BitvectorType:
                 if (ShouldImplement("LOI"))
-                    Targets.Add((exprLocation, "LOI", "")); 
+                    AddTarget((exprLocation, "LOI", "")); 
                 break;
         }
     }
@@ -56,11 +56,11 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
         switch (uExpr.Type) {
             case BoolType:
                 if (ShouldImplement("COD"))
-                    Targets.Add(($"{uOpExpr.Center.pos}", "COD", ""));
+                    AddTarget(($"{uOpExpr.Center.pos}", "COD", ""));
                 break;
             case BitvectorType:
                 if (ShouldImplement("LOD"))
-                    Targets.Add(($"{uOpExpr.Center.pos}", "LOD", ""));
+                    AddTarget(($"{uOpExpr.Center.pos}", "LOD", ""));
                 break;
         }
     }
@@ -85,11 +85,11 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
         if (!int.TryParse(litExpr.Value.ToString(), out var numVal))
             return;
         
-        Targets.Add(($"{litExpr.Center.pos}", "LVR", $"{numVal + 1}"));
-        Targets.Add(($"{litExpr.Center.pos}", "LVR", $"{numVal - 1}"));
+        AddTarget(($"{litExpr.Center.pos}", "LVR", $"{numVal + 1}"));
+        AddTarget(($"{litExpr.Center.pos}", "LVR", $"{numVal - 1}"));
         if (numVal == 0 || numVal + 1 == 0 || numVal - 1 == 0)
             return;
-        Targets.Add(($"{litExpr.Center.pos}", "LVR", $"0"));
+        AddTarget(($"{litExpr.Center.pos}", "LVR", $"0"));
     }
     
     private void HandleRealLiteral(LiteralExpr litExpr) {
@@ -100,15 +100,15 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
         
         var incVal = (numVal + 1).ToString(format);
         incVal = incVal.Contains('.') ? incVal : incVal + ".0";
-        Targets.Add(($"{litExpr.Center.pos}", "LVR", incVal));
+        AddTarget(($"{litExpr.Center.pos}", "LVR", incVal));
 
         var decVal = (numVal - 1).ToString(format);
         decVal = decVal.Contains('.') ? decVal : decVal + ".0";
-        Targets.Add(($"{litExpr.Center.pos}", "LVR", decVal));
+        AddTarget(($"{litExpr.Center.pos}", "LVR", decVal));
         
         if (numVal == 0 || numVal + 1 == 0 || numVal - 1 == 0)
             return;
-        Targets.Add(($"{litExpr.Center.pos}", "LVR", $"0.0"));
+        AddTarget(($"{litExpr.Center.pos}", "LVR", $"0.0"));
     } 
 
     private void HandleStringLiteral(LiteralExpr litExpr) {
@@ -116,9 +116,9 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
         if (sVal == null) return;
         
         var repVal = sVal == "" ? "MutDafny" : "";
-        Targets.Add(($"{litExpr.Center.pos}", "LVR", repVal));
+        AddTarget(($"{litExpr.Center.pos}", "LVR", repVal));
         if (sVal.Length <= 1) return;
-        Targets.Add(($"{litExpr.Center.pos}", "LVR", 
+        AddTarget(($"{litExpr.Center.pos}", "LVR", 
             sVal[0] + "XX" + 
             sVal.Substring(1, sVal.Length - 2) + 
             "XX" + sVal[^1]));
@@ -131,31 +131,31 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
         var exprLocation = $"{expr.StartToken.pos}-{expr.EndToken.pos}";
         switch (expr.Type) {
             case IntType:
-                Targets.Add((exprLocation, "EVR", "int")); break;
+                AddTarget((exprLocation, "EVR", "int")); break;
             case RealType:
-                Targets.Add((exprLocation, "EVR", "real")); break;
+                AddTarget((exprLocation, "EVR", "real")); break;
             case BitvectorType:
-                Targets.Add((exprLocation, "EVR", "bv")); break;
+                AddTarget((exprLocation, "EVR", "bv")); break;
             case CharType:
-                Targets.Add((exprLocation, "EVR", "char")); break;
+                AddTarget((exprLocation, "EVR", "char")); break;
             case SetType:
-                Targets.Add((exprLocation, "EVR", "set")); break;
+                AddTarget((exprLocation, "EVR", "set")); break;
             case MultiSetType:
-                Targets.Add((exprLocation, "EVR", "multiset")); break;
+                AddTarget((exprLocation, "EVR", "multiset")); break;
             case SeqType:
-                Targets.Add((exprLocation, "EVR", "seq")); break;
+                AddTarget((exprLocation, "EVR", "seq")); break;
             case MapType:
-                Targets.Add((exprLocation, "EVR", "map")); break;
+                AddTarget((exprLocation, "EVR", "map")); break;
             case UserDefinedType uType:
                 if (uType.Name == "nat") {
-                    Targets.Add((exprLocation, "EVR", "int"));
+                    AddTarget((exprLocation, "EVR", "int"));
                 } else if (uType.Name == "string") { // string type
-                    Targets.Add((exprLocation, "EVR", "string"));
+                    AddTarget((exprLocation, "EVR", "string"));
                 } else if (expr.Type.IsArrayType) {
-                    Targets.Add((exprLocation, "EVR", "array"));
+                    AddTarget((exprLocation, "EVR", "array"));
                 }
                 if (uType.Name[^1] == '?') { // nullable type
-                    Targets.Add((exprLocation, "EVR", "null"));
+                    AddTarget((exprLocation, "EVR", "null"));
                 }
                 break;
         }
@@ -167,7 +167,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
         
         if (tpRhs.Type is UserDefinedType uType && uType.ResolvedClass is NonNullTypeDecl nnTypeDecl && 
             nnTypeDecl.Class != null) {
-            Targets.Add(($"{tpRhs.StartToken.pos}-{tpRhs.EndToken.pos}", "EVR", "null"));
+            AddTarget(($"{tpRhs.StartToken.pos}-{tpRhs.EndToken.pos}", "EVR", "null"));
         }
     }
     
@@ -177,7 +177,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
         foreach (var var in _currentScopeVars) {
             if (nSegExpr.Name == var.Key) continue;
             if (nSegExpr.Type.ToString() == var.Value.ToString())
-                Targets.Add(($"{nSegExpr.Center.pos}", "VER", var.Key));
+                AddTarget(($"{nSegExpr.Center.pos}", "VER", var.Key));
         }
     }
     
@@ -192,13 +192,13 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
                 if (dExpr.Elements.Count == 0 && type == "") 
                     return;
                 arg = dExpr.Elements.Count == 0 ? type : "";
-                Targets.Add((exprLocation, "CIR", arg)); break;
+                AddTarget((exprLocation, "CIR", arg)); break;
             case MapDisplayExpr mDExpr:
                 type = $"{PrimitiveTypeToStr(mDExpr.Type.TypeArgs[0])}-{PrimitiveTypeToStr(mDExpr.Type.TypeArgs[1])}";
                 if (mDExpr.Elements.Count == 0 && type == "") 
                     return;
                 arg = mDExpr.Elements.Count == 0 ? type : "";
-                Targets.Add((exprLocation, "CIR", arg)); break;
+                AddTarget((exprLocation, "CIR", arg)); break;
         }
     }
 
@@ -212,7 +212,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
         if (!hasInit && type == "")
             return;
         var arg = hasInit ? "" : type;
-        Targets.Add((exprLocation, "CIR", arg));
+        AddTarget((exprLocation, "CIR", arg));
     }
 
     private void ScanMethodTargets(ConcreteAssignStatement cAStmt) {
@@ -235,7 +235,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
             typeArg = typeArg == "" ? type : $"{typeArg}-{type}";
         }
         if (typeArg != "")
-            Targets.Add((_childMethodCallPos, "MRR", typeArg));
+            AddTarget((_childMethodCallPos, "MRR", typeArg));
     }
 
     private void ScanMAPTargets(ConcreteAssignStatement cAStmt) {
@@ -252,7 +252,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
             argProp = argProp == "" ? $"{methodArgPos}" : $"{argProp}-{methodArgPos}";
         }
         if (argProp != "")
-            Targets.Add((_childMethodCallPos, "MAP", argProp));
+            AddTarget((_childMethodCallPos, "MAP", argProp));
     }
 
     private void ScanMNRTargets(ConcreteAssignStatement cAStmt) {
@@ -261,7 +261,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
 
         if (cAStmt.Lhss.Count == 1 && // naked receiver can be applied if the types match or if they are inferred from context
             TypeToStr(cAStmt.Lhss[0].Type) == TypeToStr(_childExprDotName.Lhs.Type))
-            Targets.Add((_childMethodCallPos, "MNR", ""));
+            AddTarget((_childMethodCallPos, "MNR", ""));
     }
     
     private void ScanMCRTargets() {
@@ -290,7 +290,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
                     continue;
                 }
                 
-                Targets.Add(($"{methodCall.Center.pos}", "MCR", $"{m.Name}"));
+                AddTarget(($"{methodCall.Center.pos}", "MCR", $"{m.Name}"));
             }
         }
         
@@ -316,7 +316,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
             varsArg = varsArg == "" ? $"{selectedVar}" : $"{varsArg}-{selectedVar}";
         }
         
-        Targets.Add((_childMethodCallPos, "MVR", varsArg));
+        AddTarget((_childMethodCallPos, "MVR", varsArg));
     }
 
     private void ScanSARTargets(ApplySuffix appSufExpr) {
@@ -328,7 +328,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
                 var b2 = appSufExpr.Bindings.ArgumentBindings[j];
                 if (b1.Actual.Type.ToString() != b2.Actual.Type.ToString()) 
                     continue;
-                Targets.Add(($"{b1.Actual.Center.pos}", "SAR", $"{b2.Actual.Center.pos}"));
+                AddTarget(($"{b1.Actual.Center.pos}", "SAR", $"{b2.Actual.Center.pos}"));
             }
         }
     }
@@ -351,7 +351,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
             }
             
             if (signatureMatches)
-                Targets.Add(($"{appSufExpr.Center.pos}", "DCR", $"{ctor.Name}"));
+                AddTarget(($"{appSufExpr.Center.pos}", "DCR", $"{ctor.Name}"));
         }
     }
     
@@ -362,7 +362,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
         var dtCtor = nSegExpr.Name;
         foreach (var ctor in nSegExpr.Type.AsDatatype.Ctors) {
             if (ctor.Name != dtCtor && ctor.Formals.Count == 0)
-                Targets.Add(($"{nSegExpr.Center.pos}", "DCR", $"{ctor.Name}"));
+                AddTarget(($"{nSegExpr.Center.pos}", "DCR", $"{ctor.Name}"));
         }
     }
     
@@ -380,7 +380,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
                 
                 if ((classDecl1.ToString() == classDecl2.ToString() || parents.Contains(classDecl2.ToString())) &&
                     fieldAccess.Type.ToString() == field.Item3.ToString())
-                    Targets.Add(($"{fieldAccess.Center.pos}", "FAR", field.Item1));
+                    AddTarget(($"{fieldAccess.Center.pos}", "FAR", field.Item1));
             }
         }
     }
@@ -398,7 +398,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
         for (int i = 0; i < dims; i++) {
             if (i == indexAccess)
                 continue;
-            Targets.Add(($"{exprDName.Center.pos}", "TAR", $"{i}"));
+            AddTarget(($"{exprDName.Center.pos}", "TAR", $"{i}"));
         }
     }
 
@@ -417,7 +417,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
                     var1Parents.Count == var2Parents.Count && 
                     var1Class != var2Class)
                 {
-                    Targets.Add(($"{childClassVar1.Item2}", "PRV", childClassVar2.Key));
+                    AddTarget(($"{childClassVar1.Item2}", "PRV", childClassVar2.Key));
                 }
             }
         }
@@ -475,7 +475,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
             if (ShouldImplement("SDL")) {
                 var fieldType = TypeToStr(cf.Type);
                 if (fieldType != "")
-                    Targets.Add(($"{cf.Center.pos}", "SDL", ""));
+                    AddTarget(($"{cf.Center.pos}", "SDL", ""));
             }
             
             if (!_currentScopeVars.ContainsKey(cf.Name)) 
@@ -607,7 +607,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
         }
         
         if (canApplySWV && ShouldImplement("SWV"))
-            Targets.Add(($"{vDeclStmt.Center.pos}", "SWV", $"{_prevVarDeclStmt?.Center.pos}"));
+            AddTarget(($"{vDeclStmt.Center.pos}", "SWV", $"{_prevVarDeclStmt?.Center.pos}"));
         _prevVarDeclStmt = vDeclStmt;
     }
 

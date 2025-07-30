@@ -4,7 +4,7 @@ namespace MutDafny.Visitor;
 
 public abstract class TargetScanner(string MutationTargetURI, List<string> operatorsInUse, ErrorReporter reporter) : Visitor("-1", reporter)
 {
-    protected List<(string, string, string)> Targets { get; } = [];
+    protected List<(string, string, string)> Targets { get; } = ImportPreviousTargets();
     protected bool IsParentSpec;
     protected bool IsFirstVisit = true;
     protected static List<Statement> OriginalStmts { get; } = [];
@@ -17,8 +17,33 @@ public abstract class TargetScanner(string MutationTargetURI, List<string> opera
         return !IsFirstVisit && !IsParentSpec && (operatorsInUse.Count == 0 || operatorsInUse.Contains(op));
     }
     
+    private static List<(string, string, string)> ImportPreviousTargets() {
+        if (!File.Exists("targets.csv"))
+            return [];
+        
+        var targets = new List<(string, string, string)>();
+        var lines = File.ReadAllLines("targets.csv");
+        foreach (var line in lines) {
+            var components = line.Split(',');
+            if (components.Length < 2)
+                continue;
+            
+            var mutationPos = components[0];
+            var mutationOp = components[1];
+            var mutationArg = components.Length > 2 ? components[2] : "";
+                
+            targets.Add((mutationPos, mutationOp, mutationArg));
+        }
+        return targets;
+    }
+
+    protected void AddTarget((string, string, string) target) {
+        if (!Targets.Contains(target))
+            Targets.Add(target);
+    }
+    
     public void ExportTargets() {
-        using StreamWriter sw = File.AppendText("targets.csv");
+        using StreamWriter sw = File.CreateText("targets.csv");
         foreach (var target in Targets) {
             var line = target.Item1 + "," + target.Item2 + "," + target.Item3;
             sw.WriteLine(line);
