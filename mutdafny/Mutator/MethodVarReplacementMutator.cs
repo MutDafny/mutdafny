@@ -21,7 +21,7 @@ public class MethodVarReplacementMutator(string mutationTargetPos, string val, E
         return rhss;
     }
 
-    private bool IsTarget(ApplySuffix expr) {
+    private bool IsTarget(SuffixExpr expr) {
         return expr.Center.pos == int.Parse(MutationTargetPos);
     }
     
@@ -32,7 +32,7 @@ public class MethodVarReplacementMutator(string mutationTargetPos, string val, E
         foreach (var member in decl.Members) {
             if (member is not ConstantField cf)
                 continue;
-            if (cf.Rhs is ApplySuffix appSufExpr && IsTarget(appSufExpr)) {
+            if (cf.Rhs is SuffixExpr suffixExpr && IsTarget(suffixExpr)) {
                 cf.Rhs = CreateMutatedExpression(cf.Rhs, _vars[0]);
                 TargetExpression = null;
                 return;
@@ -55,8 +55,8 @@ public class MethodVarReplacementMutator(string mutationTargetPos, string val, E
     }
     
     protected override void VisitExpression(SuffixExpr suffixExpr) {
-        if (suffixExpr is ApplySuffix appSufExpr && IsTarget(appSufExpr)) {
-            TargetExpression = appSufExpr;
+        if (IsTarget(suffixExpr)) {
+            TargetExpression = suffixExpr;
             return;
         }
         base.VisitExpression(suffixExpr);
