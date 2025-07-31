@@ -523,6 +523,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     protected override void HandleFunction(Function function) {
         _declaredMethods.Add(function);
         base.HandleFunction(function);
+        _childMethodCallPos = "";
     }
 
     /// -------------------------------------
@@ -531,7 +532,11 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     protected override void HandleStatement(Statement stmt) {
         if (!IsStatementOriginal(stmt))
             return;
+        
+        var prevChildMethodCallPos = _childMethodCallPos;
+        _childMethodCallPos = "";
         base.HandleStatement(stmt);
+        _childMethodCallPos = prevChildMethodCallPos;
     }
     
     protected override void HandleBlock(List<Statement> statements) {
@@ -562,7 +567,6 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
         
         if (_childMethodCallPos != "") // rhs is method call
             ScanMethodTargets(aStmt);
-        _childMethodCallPos = "";
         _childMethodCallArgTypes = [];
         _childExprDotName = null;
     }
@@ -573,7 +577,6 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
 
         if (_childMethodCallPos != "") // rhs is method call
             ScanMethodTargets(aStStmt);
-        _childMethodCallPos = "";
         _childMethodCallArgTypes = [];
         _childExprDotName = null;
     }
