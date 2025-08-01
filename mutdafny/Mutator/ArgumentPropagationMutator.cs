@@ -7,6 +7,7 @@ public class ArgumentPropagationMutator(string mutationTargetPos, string val, Er
 {
     private readonly List<int> _replacementArgsPos = val.Split('-').Select(int.Parse).ToList();
     private SuffixExpr? _childSuffixExpr;
+    private bool _isAssignReplacement;
     
     private bool IsTarget(Expression expr) {
         return expr.Center.pos == int.Parse(MutationTargetPos);
@@ -47,7 +48,9 @@ public class ArgumentPropagationMutator(string mutationTargetPos, string val, Er
     }
     
     protected override void VisitStatement(AssignStatement aStmt) {
+        _isAssignReplacement = true;
         base.VisitStatement(aStmt);
+        _isAssignReplacement = false;
         if (TargetExpression == null) return; // target not found
         aStmt.Rhss = CreateArgumentPropagationRhss();
         TargetExpression = null;
@@ -55,7 +58,9 @@ public class ArgumentPropagationMutator(string mutationTargetPos, string val, Er
     }
     
     protected override void VisitStatement(AssignSuchThatStmt aStStmt) {
+        _isAssignReplacement = true;
         base.VisitStatement(aStStmt);
+        _isAssignReplacement = false;
         if (TargetExpression == null) return; // target not found
         aStStmt.Expr = CreateMutatedExpression(aStStmt.Expr);
         TargetExpression = null;
@@ -74,6 +79,8 @@ public class ArgumentPropagationMutator(string mutationTargetPos, string val, Er
     protected override void HandleAssignmentRhs(AssignmentRhs aRhs) {
         if (aRhs is ExprRhs exprRhs) {
             HandleExpression(exprRhs.Expr);
+            if (TargetFound() && !_isAssignReplacement) // mutate
+                exprRhs.Expr = CreateMutatedExpression(exprRhs.Expr);
         } else if (aRhs is TypeRhs tpRhs) {
             var elInit = tpRhs.ElementInit;
             
@@ -81,6 +88,8 @@ public class ArgumentPropagationMutator(string mutationTargetPos, string val, Er
                 HandleExprList(tpRhs.ArrayDimensions);
             } if (elInit != null && IsWorthVisiting(elInit.StartToken.pos, elInit.EndToken.pos)) {
                 HandleExpression(elInit);
+                if (TargetFound() && !_isAssignReplacement) // mutate
+                    tpRhs.ElementInit = CreateMutatedExpression(tpRhs.ElementInit);
             } if (tpRhs.InitDisplay != null) {
                 HandleExprList(tpRhs.InitDisplay);
             } if (tpRhs.Bindings != null) {
