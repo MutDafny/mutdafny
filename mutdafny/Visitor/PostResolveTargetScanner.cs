@@ -39,7 +39,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
                     AddTarget((exprLocation, "AOI", "")); 
                 break;
             case UserDefinedType uType:
-                if (uType.Name == "nat")
+                if (uType.Name == "nat" && ShouldImplement("AOI"))
                     AddTarget((exprLocation, "AOI", ""));
                 break;
             case BoolType:
@@ -674,7 +674,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     /// --------------------------------------
     protected override void VisitExpression(LiteralExpr litExpr) {
         if (!((litExpr.Value is BigInteger bi && bi == BigInteger.Zero) || 
-              (litExpr.Value is BigDec bd && bd != BigDec.ZERO))) {
+              (litExpr.Value is BigDec bd && bd == BigDec.ZERO))) {
             ScanUOITargets(litExpr);
         }
         ScanLVRTargets(litExpr);
