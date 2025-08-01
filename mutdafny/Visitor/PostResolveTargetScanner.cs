@@ -222,6 +222,13 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
         ScanMVRTargets(cAStmt);
     }
     
+    private void ScanMethodTargets(SuffixExpr suffixExpr) {
+        ScanMRRTargets(suffixExpr);
+        ScanMAPTargets(suffixExpr);
+        ScanMNRTargets(suffixExpr);
+        ScanMVRTargets(suffixExpr);
+    }
+    
     private void ScanMRRTargets(ConcreteAssignStatement cAStmt) {
         if (!ShouldImplement("MRR")) return;
         
@@ -236,6 +243,15 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
         }
         if (typeArg != "")
             AddTarget((_childMethodCallPos, "MRR", typeArg));
+    }
+    
+    private void ScanMRRTargets(SuffixExpr suffixExpr) {
+        if (!ShouldImplement("MRR")) return;
+        
+        var type = TypeToStr(suffixExpr.Type);
+        if (type == "")
+            return;
+        AddTarget((_childMethodCallPos, "MRR", type));
     }
 
     private void ScanMAPTargets(ConcreteAssignStatement cAStmt) {
@@ -254,13 +270,31 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
         if (argProp != "")
             AddTarget((_childMethodCallPos, "MAP", argProp));
     }
+    
+    private void ScanMAPTargets(SuffixExpr suffixExpr) {
+        if (!ShouldImplement("MAP")) return;
+
+        var type = TypeToStr(suffixExpr.Type);
+        var methodArgPos = _childMethodCallArgTypes.IndexOf(type);
+        if (methodArgPos == -1)
+            return;
+        AddTarget((_childMethodCallPos, "MAP", $"{methodArgPos}"));
+    }
 
     private void ScanMNRTargets(ConcreteAssignStatement cAStmt) {
         if (!ShouldImplement("MNR") || _childExprDotName == null) 
             return;
 
         if (cAStmt.Lhss.Count == 1 && // naked receiver can be applied if the types match or if they are inferred from context
-            TypeToStr(cAStmt.Lhss[0].Type) == TypeToStr(_childExprDotName.Lhs.Type))
+            cAStmt.Lhss[0].Type.ToString() == _childExprDotName.Lhs.Type.ToString())
+            AddTarget((_childMethodCallPos, "MNR", ""));
+    }
+    
+    private void ScanMNRTargets(SuffixExpr suffixExpr) {
+        if (!ShouldImplement("MNR") || _childExprDotName == null) 
+            return;
+
+        if (suffixExpr.Type != null && suffixExpr.Type.ToString() == _childExprDotName.Lhs.Type.ToString())
             AddTarget((_childMethodCallPos, "MNR", ""));
     }
     
@@ -317,6 +351,17 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
         }
         
         AddTarget((_childMethodCallPos, "MVR", varsArg));
+    }
+
+    private void ScanMVRTargets(SuffixExpr suffixExpr) {
+        if (!ShouldImplement("MVR"))
+            return;
+        
+        foreach (var var in _currentScopeVars) {
+            if (suffixExpr.Type == null || var.Value.ToString() != suffixExpr.Type.ToString())
+                continue;
+            AddTarget((_childMethodCallPos, "MVR", var.Key));
+        }
     }
 
     private void ScanSARTargets(ApplySuffix appSufExpr) {
@@ -722,21 +767,20 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
 
             _skipChildFARMutation = true;
         }
+        
         if (suffixExpr.Lhs is ExprDotName exprDNameLhs)
             _childExprDotName = exprDNameLhs;
-
-        if (suffixExpr is ExprDotName exprDName)
-        {
+        if (suffixExpr is ExprDotName exprDName) {
             ScanTARTargets(exprDName);
             
             if (!_skipChildFARMutation && exprDName.Lhs is NameSegment nSegExpr && 
                 nSegExpr.Type.AsTopLevelTypeWithMembers != null && 
-                nSegExpr.Type.AsTopLevelTypeWithMembers is ClassLikeDecl)
-            {
+                nSegExpr.Type.AsTopLevelTypeWithMembers is ClassLikeDecl) {
                 _accessedClassFields.Add(exprDName);
             }
         }
         
+        ScanMethodTargets(suffixExpr);
         ScanUOITargets(suffixExpr);
         ScanEVRTargets(suffixExpr);
         _skipChildEVRMutation = true;

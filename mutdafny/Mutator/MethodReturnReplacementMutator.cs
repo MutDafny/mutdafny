@@ -4,7 +4,8 @@ using Microsoft.Dafny;
 
 namespace MutDafny.Mutator;
 
-public class MethodReturnReplacementMutator(string mutationTargetPos, string val, ErrorReporter reporter) : Mutator(mutationTargetPos, reporter)
+public class MethodReturnReplacementMutator(string mutationTargetPos, string val, ErrorReporter reporter) 
+    : ExprReplacementMutator(mutationTargetPos, reporter)
 {
     private readonly List<string> _types = val.Split('-').ToList();
     private SuffixExpr? _childSuffixExpr;
@@ -13,7 +14,8 @@ public class MethodReturnReplacementMutator(string mutationTargetPos, string val
         return expr.Center.pos == int.Parse(MutationTargetPos);
     }
     
-    private Expression CreateMutatedExpression(Expression originalExpr) {
+    protected override Expression CreateMutatedExpression(Expression originalExpr) {
+        TargetExpression = null;
         if (_types.Count != 0 || _childSuffixExpr == null || _childSuffixExpr is not ApplySuffix appSufExpr)
             return CreateDefaultExpression(_types[0], originalExpr);
         return originalExpr;
@@ -88,5 +90,23 @@ public class MethodReturnReplacementMutator(string mutationTargetPos, string val
             return;
         }
         base.VisitExpression(suffixExpr);
+    }
+    
+    protected override void HandleAssignmentRhs(AssignmentRhs aRhs) {
+        if (aRhs is ExprRhs exprRhs) {
+            HandleExpression(exprRhs.Expr);
+        } else if (aRhs is TypeRhs tpRhs) {
+            var elInit = tpRhs.ElementInit;
+            
+            if (tpRhs.ArrayDimensions != null) {
+                HandleExprList(tpRhs.ArrayDimensions);
+            } if (elInit != null && IsWorthVisiting(elInit.StartToken.pos, elInit.EndToken.pos)) {
+                HandleExpression(elInit);
+            } if (tpRhs.InitDisplay != null) {
+                HandleExprList(tpRhs.InitDisplay);
+            } if (tpRhs.Bindings != null) {
+                HandleActualBindings(tpRhs.Bindings);
+            }
+        }
     }
 }

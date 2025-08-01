@@ -2,7 +2,8 @@
 
 namespace MutDafny.Mutator;
 
-public class NakedReceiverMutator(string mutationTargetPos, ErrorReporter reporter) : Mutator(mutationTargetPos, reporter)
+public class NakedReceiverMutator(string mutationTargetPos, ErrorReporter reporter) 
+    : ExprReplacementMutator(mutationTargetPos, reporter)
 {
     private SuffixExpr? _childSuffixExpr;
 
@@ -10,14 +11,15 @@ public class NakedReceiverMutator(string mutationTargetPos, ErrorReporter report
         return expr.Center.pos == int.Parse(MutationTargetPos);
     }
     
-    private Expression CreateMutatedExpression(Expression originalExpr) {
-        if (_childSuffixExpr is ExprDotName exprDName)
+    protected override Expression CreateMutatedExpression(Expression originalExpr) {
+        TargetExpression = null;
+        if (_childSuffixExpr?.Lhs is ExprDotName exprDName)
             return exprDName.Lhs;
         return originalExpr;
     }
     
     private List<AssignmentRhs> CreateMutatedRhss(Expression originalRhs) {
-        if (_childSuffixExpr is ExprDotName exprDName)
+        if (_childSuffixExpr?.Lhs is ExprDotName exprDName)
             return [new ExprRhs(exprDName.Lhs)];
         return [new ExprRhs(originalRhs)];
     }
@@ -60,5 +62,23 @@ public class NakedReceiverMutator(string mutationTargetPos, ErrorReporter report
             return;
         }
         base.VisitExpression(suffixExpr);
+    }
+    
+    protected override void HandleAssignmentRhs(AssignmentRhs aRhs) {
+        if (aRhs is ExprRhs exprRhs) {
+            HandleExpression(exprRhs.Expr);
+        } else if (aRhs is TypeRhs tpRhs) {
+            var elInit = tpRhs.ElementInit;
+            
+            if (tpRhs.ArrayDimensions != null) {
+                HandleExprList(tpRhs.ArrayDimensions);
+            } if (elInit != null && IsWorthVisiting(elInit.StartToken.pos, elInit.EndToken.pos)) {
+                HandleExpression(elInit);
+            } if (tpRhs.InitDisplay != null) {
+                HandleExprList(tpRhs.InitDisplay);
+            } if (tpRhs.Bindings != null) {
+                HandleActualBindings(tpRhs.Bindings);
+            }
+        }
     }
 }

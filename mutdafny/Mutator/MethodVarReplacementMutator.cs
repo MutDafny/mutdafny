@@ -3,15 +3,20 @@
 namespace MutDafny.Mutator;
 
 public class MethodVarReplacementMutator(string mutationTargetPos, string val, ErrorReporter reporter) 
-    : Mutator(mutationTargetPos, reporter)
+    : ExprReplacementMutator(mutationTargetPos, reporter)
 {
     private readonly List<string> _vars = val.Split('-').ToList();
+    
+    protected override Expression CreateMutatedExpression(Expression originalExpr) {
+        TargetExpression = null;
+        return new NameSegment(originalExpr.Origin, _vars[0], null);
+    }
 
     private NameSegment CreateMutatedExpression(Expression originalExpr, string var) {
         return new NameSegment(originalExpr.Origin, var, null);
     }
     
-    private List<AssignmentRhs> CreateArgumentPropagationRhss() {
+    private List<AssignmentRhs> CreateMutatedRhss() {
         var rhss = new List<AssignmentRhs>();
         foreach (var var in _vars) {
             var newExprRhs = new ExprRhs(CreateMutatedExpression(TargetExpression, var));
@@ -44,7 +49,8 @@ public class MethodVarReplacementMutator(string mutationTargetPos, string val, E
     protected override void VisitStatement(AssignStatement aStmt) {
         base.VisitStatement(aStmt);
         if (TargetExpression == null) return; // target not found
-        aStmt.Rhss = CreateArgumentPropagationRhss();
+        aStmt.Rhss = CreateMutatedRhss();
+        TargetExpression = null;
     }
     
     protected override void VisitStatement(AssignSuchThatStmt aStStmt) {
@@ -60,5 +66,23 @@ public class MethodVarReplacementMutator(string mutationTargetPos, string val, E
             return;
         }
         base.VisitExpression(suffixExpr);
+    }
+    
+    protected override void HandleAssignmentRhs(AssignmentRhs aRhs) {
+        if (aRhs is ExprRhs exprRhs) {
+            HandleExpression(exprRhs.Expr);
+        } else if (aRhs is TypeRhs tpRhs) {
+            var elInit = tpRhs.ElementInit;
+            
+            if (tpRhs.ArrayDimensions != null) {
+                HandleExprList(tpRhs.ArrayDimensions);
+            } if (elInit != null && IsWorthVisiting(elInit.StartToken.pos, elInit.EndToken.pos)) {
+                HandleExpression(elInit);
+            } if (tpRhs.InitDisplay != null) {
+                HandleExprList(tpRhs.InitDisplay);
+            } if (tpRhs.Bindings != null) {
+                HandleActualBindings(tpRhs.Bindings);
+            }
+        }
     }
 }
