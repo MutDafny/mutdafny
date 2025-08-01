@@ -38,6 +38,10 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
                 if (ShouldImplement("AOI"))
                     AddTarget((exprLocation, "AOI", "")); 
                 break;
+            case UserDefinedType uType:
+                if (uType.Name == "nat")
+                    AddTarget((exprLocation, "AOI", ""));
+                break;
             case BoolType:
                 if (ShouldImplement("COI"))
                     AddTarget((exprLocation, "COI", "")); 
@@ -73,6 +77,10 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
                 HandleIntegerLiteral(litExpr); break;
             case RealType:
                 HandleRealLiteral(litExpr); break;
+            case UserDefinedType uType:
+                if (uType.Name == "nat")
+                    HandleIntegerLiteral(litExpr);
+                break;
             default:
                 if (litExpr is StringLiteralExpr) {
                     HandleStringLiteral(litExpr);
@@ -488,7 +496,9 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
             MultiSetType => "multiset",
             SeqType => "seq",
             MapType => "map",
-            UserDefinedType uType => uType.Name == "string" ? "string" :  "",
+            UserDefinedType uType => uType.Name == "string" ? 
+                "string" : 
+                uType.Name == "nat" ? "nat" : "",
             _ => "",
         };
     }
