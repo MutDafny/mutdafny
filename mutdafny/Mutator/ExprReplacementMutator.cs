@@ -38,11 +38,16 @@ public abstract class ExprReplacementMutator(string mutationTargetPos, ErrorRepo
     
     protected override void HandleMemberDecls(TopLevelDeclWithMembers decl) {
         foreach (var member in decl.Members) {
+            if (member.IsGhost) continue; // only searches for mutation targets in non-ghost constructs
+
             // only visit members that may contain the mutation target
             if (!IsWorthVisiting(member.StartToken.pos, member.EndToken.pos)) continue;
             if (member is Method m) { // includes constructor
                 HandleMethod(m);  
             } else if (member is Function func) { // includes predicate
+                // only searches for mutation targets in functions/predciates not used in spec
+                var specHelpers = SpecHelperFinder.SpecHelpers;            
+                if (specHelpers.Contains(func.Name)) continue;
                 HandleFunction(func);
             } else if (member is ConstantField cf) {
                 if (cf.Rhs == null) continue;

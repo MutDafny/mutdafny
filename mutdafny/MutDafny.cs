@@ -79,7 +79,11 @@ public class MutationTargetScanner(string mutationTargetURI, List<string> operat
 public class MutantGenerator(string mutationTargetPos, string mutationOperator, string? mutationArg, ErrorReporter reporter) : Rewriter(reporter)
 {
     public override void PreResolve(ModuleDefinition module) {
-        if (mutationOperator == "VDL" || mutationOperator == "ODL") return;
+        if (mutationOperator == "VDL" || mutationOperator == "ODL") {
+                var specHelperFinder = new SpecHelperFinder(Reporter);
+                specHelperFinder.Find(module);
+                return;
+        }
         var mutatorFactory = new MutatorFactory(Reporter);
         var mutator = mutatorFactory.Create(mutationTargetPos, mutationOperator, mutationArg);
         mutator?.Mutate(module);
