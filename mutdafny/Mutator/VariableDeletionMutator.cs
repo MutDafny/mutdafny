@@ -1,12 +1,10 @@
 ﻿using Microsoft.Dafny;
-using Type = Microsoft.Dafny.Type;
 
 namespace MutDafny.Mutator;
 
 public class VariableDeletionMutator(string mutationTargetPos, string var, ErrorReporter reporter) : Mutator(mutationTargetPos, reporter)
 {
     private readonly List<Statement> _toDelete = [];
-    private Type? _currentTypeRestriction;
     private string _currentScope = "-";
     private readonly List<(string, string)> _sideEffectVarsToDelete = [];
 
@@ -19,12 +17,7 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
                 replacementExpr = bExpr.E0;
             }
         }
-
-        if (replacementExpr != null && _currentTypeRestriction != null &&
-            replacementExpr.GetType() != _currentTypeRestriction.GetType()) 
-        {
-            replacementExpr = null;
-        }
+        
         TargetExpression = null;
         return replacementExpr;
     }
@@ -42,13 +35,7 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
         } else {
             _toDelete.Add(context);
         }
-
-        if (replacementExpr != null && _currentTypeRestriction != null &&
-            replacementExpr.GetType() != _currentTypeRestriction.GetType())
-        {
-            replacementExpr = null;
-            _toDelete.Add(context);
-        }
+        
         TargetExpression = null;
         return replacementExpr;
     }
@@ -62,17 +49,12 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
                 replacementExpr = bExpr.E0;
             }
         }
-
-        if (replacementExpr != null && _currentTypeRestriction != null &&
-            replacementExpr.GetType() != _currentTypeRestriction.GetType()) 
-        {
-            replacementExpr = null;
-        }
+        
         TargetExpression = replacementExpr == null ? context : null;
         return replacementExpr;
     }
     
-    private bool IsTarget(string name, int tokenPos) {
+    private bool IsTarget(string name) {
         var positions = MutationTargetPos.Split("-");
         var currentPositions = _currentScope.Split("-");
 
@@ -87,7 +69,7 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
     }
     
     protected override void VisitExpression(NameSegment nSegExpr) {
-        if (IsTarget(nSegExpr.Name, nSegExpr.Center.pos)) {
+        if (IsTarget(nSegExpr.Name)) {
             TargetExpression = nSegExpr;
         }
     }
@@ -312,7 +294,7 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
     
     protected override void VisitStatement(VarDeclStmt vDeclStmt) {
         foreach (var (e, i) in vDeclStmt.Locals.Select((e, i) => (e, i)).ToList()) {
-            if (!IsTarget(e.Name, e.Center.pos)) continue;
+            if (!IsTarget(e.Name)) continue;
             if (vDeclStmt.Locals.Count == 1) {
                 _toDelete.Add(vDeclStmt);
                 CollectSideEffectVarsToDelete(vDeclStmt);
@@ -384,14 +366,12 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
     
     protected override void VisitStatement(IfStmt ifStmt) {
         if (ifStmt.Guard != null) {
-            _currentTypeRestriction = new BoolType();
             HandleExpression(ifStmt.Guard);
             if (TargetFound()) { // mutate
                 var replacement = HandleTarget(ifStmt);
                 if (replacement == null) return;
                 ifStmt.Guard = replacement;
             }
-            _currentTypeRestriction = null;
         }
         HandleBlock(ifStmt.Thn);
         if (ifStmt.Els == null) return;
@@ -405,14 +385,12 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
     }
     
     protected override void VisitStatement(WhileStmt whileStmt) {
-        _currentTypeRestriction = new BoolType();
         HandleExpression(whileStmt.Guard);
         if (TargetFound()) { // mutate
             var replacement = HandleTarget(whileStmt);
             if (replacement == null) return;
             whileStmt.Guard = replacement;
         }
-        _currentTypeRestriction = null;
         if (whileStmt.Body != null) HandleBlock(whileStmt.Body);
     }
     
@@ -446,7 +424,6 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
     
     protected override void VisitStatement(AlternativeLoopStmt altLStmt) {
         foreach (var alt in altLStmt.Alternatives.ToList()) {
-            _currentTypeRestriction = new BoolType();
             HandleExpression(alt.Guard);
             if (TargetFound()) { // mutate
                 var replacement = HandleTarget();
@@ -458,7 +435,6 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
                     _toDelete.Add(altLStmt);
                 }
             }
-            _currentTypeRestriction = null;
             HandleBlock(alt.Body);  
         }
     }
@@ -660,7 +636,7 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
         }
 
         if (suffixExpr is ExprDotName exprDName && 
-            IsTarget(exprDName.SuffixNameNode.Value, exprDName.SuffixNameNode.Center.pos)) {
+            IsTarget(exprDName.SuffixNameNode.Value)) {
             TargetExpression = suffixExpr;
             return;
         }

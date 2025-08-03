@@ -82,15 +82,7 @@ public class MutantGenerator(string mutationTargetPos, string mutationOperator, 
         if (mutationOperator == "VDL" || mutationOperator == "ODL") {
                 var specHelperFinder = new SpecHelperFinder(Reporter);
                 specHelperFinder.Find(module);
-                return;
         }
-        var mutatorFactory = new MutatorFactory(Reporter);
-        var mutator = mutatorFactory.Create(mutationTargetPos, mutationOperator, mutationArg);
-        mutator?.Mutate(module);
-    }
-
-    public override void PostResolve(ModuleDefinition module) {
-        if (mutationOperator != "VDL" && mutationOperator != "ODL") return;
         var mutatorFactory = new MutatorFactory(Reporter);
         var mutator = mutatorFactory.Create(mutationTargetPos, mutationOperator, mutationArg);
         mutator?.Mutate(module);
