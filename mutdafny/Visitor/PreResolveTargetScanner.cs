@@ -216,7 +216,8 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
     }
 
     private bool ExcludeSWSTarget(Statement stmt) {
-        return stmt is PrintStmt || stmt is OpaqueBlock || stmt is PredicateStmt || stmt is CalcStmt;
+        return stmt is PrintStmt || stmt is OpaqueBlock || stmt is PredicateStmt || stmt is CalcStmt ||
+               (stmt is VarDeclStmt && stmt.CoveredTokens.Select((e) => e.val).Contains("ghost"));
     }
     
     /// -------------------------------------

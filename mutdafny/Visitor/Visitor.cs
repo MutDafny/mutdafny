@@ -185,6 +185,9 @@ public class Visitor
     /// Group of statement visitors
     /// ---------------------------
     protected virtual void HandleStatement(Statement stmt) {
+        if (stmt is VarDeclStmt && stmt.CoveredTokens.Select((e) => e.val).Contains("ghost"))
+            return;
+        
         var derivedType = stmt.GetType();
         while (derivedType != typeof(object) && derivedType != null) {
             if (_statementHandlers.TryGetValue(derivedType, out var handler)) {
