@@ -360,29 +360,42 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
     }
     
     protected override void VisitStatement(IfStmt ifStmt) {
-        if (ShouldImplement("SDL")) {
-            if (ifStmt.Els == null) {
-                AddTarget(($"{ifStmt.StartToken.pos}-{ifStmt.EndToken.pos}", "SDL", ""));
-                _isChildIfBlock = false;
-            } else if (_isChildIfBlock) {
-                AddTarget(($"{ifStmt.Thn.StartToken.pos}-{ifStmt.Thn.EndToken.pos}", "SDL", ""));
-            } else { // first block
-                _isChildIfBlock = true;
-            }
+        var prevParentBlockHasStmt = _parentBlockHasStmt;
+        
+        if (ifStmt.Guard != null) {
+            HandleExpression(ifStmt.Guard);
+        }
 
-            if (ifStmt.Els is BlockStmt) { // last block
-                AddTarget(($"{ifStmt.Els.StartToken.pos}-{ifStmt.Els.EndToken.pos}", "SDL", ""));
-                _isChildIfBlock = false;
+        _parentBlockHasStmt = false;
+        HandleBlock(ifStmt.Thn);
+        if (ifStmt.Els != null && _isChildIfBlock && ShouldImplement("SDL") && _parentBlockHasStmt) {
+            AddTarget(($"{ifStmt.Thn.StartToken.pos}-{ifStmt.Thn.EndToken.pos}", "SDL", ""));
+        } else if (ifStmt.Els == null && ShouldImplement("SDL") && _parentBlockHasStmt) {
+            AddTarget(($"{ifStmt.StartToken.pos}-{ifStmt.EndToken.pos}", "SDL", ""));
+            _isChildIfBlock = false;
+        } else if (ifStmt.Els != null && !_isChildIfBlock) {
+            _isChildIfBlock = true;
+        }
+        
+        _parentBlockHasStmt = false;
+        if (ifStmt.Els != null) {
+            if (ifStmt.Els is BlockStmt bEls) {
+                HandleBlock(bEls);
+                if (ShouldImplement("SDL") && _parentBlockHasStmt) {
+                    AddTarget(($"{ifStmt.Els.StartToken.pos}-{ifStmt.Els.EndToken.pos}", "SDL", ""));
+                    _isChildIfBlock = false;
+                }
+            } else {
+                HandleStatement(ifStmt.Els);
             }
         }
+        _parentBlockHasStmt = prevParentBlockHasStmt;
         
         if (ShouldImplement("CBE")) {
             AddTarget(($"{ifStmt.Thn.StartToken.pos}-{ifStmt.Thn.EndToken.pos}", "CBE", ""));
             if (ifStmt.Els != null && ifStmt.Els is BlockStmt)
                 AddTarget(($"{ifStmt.Els.StartToken.pos}-{ifStmt.Els.EndToken.pos}", "CBE", ""));
         }
-
-        base.VisitStatement(ifStmt);
     }
     
     private void VisitStatement(LoopStmt loopStmt) {
