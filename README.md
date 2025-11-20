@@ -1,4 +1,7 @@
 # MutDafny: A Mutation Testing Tool for Dafny Programs
+MutDafny is a tool for automatically signaling potential weaknesses in Dafny specifications. 
+Using a mutation testing approach, it introduces mutations into the code and relies on formal specifications for detecting them. 
+If a program with a mutant verifies, this may indicate a *weakness in the specification*. 
 
 ## Running the Project
 
