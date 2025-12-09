@@ -9,6 +9,7 @@ If a program with a mutant verifies, this may indicate a *weakness in the specif
 ```
 cd dafny && make exe
 ```
+**Note**: Requires .NET 6.0 and Java (version 22 or older).
 
 2. **Install Z3**
 ```
