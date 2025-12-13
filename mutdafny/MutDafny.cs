@@ -14,6 +14,7 @@ public class MutDafny : PluginConfiguration
 
     private List<string> OperatorsInUse { get; set; } = [];
     private string MutationTargetURI { get; set; } = "";
+    private int NumMutations { get; set; } = -1;
     private string MutationTargetPos { get; set; } = "";
     private string MutationOperator { get; set; } = "";
     private string? MutationArg { get; set; }
@@ -22,24 +23,11 @@ public class MutDafny : PluginConfiguration
         if (args.Length == 0) return;
         if (args[0] == "scan") {
             _scan = true;
-            if (args.Length == 1) return;
-            if (args[1].EndsWith(".dfy")) {
-                MutationTargetURI = args[1];
-                if (args.Length == 2) return;
-                OperatorsInUse = new List<string>(args[2..]);   
-            } else { 
-                OperatorsInUse = new List<string>(args[1..]);   
-            }
+            ParseScanArguments(args);
         } 
-        else if (args[0] == "mut" && args.Length >= 3) {
+        else if (args[0] == "mut" && args.Length >= 2) {
             _mutate = true;
-            MutationTargetPos = args[1];
-            MutationOperator = args[2];
-            MutationArg = args.Length switch {
-                3 => null,
-                4 => args[3],
-                _ => string.Join(" ", new List<string>(args[new Range(3, args.Length)]))
-            };
+            ParseMutArguments(args);
         } else if (args[0] == "analyze") {
             _analyze = true;
             if (args.Length == 1) return;
@@ -47,9 +35,34 @@ public class MutDafny : PluginConfiguration
         }
     }
 
+    private void ParseScanArguments(string[] args) {
+        if (args.Length == 1) return;
+        if (args[1].EndsWith(".dfy")) {
+            MutationTargetURI = args[1];
+            if (args.Length == 2) return;
+            OperatorsInUse = new List<string>(args[2..]);   
+        } else { 
+            OperatorsInUse = new List<string>(args[1..]);   
+        }
+    }
+
+    private void ParseMutArguments(string[] args) {
+        if (args.Length == 2) {
+            NumMutations = int.Parse(args[1]);
+        } else {
+            MutationTargetPos = args[1];
+            MutationOperator = args[2];
+            MutationArg = args.Length switch {
+                3 => null,
+                4 => args[3],
+                _ => string.Join(" ", new List<string>(args[new Range(3, args.Length)]))
+            };
+        }
+    }
+
     public override Rewriter[] GetRewriters(ErrorReporter reporter) {
         return _mutate ? 
-            [new MutantGenerator(MutationTargetPos, MutationOperator, MutationArg, reporter)] : 
+            [new MutantGenerator(NumMutations, MutationTargetPos, MutationOperator, MutationArg, reporter)] : 
             (_scan ? [new MutationTargetScanner(MutationTargetURI, OperatorsInUse, reporter)] : 
              _analyze ? [new ProgramAnalyzer(MutationTargetURI, reporter)] : []);
     }
@@ -76,12 +89,20 @@ public class MutationTargetScanner(string mutationTargetURI, List<string> operat
     }
 }
 
-public class MutantGenerator(string mutationTargetPos, string mutationOperator, string? mutationArg, ErrorReporter reporter) : Rewriter(reporter)
+public class MutantGenerator(int numMutations, string mutationTargetPos, string mutationOperator, string? mutationArg, ErrorReporter reporter) : Rewriter(reporter)
 {
     public override void PreResolve(ModuleDefinition module) {
+        if (numMutations == -1) {
+            GenerateMutant(module, mutationTargetPos, mutationOperator, mutationArg); 
+        } else {
+          // TODO  
+        }
+    }
+
+    private void GenerateMutant(ModuleDefinition module, string mutationTargetPos, string mutationOperator, string? mutationArg) {
         if (mutationOperator == "VDL" || mutationOperator == "ODL") {
-                var specHelperFinder = new SpecHelperFinder(Reporter);
-                specHelperFinder.Find(module);
+            var specHelperFinder = new SpecHelperFinder(Reporter);
+            specHelperFinder.Find(module);
         }
         var mutatorFactory = new MutatorFactory(Reporter);
         var mutator = mutatorFactory.Create(mutationTargetPos, mutationOperator, mutationArg);
@@ -96,6 +117,7 @@ public class MutantGenerator(string mutationTargetPos, string mutationOperator, 
         var programText = stringWriter.ToString();
 
         var filename = Path.GetFileNameWithoutExtension(program.Name);
+        // TODO: change for multiple mutations
         filename += mutationArg != null ? 
             $"_{mutationTargetPos}_{mutationOperator}_{mutationArg}.dfy" : 
             $"_{mutationTargetPos}_{mutationOperator}.dfy";
