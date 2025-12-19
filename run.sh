@@ -3,11 +3,10 @@ if [[ -z $1 ]]; then
     exit
 fi
 
-rm -rf mutants
-mkdir mutants
-mkdir mutants/alive
-mkdir mutants/timed-out
-mkdir mutants/killed
+mkdir -p mutants
+mkdir -p mutants/alive
+mkdir -p mutants/timed-out
+mkdir -p mutants/killed
 
 
 echo Scanning $1 for mutation targets
