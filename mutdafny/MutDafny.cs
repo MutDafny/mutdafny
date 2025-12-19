@@ -74,14 +74,15 @@ public class MutationTargetScanner(string mutationTargetURI, List<string> operat
         targetScanner.ExportTargets();
         FirstCall = false;
     }
+    
     public override void PostResolve(Program program) {
-        //  save original code but post serialization to perform difs
+        //  save original code but post serialization to perform diffs
         var stringWriter = new StringWriter();
         var printer = new Printer(stringWriter, program.Options, PrintModes.Serialization);
         printer.PrintProgram(program, false);
         var programText = stringWriter.ToString();
+        
         var filename = Path.GetFileNameWithoutExtension(program.Name) + ".dfy";
-
         Directory.CreateDirectory("original");
         File.WriteAllText(Path.Combine("original", filename), programText);
     }
