@@ -16,14 +16,8 @@ dotnet ./dafny/Binaries/Dafny.dll verify $1 \
 
 
 IFS=','
-readarray -t targets < targets.csv
-for target in "${targets[@]}"
+while read pos op arg; 
 do
-    read -ra target_args <<< "$target"
-    pos=${target_args[0]}
-    op=${target_args[1]}
-    arg=${target_args[2]}
-
     output=""
     if [[ -z $arg ]]; 
     then 
@@ -65,6 +59,6 @@ do
     fi
     echo
     rm elapsed-time.csv
-done
+done < targets.csv
 
 rm targets.csv
