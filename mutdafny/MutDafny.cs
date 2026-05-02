@@ -59,6 +59,11 @@ public class MutationTargetScanner(string mutationTargetURI, List<string> operat
 {
     public static bool FirstCall = true;
     
+    public override void PreResolve(Program program) {
+        // save original code but post serialization to perform diffs
+        StoreProgram(program);
+    }
+    
     public override void PreResolve(ModuleDefinition module) {
         var specHelperFinder = new SpecHelperFinder(Reporter);
         specHelperFinder.Find(module);
@@ -75,8 +80,7 @@ public class MutationTargetScanner(string mutationTargetURI, List<string> operat
         FirstCall = false;
     }
     
-    public override void PostResolve(Program program) {
-        //  save original code but post serialization to perform diffs
+    private void StoreProgram(Program program) {
         var stringWriter = new StringWriter();
         var printer = new Printer(stringWriter, program.Options, PrintModes.Serialization);
         printer.PrintProgram(program, false);
@@ -90,18 +94,22 @@ public class MutationTargetScanner(string mutationTargetURI, List<string> operat
 
 public class MutantGenerator(string mutationTargetPos, string mutationOperator, string? mutationArg, ErrorReporter reporter) : Rewriter(reporter)
 {
-    public override void PreResolve(ModuleDefinition module) {
+    public override void PreResolve(Program program) {
+        MutateProgram(program);
+        StoreProgram(program);
+    }
+
+    private void MutateProgram(Program program) {
         if (mutationOperator == "VDL" || mutationOperator == "ODL") {
-                var specHelperFinder = new SpecHelperFinder(Reporter);
-                specHelperFinder.Find(module);
+            var specHelperFinder = new SpecHelperFinder(Reporter);
+            specHelperFinder.Find(program);
         }
         var mutatorFactory = new MutatorFactory(Reporter);
         var mutator = mutatorFactory.Create(mutationTargetPos, mutationOperator, mutationArg);
-        mutator?.Mutate(module);
+        mutator?.Mutate(program);
     }
-
-    public override void PostResolve(Program program) {
-        // save mutant
+    
+    private void StoreProgram(Program program) {
         var stringWriter = new StringWriter();
         var printer = new Printer(stringWriter, program.Options, PrintModes.Serialization);
         printer.PrintProgram(program, false);
