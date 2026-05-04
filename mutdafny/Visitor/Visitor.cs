@@ -18,13 +18,11 @@ public class Visitor
     private readonly Dictionary<Type, Action<Statement>> _statementHandlers;
     private readonly Dictionary<Type, Action<Expression>> _expressionHandlers;
     protected readonly string MutationTargetPos;
-    private readonly bool _multipleModule;
     protected readonly ErrorReporter Reporter;
     
-    protected Visitor(string mutationTargetPos, ErrorReporter reporter, bool multipleModule = false)
+    protected Visitor(string mutationTargetPos, ErrorReporter reporter)
     {
         MutationTargetPos = mutationTargetPos;
-        _multipleModule = multipleModule;
         Reporter = reporter;
         
         _statementHandlers = new Dictionary<Type, Action<Statement>> {
@@ -123,14 +121,10 @@ public class Visitor
         foreach (var decl in module.SourceDecls) {
             // only visit declarations that may contain the mutation target
             if (!IsWorthVisiting(decl.StartToken.pos, decl.EndToken.pos)) continue;
-            
             if (decl is TopLevelDeclWithMembers declWithMembers) { // includes class, trait, datatype, etc.
                 HandleMemberDecls(declWithMembers);   
             }
-
-            if (decl is LiteralModuleDecl moduleDecl && _multipleModule) {
-                Find(moduleDecl.ModuleDef);
-            } else if (decl is IteratorDecl itDecl) {
+            if (decl is IteratorDecl itDecl) {
                 HandleBlock(itDecl.Body);
             } else if (decl is NewtypeDecl newTpDecl) {
                 HandleExpression(newTpDecl.Constraint);

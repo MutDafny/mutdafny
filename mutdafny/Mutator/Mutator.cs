@@ -2,8 +2,7 @@
 
 namespace MutDafny.Mutator;
 
-public abstract class Mutator(string mutationTargetPos, ErrorReporter reporter, bool multipleModule = false) 
-    : Visitor.Visitor(mutationTargetPos, reporter, multipleModule)
+public abstract class Mutator(string mutationTargetPos, ErrorReporter reporter) : Visitor.Visitor(mutationTargetPos, reporter)
 {
     public void Mutate(ModuleDefinition topNode) {
         base.Find(topNode);
