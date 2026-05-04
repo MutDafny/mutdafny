@@ -19,6 +19,8 @@ public class SpecHelperFinder(ErrorReporter reporter): Visitor("-1", reporter)
 
     protected override void  HandleSourceDecls(ModuleDefinition module) {
         foreach (var decl in module.SourceDecls) {
+            if (decl is LiteralModuleDecl litModuleDecl)
+                Find(litModuleDecl.ModuleDef);
             if (decl is TopLevelDeclWithMembers declWithMembers) { // includes class, trait, datatype, etc.
                 HandleMemberDecls(declWithMembers);
             }

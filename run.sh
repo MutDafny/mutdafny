@@ -42,11 +42,10 @@ fi
 # ------------------------------------------------------------------------------ Cleanup
 
 rm -rf targets.csv
-rm -rf mutants
-mkdir mutants
-mkdir mutants/alive
-mkdir mutants/timed-out
-mkdir mutants/killed
+mkdir -p mutants
+mkdir -p mutants/alive
+mkdir -p mutants/timed-out
+mkdir -p mutants/killed
 
 # ------------------------------------------------------------------------------ MutDafny utils
 
@@ -62,6 +61,10 @@ single_mutation() {
     local op="$2"
     local arg="$3"
 
+IFS=','
+while read pos op arg; 
+do
+    output=""
     if [[ -z $arg ]]; 
     then 
         echo Mutating position $pos: operator $op

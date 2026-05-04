@@ -93,6 +93,10 @@ public class Visitor
     /// ---------------------------
     /// Group of top level visitors
     /// ---------------------------
+    public virtual void Find(Program program) {
+        Find(program.DefaultModuleDef);
+    }
+    
     public virtual void Find(ModuleDefinition module) {
         // only visit modules that may contain the mutation target
         if (module.EndToken.pos == 0 || // default module
@@ -121,6 +125,8 @@ public class Visitor
         foreach (var decl in module.SourceDecls) {
             // only visit declarations that may contain the mutation target
             if (!IsWorthVisiting(decl.StartToken.pos, decl.EndToken.pos)) continue;
+            if (decl is LiteralModuleDecl litModuleDecl)
+                Find(litModuleDecl.ModuleDef);
             if (decl is TopLevelDeclWithMembers declWithMembers) { // includes class, trait, datatype, etc.
                 HandleMemberDecls(declWithMembers);   
             }

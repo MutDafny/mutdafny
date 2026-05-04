@@ -72,6 +72,11 @@ public class MutationTargetScanner(string mutationTargetURI, List<string> operat
 {
     public static bool FirstCall = true;
     
+    public override void PreResolve(Program program) {
+        // save original code but post serialization to perform diffs
+        StoreProgram(program);
+    }
+    
     public override void PreResolve(ModuleDefinition module) {
         var specHelperFinder = new SpecHelperFinder(Reporter);
         specHelperFinder.Find(module);
@@ -87,30 +92,42 @@ public class MutationTargetScanner(string mutationTargetURI, List<string> operat
         targetScanner.ExportTargets();
         FirstCall = false;
     }
+    
+    private void StoreProgram(Program program) {
+        var stringWriter = new StringWriter();
+        var printer = new Printer(stringWriter, program.Options, PrintModes.Serialization);
+        printer.PrintProgram(program, false);
+        var programText = stringWriter.ToString();
+        
+        var filename = Path.GetFileNameWithoutExtension(program.Name) + ".dfy";
+        Directory.CreateDirectory("original");
+        File.WriteAllText(Path.Combine("original", filename), programText);
+    }
 }
 
 public class MutantGenerator(int numMutations, string mutationTargetPos, string mutationOperator, string? mutationArg, ErrorReporter reporter) : Rewriter(reporter)
 {
-    public override void PreResolve(ModuleDefinition module) {
+    public override void PreResolve(Program program) {
         if (numMutations == -1) {
-            GenerateMutant(module, mutationTargetPos, mutationOperator, mutationArg); 
+            MutateProgram(program); 
         } else {
           // TODO  
         }
+        MutateProgram(program);
+        StoreProgram(program);
     }
 
-    private void GenerateMutant(ModuleDefinition module, string mutationTargetPos, string mutationOperator, string? mutationArg) {
+    private void MutateProgram(Program program) {
         if (mutationOperator == "VDL" || mutationOperator == "ODL") {
             var specHelperFinder = new SpecHelperFinder(Reporter);
-            specHelperFinder.Find(module);
+            specHelperFinder.Find(program);
         }
         var mutatorFactory = new MutatorFactory(Reporter);
         var mutator = mutatorFactory.Create(mutationTargetPos, mutationOperator, mutationArg);
-        mutator?.Mutate(module);
+        mutator?.Mutate(program);
     }
-
-    public override void PostResolve(Program program) {
-        // save mutant
+    
+    private void StoreProgram(Program program) {
         var stringWriter = new StringWriter();
         var printer = new Printer(stringWriter, program.Options, PrintModes.Serialization);
         printer.PrintProgram(program, false);
@@ -119,8 +136,8 @@ public class MutantGenerator(int numMutations, string mutationTargetPos, string 
         var filename = Path.GetFileNameWithoutExtension(program.Name);
         // TODO: change for multiple mutations
         filename += mutationArg != null ? 
-            $"_{mutationTargetPos}_{mutationOperator}_{mutationArg}.dfy" : 
-            $"_{mutationTargetPos}_{mutationOperator}.dfy";
+            $"__{mutationTargetPos}_{mutationOperator}_{mutationArg}.dfy" : 
+            $"__{mutationTargetPos}_{mutationOperator}.dfy";
         File.WriteAllText(filename, programText);
     }
 }

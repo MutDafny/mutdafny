@@ -81,6 +81,8 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
         foreach (var decl in module.SourceDecls.ToList()) {
             // only visit declarations that may contain the mutation target
             if (!IsWorthVisiting(decl.StartToken.pos, decl.EndToken.pos)) continue;
+            if (decl is LiteralModuleDecl litModuleDecl)
+                Find(litModuleDecl.ModuleDef);
             if (decl is TopLevelDeclWithMembers declWithMembers) { // includes class, trait, datatype, etc.
                 HandleMemberDecls(declWithMembers);   
             }
