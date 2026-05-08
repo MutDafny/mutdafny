@@ -2,7 +2,7 @@
 
 namespace MutDafny.Mutator;
 
-public class CaseBlockReplacementMutator(string mutationTargetPos, ErrorReporter reporter): Mutator(mutationTargetPos, reporter)
+public class CaseBlockReplacementMutator(string mutationTargetPos, ErrorReporter reporter) : Mutator(mutationTargetPos, reporter)
 {
     private bool IsTarget(NestedMatchCase cs) {
         var positions = MutationTargetPos.Split("-");
@@ -17,6 +17,8 @@ public class CaseBlockReplacementMutator(string mutationTargetPos, ErrorReporter
     /// Group of overriden visitors
     /// ---------------------------
     protected override void VisitStatement(NestedMatchStmt nMatchStmt) {
+        if (AlreadyMutated(nMatchStmt)) base.VisitStatement(nMatchStmt);
+        
         NestedMatchCaseStmt? defaultCase = null;
         NestedMatchCaseStmt? targetCase = null;
         var cloner = new Cloner();
@@ -30,6 +32,8 @@ public class CaseBlockReplacementMutator(string mutationTargetPos, ErrorReporter
         }
 
         if (defaultCase == null || targetCase == null) return;
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(nMatchStmt);
         foreach (var cs in nMatchStmt.Cases) {
             if (cs.Pat is IdPattern idPat && idPat.IsWildcardPattern) {
                 cs.Body = targetCase.Body;
@@ -44,6 +48,8 @@ public class CaseBlockReplacementMutator(string mutationTargetPos, ErrorReporter
     }
     
     protected override void VisitExpression(NestedMatchExpr nMExpr) {
+        if (AlreadyMutated(nMExpr)) base.VisitExpression(nMExpr);
+        
         NestedMatchCaseExpr? defaultCase = null;
         NestedMatchCaseExpr? targetCase = null;
         foreach (var cs in nMExpr.Cases) {
@@ -56,6 +62,8 @@ public class CaseBlockReplacementMutator(string mutationTargetPos, ErrorReporter
         }
 
         if (defaultCase == null || targetCase == null) return;
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(nMExpr);
         foreach (var cs in nMExpr.Cases) {
             if (cs.Pat is IdPattern idPat && idPat.IsWildcardPattern) {
                 cs.Body = targetCase.Body;

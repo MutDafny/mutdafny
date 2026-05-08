@@ -12,7 +12,9 @@ public class SwapStmtMutator(string mutationTargetPos, ErrorReporter reporter) :
         var startPosition = int.Parse(positions[0]);
         var endPosition = int.Parse(positions[1]);
         
-        return stmt.StartToken.pos == startPosition && stmt.EndToken.pos == endPosition;
+        return stmt.StartToken.pos == startPosition && 
+               stmt.EndToken.pos == endPosition &&
+               !AlreadyMutated(stmt);
     }
     
     /// -----------------
@@ -23,9 +25,12 @@ public class SwapStmtMutator(string mutationTargetPos, ErrorReporter reporter) :
             if (!IsTarget(stmt)) continue;
             TargetStatement = stmt;
 
-            if (i == 0) return;
+            if (i == 0 || AlreadyMutated(statements[i - 1])) return;
             var prevStmt = CloneStatement(statements[i - 1]);
             if (prevStmt == null) return;
+            MutantGenerator.NumMutations++;
+            MutantGenerator.MutatedNodes.Add(stmt);
+            MutantGenerator.MutatedNodes.Add(statements[i - 1]);
             statements[i - 1] = statements[i];
             statements[i] = prevStmt;
             return;

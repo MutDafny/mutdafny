@@ -14,15 +14,18 @@ public class LoopStmtReplacementMutator(string mutationTargetPos, string val, Er
         if (originalStmt is not BreakOrContinueStmt bcStmt) 
             return new ReturnStmt(origin, null);
         var count = bcStmt.BreakAndContinueCount;
-        return val switch {
+        Statement mutatedExpr = val switch {
             "break" => new BreakOrContinueStmt(origin, count, false, attributes),
             "continue" => new BreakOrContinueStmt(origin, count, true, attributes),
             _ => new ReturnStmt(origin, null)
         };
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(mutatedExpr);
+        return mutatedExpr;
     }
 
     private bool IsTarget(BreakOrContinueStmt stmt) {
-        return stmt.Center.pos == int.Parse(MutationTargetPos);
+        return stmt.Center.pos == int.Parse(MutationTargetPos) && !AlreadyMutated(stmt);
     }
 
     /// -----------------

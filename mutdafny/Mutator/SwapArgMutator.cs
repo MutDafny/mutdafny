@@ -10,6 +10,9 @@ public class SwapArgMutator(string mutationTargetPos, string newArgPos, ErrorRep
     private void Mutate(List<ActualBinding> bindings) {
         var targetBinding = bindings[_targetBindingPos];
         var replacementBinding = bindings[_replacementBindingPos];
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(targetBinding);
+        MutantGenerator.MutatedNodes.Add(replacementBinding);
         
         var targetBindingClone = new ActualBinding(targetBinding.Origin, targetBinding.Actual);
         bindings[_targetBindingPos].Actual = replacementBinding.Actual;
@@ -17,11 +20,13 @@ public class SwapArgMutator(string mutationTargetPos, string newArgPos, ErrorRep
     }
     
     private bool IsTarget(Expression actualBinding) {
-        return actualBinding.Center.pos == int.Parse(MutationTargetPos);
+        return actualBinding.Center.pos == int.Parse(MutationTargetPos) &&
+               !AlreadyMutated(actualBinding);
     }
     
     private bool IsReplacement(Expression actualBinding) {
-        return actualBinding.Center.pos == int.Parse(newArgPos);
+        return actualBinding.Center.pos == int.Parse(newArgPos) &&
+               !AlreadyMutated(actualBinding);
     }
     
     /// -----------------

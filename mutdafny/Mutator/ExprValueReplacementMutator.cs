@@ -36,6 +36,9 @@ public class ExprValueReplacementMutator(string mutationTargetPos, string val, E
         }
 
         TargetExpression = null;
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(mutatedExpr);
+        ForbidChildrenMutation(mutatedExpr);
         return mutatedExpr;
     }
     
@@ -58,7 +61,10 @@ public class ExprValueReplacementMutator(string mutationTargetPos, string val, E
         var startPosition = int.Parse(positions[0]);
         var endPosition = int.Parse(positions[1]);
         
-        return expr.StartToken.pos == startPosition && expr.EndToken.pos == endPosition;
+        return expr.StartToken.pos == startPosition && 
+               expr.EndToken.pos == endPosition && 
+               !AlreadyMutated(expr) &&
+               !ContainsMutatedChildren(expr);
     }
 
     private bool IsTarget(TypeRhs typeRhs) {
@@ -67,7 +73,10 @@ public class ExprValueReplacementMutator(string mutationTargetPos, string val, E
         var startPosition = int.Parse(positions[0]);
         var endPosition = int.Parse(positions[1]);
         
-        return typeRhs.StartToken.pos == startPosition && typeRhs.EndToken.pos == endPosition;
+        return typeRhs.StartToken.pos == startPosition && 
+               typeRhs.EndToken.pos == endPosition && 
+               !AlreadyMutated(typeRhs) &&
+               !ContainsMutatedChildren(typeRhs);
     }
     
     /// ----------------------------

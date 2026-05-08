@@ -52,7 +52,7 @@ mkdir -p mutants/killed
 scan_program() {
     echo Scanning $PROGRAM for mutation targets
     dotnet ./dafny/Binaries/Dafny.dll verify $PROGRAM \
-        --allow-warnings --solver-path ./dafny/Binaries/z3 \
+        --solver-path ./dafny/Binaries/z3 --allow-warnings \
         --plugin ./mutdafny/bin/Debug/net8.0/mutdafny.dll,scan > /dev/null
 }
 
@@ -61,29 +61,28 @@ single_mutation() {
     local op="$2"
     local arg="$3"
 
-IFS=','
-while read pos op arg; 
-do
     output=""
     if [[ -z $arg ]]; 
     then 
         echo Mutating position $pos: operator $op
-        dotnet ./dafny/Binaries/Dafny.dll verify $PROGRAM \
-            --allow-warnings --solver-path ./dafny/Binaries/z3 \
-            --plugin ./mutdafny/bin/Debug/net8.0/mutdafny.dll,"mut $pos $op"
+        output=$(dotnet ./dafny/Binaries/Dafny.dll verify $PROGRAM \
+            --solver-path ./dafny/Binaries/z3 --allow-warnings \
+            --plugin ./mutdafny/bin/Debug/net8.0/mutdafny.dll,"mut $pos $op" 2>/dev/null)
     else
         echo Mutating position $pos: operator $op, argument $arg
-        dotnet ./dafny/Binaries/Dafny.dll verify $PROGRAM \
-            --allow-warnings --solver-path ./dafny/Binaries/z3 \
-            --plugin ./mutdafny/bin/Debug/net8.0/mutdafny.dll,"mut $pos $op $arg"
+        output=$(dotnet ./dafny/Binaries/Dafny.dll verify $PROGRAM \
+            --solver-path ./dafny/Binaries/z3 --allow-warnings \
+            --plugin ./mutdafny/bin/Debug/net8.0/mutdafny.dll,"mut $pos $op $arg" 2>/dev/null)
     fi
+    echo $output
 }
 
 multiple_mutation() {
     echo Applying $NUM_MUTS mutations to the program
-    dotnet ./dafny/Binaries/Dafny.dll verify $PROGRAM \
-        --allow-warnings --solver-path ./dafny/Binaries/z3 \
-        --plugin ./mutdafny/bin/Debug/net8.0/mutdafny.dll,"mut $NUM_MUTATIONS"
+    output=$(dotnet ./dafny/Binaries/Dafny.dll verify $PROGRAM \
+        --solver-path ./dafny/Binaries/z3 --allow-warnings \
+        --plugin ./mutdafny/bin/Debug/net8.0/mutdafny.dll,"mut $NUM_MUTS" 2>/dev/null)
+    echo $output
 }
 
 process_output() {
@@ -96,9 +95,15 @@ process_output() {
 
     COLOR='\033[0;31m'; if [[ -n $verified ]]; then COLOR='\033[0m'; fi
     if [[ -z $verification_finished ]]; then # verification did not finish due to invalid program
-        rm *.dfy
-        echo Error: mutant is invalid
-    else
+
+        if [ -f *.dfy ]; then
+            rm *.dfy
+            echo Error: mutant is invalid
+        else
+            echo Could not apply $NUM_MUTS mutations to the program
+        fi
+
+    elif [ -f *.dfy ]; then
         echo -e "${COLOR}${output}\033[0m"
         output_dir=""
         if [[ -n $timed_out ]]; then
@@ -111,17 +116,19 @@ process_output() {
             echo Verification failed: mutant was killed
             output_dir=mutants/killed
         fi
+
         mv *.dfy $output_dir
+    else
+        echo Could not apply $NUM_MUTS mutations to the program
     fi
 }
 
 # ------------------------------------------------------------------------------ Main
 
-
 scan_program
 
+IFS=','
 if [ "$#" -eq "1" ] || [ $NUM_MUTS -eq "1" ]; then
-    IFS=','
     while read pos op arg;
     do
 
@@ -135,7 +142,10 @@ if [ "$#" -eq "1" ] || [ $NUM_MUTS -eq "1" ]; then
 
     done < targets.csv
 else
-    while [ ! -s targets.txt ];
+    num_targets=$(wc -l < targets.csv)
+    MAX_TRIES=$(($num_targets / $NUM_MUTS * 5)) # 5 tries per mutant
+    NUM_TRIES=0
+    while [ $(wc -l < targets.csv 2>/dev/null || echo 0) -ge $NUM_MUTS ] && [ $NUM_TRIES -lt $MAX_TRIES ];
     do
 
         output=$(multiple_mutation)
@@ -144,9 +154,21 @@ else
         mutant_outcome_msg=$(process_output "$output")
         echo $mutant_outcome_msg
         echo
+
+        could_not_apply_all_muts=$(echo $mutant_outcome_msg | grep "Could not apply $NUM_MUTS mutations to the program")
+        if [[ -n $could_not_apply_all_muts ]]; then
+            NUM_TRIES=$((NUM_TRIES+1))
+        else
+            NUM_TRIES=0
+            num_targets=$(wc -l < targets.csv)
+            MAX_TRIES=$(($num_targets / $NUM_MUTS * 5))
+        fi
         rm elapsed-time.csv
 
     done
+
+    if [ $(wc -l < targets.csv 2>/dev/null || echo 0) -lt $NUM_MUTS ]; then echo "Consumed all targets"; fi
+    if [ $NUM_TRIES -ge $MAX_TRIES ]; then echo "Reached max combination tries"; fi
 fi
 
 rm targets.csv

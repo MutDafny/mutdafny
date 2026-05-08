@@ -7,6 +7,7 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
     private readonly List<Statement> _toDelete = [];
     private string _currentScope = "-";
     private readonly List<(string, string)> _sideEffectVarsToDelete = [];
+    private bool _alreadyCountedMut;
 
     private Expression? HandleTarget() {
         Expression? replacementExpr = null;
@@ -69,9 +70,8 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
     }
     
     protected override void VisitExpression(NameSegment nSegExpr) {
-        if (IsTarget(nSegExpr.Name)) {
+        if (IsTarget(nSegExpr.Name) && !AlreadyMutated(nSegExpr))
             TargetExpression = nSegExpr;
-        }
     }
     
     /// ---------------------------
@@ -124,12 +124,15 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             } else if (member is Function func) { // includes predicate
                 HandleFunction(func);
             } else if (member is ConstantField cf) {
-                if (IsTarget(cf)) // mutate
+                if (IsTarget(cf) && !AlreadyMutated(cf) && !ContainsMutatedChildren(cf)) // mutate
                     decl.Members.Remove(member);
-                if (cf.Rhs == null) continue;
-                HandleExpression(cf.Rhs);
-                if (TargetFound()) // mutate
+                else if (cf.Rhs != null)
+                    HandleExpression(cf.Rhs);
+                if (TargetFound()) { // mutate
+                    IncrementNumMutations();
+                    MutantGenerator.MutatedNodes.Add(cf);
                     cf.Rhs = HandleTarget() ?? null;
+                }
             }
         }
     }
@@ -177,9 +180,13 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
                         _toDelete.Add(aStmt);
                         return;
                     }
+                    IncrementNumMutations();
+                    MutantGenerator.MutatedNodes.Add(aStmt);
                     aStmt.Lhss.RemoveAt(i);
                     aStmt.Rhss.RemoveAt(i);
                 } else {
+                    IncrementNumMutations();
+                    MutantGenerator.MutatedNodes.Add(replacement);
                     aStmt.Lhss[i] = replacement;
                 }
             }
@@ -195,9 +202,13 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
                         _toDelete.Add(aStmt);
                         return;
                     }
+                    IncrementNumMutations();
+                    MutantGenerator.MutatedNodes.Add(aStmt);
                     aStmt.Lhss.RemoveAt(i);
                     aStmt.Rhss.RemoveAt(i);
                 } else {
+                    IncrementNumMutations();
+                    MutantGenerator.MutatedNodes.Add(replacement);
                     var oldExpr = (aStmt.Rhss[i] as ExprRhs)?.Expr;
                     var newExprRhs = new ExprRhs(replacement);
                     aStmt.Rhss[i] = newExprRhs;
@@ -209,8 +220,13 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
         
         if (aStmt.OriginalInitialLhs == null) return;
         HandleExpression(aStmt.OriginalInitialLhs);
-        if (TargetFound()) // mutate
-            aStmt.OriginalInitialLhs = HandleTarget(aStmt) ?? aStmt.OriginalInitialLhs;
+        if (TargetFound()) { // mutate
+            var replacement = HandleTarget(aStmt);
+            if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
+            aStmt.OriginalInitialLhs = replacement;
+        }
     }
 
     private void UpdateResolvedStatements(List<Statement> resolvedStatements, Expression newExpr, Expression oldExpr) {
@@ -229,13 +245,20 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             if (TargetFound()) { // mutate
                 var replacement = HandleTarget(aStStmt);
                 if (replacement == null) return;
+                IncrementNumMutations();
+                MutantGenerator.MutatedNodes.Add(replacement);
                 aStStmt.Lhss[i] = replacement;
             }
         }
         if (TargetFound()) return;
         HandleExpression(aStStmt.Expr);
-        if (TargetFound()) // mutate
-            aStStmt.Expr = HandleTarget(aStStmt) ?? aStStmt.Expr;
+        if (TargetFound()) { // mutate
+            var replacement = HandleTarget(aStStmt);
+            if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
+            aStStmt.Expr = replacement;
+        }
     }
     
     protected override void VisitStatement(AssignOrReturnStmt aOrRStmt) {
@@ -249,9 +272,13 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
                         _toDelete.Add(aOrRStmt);
                         return;
                     }
+                    IncrementNumMutations();
+                    MutantGenerator.MutatedNodes.Add(aOrRStmt);
                     aOrRStmt.Lhss.RemoveAt(i);
                     aOrRStmt.Rhss.RemoveAt(i);
                 } else {
+                    IncrementNumMutations();
+                    MutantGenerator.MutatedNodes.Add(replacement);
                     aOrRStmt.Lhss[i] = replacement;
                 }
             }
@@ -267,17 +294,26 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
                         _toDelete.Add(aOrRStmt);
                         return;
                     }
+                    IncrementNumMutations();
+                    MutantGenerator.MutatedNodes.Add(aOrRStmt);
                     aOrRStmt.Lhss.RemoveAt(i);
                     aOrRStmt.Rhss.RemoveAt(i);
                 } else {
+                    IncrementNumMutations();
+                    MutantGenerator.MutatedNodes.Add(replacement);
                     aOrRStmt.Rhss[i] = new ExprRhs(replacement);
                 }
             }
         }
         
         HandleExpression(aOrRStmt.Rhs.Expr);
-        if (TargetFound()) // mutate
-            aOrRStmt.Rhs.Expr = HandleTarget(aOrRStmt) ?? aOrRStmt.Rhs.Expr ;
+        if (TargetFound()) { // mutate
+            var replacement = HandleTarget(aOrRStmt);
+            if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
+            aOrRStmt.Rhs.Expr = replacement;
+        }
     }
     
     protected override void VisitStatement(SingleAssignStmt sAStmt) {
@@ -285,18 +321,25 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
         if (TargetFound()) { // mutate
             var replacement = HandleTarget(sAStmt);
             if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             sAStmt.Lhs = replacement;
         }
         HandleRhsList([sAStmt.Rhs]);
         if (TargetFound()) { // mutate
             var replacement = HandleTarget(sAStmt);
-            sAStmt.Rhs = replacement != null ? new ExprRhs(replacement) : sAStmt.Rhs;
+            if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
+            sAStmt.Rhs = new ExprRhs(replacement);
         }
     }
     
     protected override void VisitStatement(VarDeclStmt vDeclStmt) {
         foreach (var (e, i) in vDeclStmt.Locals.Select((e, i) => (e, i)).ToList()) {
             if (!IsTarget(e.Name)) continue;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(vDeclStmt);
             if (vDeclStmt.Locals.Count == 1) {
                 _toDelete.Add(vDeclStmt);
                 CollectSideEffectVarsToDelete(vDeclStmt);
@@ -347,8 +390,13 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
     
     protected override void VisitStatement(VarDeclPattern vDeclPStmt) {
         HandleExpression(vDeclPStmt.RHS);
-        if (TargetFound()) // mutate
-            vDeclPStmt.RHS = HandleTarget(vDeclPStmt) ?? vDeclPStmt.RHS;
+        if (TargetFound()) { // mutate
+            var replacement = HandleTarget(vDeclPStmt);
+            if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
+            vDeclPStmt.RHS = replacement;
+        }
     }
     
     protected override void VisitStatement(ProduceStmt pStmt) {
@@ -361,6 +409,8 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             if (TargetFound()) {
                 var replacement = HandleTarget(pStmt);
                 if (replacement == null) return;
+                IncrementNumMutations();
+                MutantGenerator.MutatedNodes.Add(replacement);
                 pStmt.Rhss[i] = new ExprRhs(replacement);
             }
         }
@@ -372,6 +422,8 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             if (TargetFound()) { // mutate
                 var replacement = HandleTarget(ifStmt);
                 if (replacement == null) return;
+                IncrementNumMutations();
+                MutantGenerator.MutatedNodes.Add(replacement);
                 ifStmt.Guard = replacement;
             }
         }
@@ -391,6 +443,8 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
         if (TargetFound()) { // mutate
             var replacement = HandleTarget(whileStmt);
             if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             whileStmt.Guard = replacement;
         }
         if (whileStmt.Body != null) HandleBlock(whileStmt.Body);
@@ -401,12 +455,16 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
         if (TargetFound()) { // mutate
             var replacement = HandleTarget(forStmt);
             if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             forStmt.Start = replacement;
         }
         HandleExpression(forStmt.End);
         if (TargetFound()) { // mutate
             var replacement = HandleTarget(forStmt);
             if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             forStmt.End = replacement;
         }
         HandleBlock(forStmt.Body);
@@ -417,6 +475,8 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
         if (TargetFound()) { // mutate
             var replacement = HandleTarget(forStmt);
             if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             forStmt.Range = replacement;
         }
         HandleStatement(forStmt.Body);
@@ -430,8 +490,12 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             if (TargetFound()) { // mutate
                 var replacement = HandleTarget();
                 if (replacement != null) {
+                    IncrementNumMutations();
+                    MutantGenerator.MutatedNodes.Add(replacement);
                     alt.Guard = replacement;
                 } else if (altLStmt.Alternatives.Count > 1) {
+                    IncrementNumMutations();
+                    MutantGenerator.MutatedNodes.Add(altLStmt);
                     altLStmt.Alternatives.Remove(alt);
                 } else {
                     _toDelete.Add(altLStmt);
@@ -448,8 +512,12 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             if (TargetFound()) { // mutate
                 var replacement = HandleTarget();
                 if (replacement != null) {
+                    IncrementNumMutations();
+                    MutantGenerator.MutatedNodes.Add(replacement);
                     alt.Guard = replacement;
                 } else if (altStmt.Alternatives.Count > 1) {
+                    IncrementNumMutations();
+                    MutantGenerator.MutatedNodes.Add(altStmt);
                     altStmt.Alternatives.Remove(alt);
                 } else {
                     _toDelete.Add(altStmt);
@@ -466,12 +534,16 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             if (!TargetFound()) continue; // else mutate
             var replacement = HandleTarget(callStmt);
             if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             callStmt.Lhs[i] = replacement;
         }
         HandleExpression(callStmt.OriginalInitialLhs);
         if (TargetFound()) { // mutate
             var replacement = HandleTarget(callStmt);
             if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             callStmt.OriginalInitialLhs = replacement;
         }
         HandleExpression(callStmt.MethodSelect);
@@ -483,6 +555,8 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             if (!TargetFound()) continue; // else mutate
             var replacement = HandleTarget(callStmt);
             if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             callStmt.Bindings.ArgumentBindings[i].Actual = replacement;
         }
         foreach (var arg in callStmt.Args.ToList()) {
@@ -491,6 +565,8 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             if (!TargetFound()) continue; // else mutate
             var replacement = HandleTarget(callStmt);
             if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             callStmt.Args[i] = replacement;
         }
     }
@@ -509,6 +585,8 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             if (!TargetFound()) continue;
             var replacement = HandleTarget();
             if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             hRStmt.Exprs[i] = replacement;
         }
     }
@@ -533,8 +611,12 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             if (!TargetFound()) continue; // mutate
             var replacement = HandleTarget();
             if (replacement != null) {
+                IncrementNumMutations();
+                MutantGenerator.MutatedNodes.Add(replacement);
                 prtStmt.Args[i] = replacement;
             } else if (prtStmt.Args.Count > 1) {
+                IncrementNumMutations();
+                MutantGenerator.MutatedNodes.Add(prtStmt);
                 prtStmt.Args.RemoveAt(i);
             } else {
                 _toDelete.Add(prtStmt);
@@ -561,20 +643,35 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
     
     protected override void VisitExpression(UnaryExpr uExpr) {
         HandleExpression(uExpr.E);
-        if (TargetFound()) // mutate
-            uExpr.E = HandleTarget(uExpr) ?? uExpr.E;
+        if (TargetFound()) { // mutate
+            var replacement = HandleTarget(uExpr);
+            if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
+            uExpr.E = replacement;
+        }
     }
     
     protected override void VisitExpression(ParensExpression pExpr) {
         HandleExpression(pExpr.E);
-        if (TargetFound()) // mutate
-            pExpr.E = HandleTarget(pExpr) ?? pExpr.E;
+        if (TargetFound()) { // mutate
+            var replacement = HandleTarget(pExpr);
+            if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
+            pExpr.E = replacement;
+        }
     }
     
     protected override void VisitExpression(NegationExpression nExpr) {
         HandleExpression(nExpr.E);
-        if (TargetFound()) // mutate
-            nExpr.E = HandleTarget(nExpr) ?? nExpr.E;
+        if (TargetFound()) { // mutate
+            var replacement = HandleTarget(nExpr);
+            if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
+            nExpr.E = replacement;
+        }
     }
 
     protected override void VisitExpression(ChainingExpression cExpr) {
@@ -591,6 +688,8 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
         if (TargetFound()) { // mutate
             var replacement = HandleTarget(ltExpr);
             if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             ltExpr.Body = replacement;
         }
         foreach (var rhs in ltExpr.RHSs.ToList()) {
@@ -599,8 +698,12 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             if (!TargetFound()) continue; // mutate
             var replacement = HandleTarget();
             if (replacement != null) {
+                IncrementNumMutations();
+                MutantGenerator.MutatedNodes.Add(replacement);
                 ltExpr.RHSs[i] = replacement;
             } else if (ltExpr.RHSs.Count > 1) {
+                IncrementNumMutations();
+                MutantGenerator.MutatedNodes.Add(ltExpr);
                 ltExpr.RHSs.RemoveAt(i);
             } else {
                 TargetExpression = ltExpr;
@@ -613,11 +716,18 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
         if (TargetFound()) { // mutate
             var replacement = HandleTarget(ltOrFExpr);
             if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             ltOrFExpr.Rhs = replacement;
         }
         HandleExpression(ltOrFExpr.Body);
-        if (TargetFound()) // mutate
-            ltOrFExpr.Body = HandleTarget(ltOrFExpr) ?? ltOrFExpr.Body;
+        if (TargetFound()) { // mutate
+            var replacement = HandleTarget(ltOrFExpr);
+            if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
+            ltOrFExpr.Body = replacement;
+        }
     }
     
     protected override void VisitExpression(ApplyExpr appExpr) {
@@ -626,7 +736,9 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             HandleExpression(arg);
             if (!TargetFound()) continue; // mutate
             var replacement = HandleTarget(appExpr);
-            if (replacement == null) return;
+            if (replacement == null) continue;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             appExpr.Args[i] = replacement;
         }
     }
@@ -634,7 +746,12 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
     protected override void VisitExpression(SuffixExpr suffixExpr) {
         HandleExpression(suffixExpr.Lhs);
         if (TargetFound()) { // mutate
-            suffixExpr.Lhs = HandleTarget(suffixExpr) ?? suffixExpr.Lhs;
+            var replacement = HandleTarget(suffixExpr);
+            if (replacement != null) {
+                IncrementNumMutations();
+                MutantGenerator.MutatedNodes.Add(replacement);
+                suffixExpr.Lhs = replacement;
+            }
         }
 
         if (suffixExpr is ExprDotName exprDName && 
@@ -650,6 +767,8 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             if (!TargetFound()) continue;
             var replacement = HandleTarget(suffixExpr);
             if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             appSufExpr.Bindings.ArgumentBindings[i].Actual = replacement;
         }
     }
@@ -659,6 +778,8 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
         if (TargetFound()) { // mutate
             var replacement = HandleTarget(fCallExpr);
             if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             fCallExpr.Receiver = replacement;
         }
         foreach (var binding in fCallExpr.Bindings.ArgumentBindings.ToList()) {
@@ -667,14 +788,21 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             if (!TargetFound()) continue;
             var replacement = HandleTarget(fCallExpr);
             if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             fCallExpr.Bindings.ArgumentBindings[i].Actual = replacement;
         }
     }
     
     protected override void VisitExpression(MemberSelectExpr mSelExpr) {
         HandleExpression(mSelExpr.Obj);
-        if (TargetFound()) // mutate
-            mSelExpr.Obj = HandleTarget(mSelExpr) ?? mSelExpr.Obj;
+        if (TargetFound()) { // mutate
+            var replacement = HandleTarget(mSelExpr);
+            if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
+            mSelExpr.Obj = replacement;
+        }
     }
     
     protected override void VisitExpression(ITEExpr iteExpr) {      
@@ -682,17 +810,26 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
         if (TargetFound()) { // mutate
             var replacement = HandleTarget(iteExpr);
             if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             iteExpr.Test = replacement;
         }
         HandleExpression(iteExpr.Thn);
         if (TargetFound()) { // mutate
             var replacement = HandleTarget(iteExpr);
             if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             iteExpr.Thn = replacement;
         }
         HandleExpression(iteExpr.Els);
-        if (TargetFound()) // mutate
-            iteExpr.Els = HandleTarget(iteExpr) ?? iteExpr.Els;
+        if (TargetFound()) { // mutate
+            var replacement = HandleTarget(iteExpr);
+            if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
+            iteExpr.Els = replacement;
+        }
     }
     
     protected override void VisitExpression(MatchExpr mExpr) {
@@ -714,6 +851,8 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             if (!TargetFound()) continue; // mutate
             var replacement = HandleTarget();
             if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             c.Body = replacement;
         }
         
@@ -730,8 +869,12 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             if (!TargetFound()) continue; // mutate
             var replacement = HandleTarget();
             if (replacement != null) {
+                IncrementNumMutations();
+                MutantGenerator.MutatedNodes.Add(replacement);
                 dExpr.Elements[i] = replacement;
             } else {
+                IncrementNumMutations();
+                MutantGenerator.MutatedNodes.Add(dExpr);
                 dExpr.Elements.RemoveAt(i);
             }
         }
@@ -743,8 +886,12 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             if (TargetFound()) { // mutate
                 var replacement = HandleTarget();
                 if (replacement != null) {
+                    IncrementNumMutations();
+                    MutantGenerator.MutatedNodes.Add(replacement);
                     elem.A = replacement;
                 } else {
+                    IncrementNumMutations();
+                    MutantGenerator.MutatedNodes.Add(mDExpr);
                     mDExpr.Elements.Remove(elem);
                     continue;
                 }
@@ -753,8 +900,12 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             if (TargetFound()) { // mutate
                 var replacement = HandleTarget();
                 if (replacement != null) {
+                    IncrementNumMutations();
+                    MutantGenerator.MutatedNodes.Add(replacement);
                     elem.B = replacement;
                 } else {
+                    IncrementNumMutations();
+                    MutantGenerator.MutatedNodes.Add(mDExpr);
                     mDExpr.Elements.Remove(elem);
                 }
             }
@@ -766,17 +917,29 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
         if (TargetFound()) { // mutate
             var replacement = HandleTarget(seqCExpr);
             if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             seqCExpr.N = replacement;
         }
         HandleExpression(seqCExpr.Initializer);
-        if (TargetFound()) // mutate
-            seqCExpr.Initializer = HandleTarget(seqCExpr) ?? seqCExpr.Initializer;
+        if (TargetFound()) { // mutate
+            var replacement = HandleTarget(seqCExpr);
+            if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
+            seqCExpr.Initializer = replacement;
+        }
     }
     
     protected override void VisitExpression(MultiSetFormingExpr mSetFExpr) { 
         HandleExpression(mSetFExpr.E);
-        if (TargetFound()) // mutate
-            mSetFExpr.E = HandleTarget(mSetFExpr) ?? mSetFExpr.E;
+        if (TargetFound()) { // mutate
+            var replacement = HandleTarget(mSetFExpr.E);
+            if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
+            mSetFExpr.E = replacement;
+        }
     }
     
     protected override void VisitExpression(SeqSelectExpr seqSExpr) {
@@ -784,6 +947,8 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
         if (TargetFound()) { // mutate
             var replacement = HandleTarget(seqSExpr);
             if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             seqSExpr.Seq = replacement;
         }
         if (seqSExpr.E0 != null) {
@@ -791,13 +956,20 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             if (TargetFound()) { // mutate
                 var replacement = HandleTarget(seqSExpr);
                 if (replacement == null) return;
+                IncrementNumMutations();
+                MutantGenerator.MutatedNodes.Add(replacement);
                 seqSExpr.E0 = replacement;
             }
         }
         if (seqSExpr.E1 == null) return;
         HandleExpression(seqSExpr.E1);
-        if (TargetFound()) // mutate
-            seqSExpr.E1 = HandleTarget(seqSExpr) ?? seqSExpr.E1;
+        if (TargetFound()) { // mutate
+            var replacement = HandleTarget(seqSExpr);
+            if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
+            seqSExpr.E1 = replacement;
+        }
     }
     
     protected override void VisitExpression(MultiSelectExpr mSExpr) {
@@ -805,6 +977,8 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
         if (TargetFound()) { // mutate
             var replacement = HandleTarget(mSExpr);
             if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             mSExpr.Array = replacement;
         }
         foreach (var index in mSExpr.Indices.ToList()) {
@@ -813,8 +987,12 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             if (!TargetFound()) continue; // mutate
             var replacement = HandleTarget();
             if (replacement != null) {
+                IncrementNumMutations();
+                MutantGenerator.MutatedNodes.Add(replacement);
                 mSExpr.Indices[i] = replacement;
             } else if (mSExpr.Indices.Count > 1) {
+                IncrementNumMutations();
+                MutantGenerator.MutatedNodes.Add(mSExpr);
                 mSExpr.Indices.RemoveAt(i);
             } else {
                 TargetExpression = mSExpr;
@@ -827,17 +1005,26 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
         if (TargetFound()) { // mutate
             var replacement = HandleTarget(seqUExpr);
             if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             seqUExpr.Seq = replacement;
         }
         HandleExpression(seqUExpr.Index);
         if (TargetFound()) { // mutate
             var replacement = HandleTarget(seqUExpr);
             if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             seqUExpr.Index = replacement;
         }
         HandleExpression(seqUExpr.Value);
-        if (TargetFound()) // mutate
-            seqUExpr.Value = HandleTarget(seqUExpr) ?? seqUExpr.Value;
+        if (TargetFound()) { // mutate
+            var replacement = HandleTarget(seqUExpr);
+            if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
+            seqUExpr.Value = replacement;
+        }
     }
     
     protected override void VisitExpression(ComprehensionExpr compExpr) {
@@ -845,6 +1032,8 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
         if (TargetFound()) { // mutate
             var replacement = HandleTarget(compExpr);
             if (replacement == null) return; 
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             compExpr.Term = replacement;
         }
         if (compExpr.Range != null) {
@@ -852,14 +1041,21 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             if (TargetFound()) { // mutate
                 var replacement = HandleTarget(compExpr);
                 if (replacement == null) return;
+                IncrementNumMutations();
+                MutantGenerator.MutatedNodes.Add(replacement);
                 compExpr.Range = replacement;
             }
         }
 
         if (compExpr is not MapComprehension mCompExpr || mCompExpr.TermLeft == null) return;
         HandleExpression(mCompExpr.TermLeft);
-        if (TargetFound()) // mutate
-            mCompExpr.TermLeft = HandleTarget(compExpr) ?? mCompExpr.TermLeft;
+        if (TargetFound()) { // mutate
+            var replacement = HandleTarget(mCompExpr.TermLeft);
+            if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
+            mCompExpr.TermLeft = replacement;
+        }
     }
     
     protected override void VisitExpression(DatatypeUpdateExpr dtUExpr) {
@@ -867,6 +1063,8 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
         if (TargetFound()) { // mutate
             var replacement = HandleTarget(dtUExpr);
             if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
             dtUExpr.Root = replacement;
         }
 
@@ -876,9 +1074,13 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             if (!TargetFound()) continue; // mutate
             var replacement = HandleTarget();
             if (replacement != null) {
+                IncrementNumMutations();
+                MutantGenerator.MutatedNodes.Add(replacement);
                 var newUpdate = Tuple.Create(update.Item1, update.Item2, replacement);
                 dtUExpr.Updates[i] = newUpdate;
             } else if (dtUExpr.Updates.Count > 1) {
+                IncrementNumMutations();
+                MutantGenerator.MutatedNodes.Add(dtUExpr);
                 dtUExpr.Updates.RemoveAt(i);
             } else {
                 TargetExpression = dtUExpr;
@@ -893,8 +1095,12 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             if (!TargetFound()) continue;
             var replacement = HandleTarget(dtValue);
             if (replacement != null) {
+                IncrementNumMutations();
+                MutantGenerator.MutatedNodes.Add(replacement);
                 dtValue.Bindings.ArgumentBindings[i].Actual = replacement;
             } else {
+                IncrementNumMutations();
+                MutantGenerator.MutatedNodes.Add(dtValue);
                 dtValue.Bindings.ArgumentBindings.RemoveAt(i);
             }
         }
@@ -907,8 +1113,13 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
             return;
         }
         HandleExpression(stmtExpr.E);
-        if (TargetFound()) // mutate
-            stmtExpr.E = HandleTarget(stmtExpr) ?? stmtExpr.E;
+        if (TargetFound()) { // mutate
+            var replacement = HandleTarget(stmtExpr);
+            if (replacement == null) return;
+            IncrementNumMutations();
+            MutantGenerator.MutatedNodes.Add(replacement);
+            stmtExpr.E = replacement;
+        }
     }
     
     /// ----------------------
@@ -920,5 +1131,12 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
         if (positions.Length < 2) return false;
         return (tokenStartPos <= int.Parse(positions[0]) &&
                 int.Parse(positions[1]) <= tokenEndPos);
+    }
+
+    private void IncrementNumMutations() {
+        if (!_alreadyCountedMut) {
+            MutantGenerator.NumMutations++;
+            _alreadyCountedMut = true;
+        }
     }
 }

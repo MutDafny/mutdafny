@@ -9,14 +9,19 @@ public class NakedReceiverMutator(string mutationTargetPos, ErrorReporter report
     private bool _isAssignReplacement;
 
     private bool IsTarget(Expression expr) {
-        return expr.Center.pos == int.Parse(MutationTargetPos);
+        return expr.Center.pos == int.Parse(MutationTargetPos) && 
+               !AlreadyMutated(expr) && !ContainsMutatedChildren(expr);
     }
     
     protected override Expression CreateMutatedExpression(Expression originalExpr) {
         TargetExpression = null;
-        if (_childSuffixExpr?.Lhs is ExprDotName exprDName)
-            return exprDName.Lhs;
-        return originalExpr;
+        if (_childSuffixExpr?.Lhs is not ExprDotName exprDName)
+            return originalExpr;
+        var mutatedExpr = exprDName.Lhs;
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(mutatedExpr);
+        ForbidChildrenMutation(mutatedExpr);
+        return mutatedExpr;
     }
     
     private List<AssignmentRhs> CreateMutatedRhss(Expression originalRhs) {
@@ -46,6 +51,9 @@ public class NakedReceiverMutator(string mutationTargetPos, ErrorReporter report
         _isAssignReplacement = false;
         if (TargetExpression == null) return; // target not found
         aStmt.Rhss = CreateMutatedRhss(TargetExpression);
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(aStmt);
+        aStmt.Rhss.ForEach(ForbidChildrenMutation);
         TargetExpression = null;
         _childSuffixExpr = null;
     }

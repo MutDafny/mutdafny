@@ -20,21 +20,27 @@ public class CollectionInitReplacementMutator(string mutationTargetPos, string v
             elements = CreateElements(originalExpr, val);
         }
 
-        return originalExpr switch {
+        Expression mutatedExpr = originalExpr switch {
             SetDisplayExpr => new SetDisplayExpr(originalExpr.Origin, true, elements),
             MultiSetDisplayExpr => new MultiSetDisplayExpr(originalExpr.Origin, elements),
             SeqDisplayExpr => new SeqDisplayExpr(originalExpr.Origin, elements),
             MapDisplayExpr => new MapDisplayExpr(originalExpr.Origin, true, pairElements),
             _ => new LiteralExpr(originalExpr.Origin, null)
         };
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(mutatedExpr);
+        return mutatedExpr;
     }
 
     private TypeRhs CreateArrayInit(TypeRhs originalRhs) {
-        return new TypeRhs(originalRhs.Origin,
+        var mutatedExpr = new TypeRhs(originalRhs.Origin,
             CreateType(originalRhs, val),
             new LiteralExpr(originalRhs.Origin, 3),
             CreateElements(originalRhs, val)
         );
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(mutatedExpr);
+        return mutatedExpr;
     }
 
     private List<Expression> CreateElements(INode originalNode, string type) {
@@ -107,7 +113,10 @@ public class CollectionInitReplacementMutator(string mutationTargetPos, string v
         var startPosition = int.Parse(positions[0]);
         var endPosition = int.Parse(positions[1]);
         
-        return expr.StartToken.pos == startPosition && expr.EndToken.pos == endPosition;
+        return expr.StartToken.pos == startPosition && 
+               expr.EndToken.pos == endPosition &&
+               !AlreadyMutated(expr) &&
+               !ContainsMutatedChildren(expr);
     }
 
     private bool IsTarget(TypeRhs typeRhs) {
@@ -116,7 +125,10 @@ public class CollectionInitReplacementMutator(string mutationTargetPos, string v
         var startPosition = int.Parse(positions[0]);
         var endPosition = int.Parse(positions[1]);
         
-        return typeRhs.StartToken.pos == startPosition && typeRhs.EndToken.pos == endPosition;
+        return typeRhs.StartToken.pos == startPosition && 
+               typeRhs.EndToken.pos == endPosition && 
+               !AlreadyMutated(typeRhs) &&
+               !ContainsMutatedChildren(typeRhs);
     }
     
     /// ---------------------------
@@ -144,6 +156,8 @@ public class CollectionInitReplacementMutator(string mutationTargetPos, string v
                 continue;
             HandleAssignmentRhs(rhs);
             if (TargetFound() && rhs is TypeRhs tpRhs && val != "") {
+                MutantGenerator.NumMutations++;
+                MutantGenerator.MutatedNodes.Add(tpRhs);
                 TargetAssignmentRhs = null;
                 rhss[i] = CreateArrayInit(tpRhs);
             }
@@ -154,6 +168,8 @@ public class CollectionInitReplacementMutator(string mutationTargetPos, string v
                 continue;
             HandleAssignmentRhs(rhs);
             if (TargetFound() && rhs is TypeRhs tpRhs && val == "") {
+                MutantGenerator.NumMutations++;
+                MutantGenerator.MutatedNodes.Add(tpRhs);
                 TargetAssignmentRhs = null;
                 tpRhs.ArrayDimensions = [new LiteralExpr(tpRhs.Origin, 0)];
                 tpRhs.InitDisplay = null;

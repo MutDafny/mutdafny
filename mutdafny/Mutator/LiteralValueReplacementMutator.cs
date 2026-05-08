@@ -29,11 +29,13 @@ public class LiteralValueReplacementMutator(string mutationTargetPos, string val
         }
 
         TargetExpression = null;
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(mutatedExpr);
         return mutatedExpr;
     }
     
     private bool IsTarget(LiteralExpr expr) {
-        return expr.Center.pos == int.Parse(MutationTargetPos);
+        return expr.Center.pos == int.Parse(MutationTargetPos) && !AlreadyMutated(expr);
     }
     
     /// -----------------

@@ -28,6 +28,8 @@ public class UnaryOpInsertionMutator(string mutationTargetPos, string op, ErrorR
        
         TargetExpression = null;
         _chainingExpressionParent = null;
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(mutatedExpr);
         return mutatedExpr;
     }
     

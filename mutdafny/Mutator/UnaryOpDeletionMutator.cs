@@ -29,6 +29,8 @@ public class UnaryOpDeletionMutator(string mutationTargetPos, ErrorReporter repo
         }
        
         TargetExpression = null;
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(mutatedExpr);
         return mutatedExpr;
     }
     

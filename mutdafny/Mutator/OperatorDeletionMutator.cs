@@ -6,6 +6,7 @@ public class OperatorDeletionMutator : ExprReplacementMutator
 {
     private BinaryExpr.Opcode _op;
     private readonly bool _shouldDeleteLhs;
+    private bool _alreadyCountedMut;
         
     public OperatorDeletionMutator(string mutationTargetPos, string val, ErrorReporter reporter) : base(mutationTargetPos, reporter)
     {
@@ -20,11 +21,20 @@ public class OperatorDeletionMutator : ExprReplacementMutator
         if (originalExpr is not BinaryExpr bExpr)
             return originalExpr;
         
-        return _shouldDeleteLhs ? bExpr.E1 : bExpr.E0;
+        var mutatedExpr = _shouldDeleteLhs ? bExpr.E1 : bExpr.E0;
+        if (!_alreadyCountedMut) {
+            MutantGenerator.NumMutations++;
+            _alreadyCountedMut = true;
+        }
+        MutantGenerator.MutatedNodes.Add(mutatedExpr);
+        return mutatedExpr;
     }
 
     private bool IsTarget(BinaryExpr expr) {
-        return expr.Op == _op;
+        var containsMutatedChildren = _shouldDeleteLhs ? 
+            ContainsMutatedChildren(expr.E0) : 
+            ContainsMutatedChildren(expr.E1);
+        return expr.Op == _op && !AlreadyMutated(expr) && !containsMutatedChildren;
     }
 
     /// ---------------------------

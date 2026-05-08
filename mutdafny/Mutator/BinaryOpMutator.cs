@@ -17,7 +17,7 @@ public class BinaryOpMutator(string mutationTargetPos, string op, ErrorReporter 
     }
     
     private bool IsTarget(BinaryExpr expr) {
-        return expr.Center.pos == int.Parse(MutationTargetPos);
+        return expr.Center.pos == int.Parse(MutationTargetPos) && !AlreadyMutated(expr);
     }
     
     /// ---------------------------
@@ -25,6 +25,8 @@ public class BinaryOpMutator(string mutationTargetPos, string op, ErrorReporter 
     /// ---------------------------
     protected override void VisitExpression(BinaryExpr bExpr) {
         if (IsTarget(bExpr)) {
+            MutantGenerator.NumMutations++;
+            MutantGenerator.MutatedNodes.Add(bExpr);
             TargetExpression = bExpr;
             Mutate(bExpr);
             return;

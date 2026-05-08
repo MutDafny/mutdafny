@@ -13,7 +13,9 @@ public class MethodBodyReplacementMutator(string mutationTargetPos, string repla
         var startPosition = int.Parse(positions[0]);
         var endPosition = int.Parse(positions[1]);
                 
-        return method.StartToken.pos == startPosition && method.EndToken.pos == endPosition;
+        return method.StartToken.pos == startPosition && 
+               method.EndToken.pos == endPosition && 
+               !AlreadyMutated(method);
     }
     
     private bool IsReplacement(Method method) {
@@ -30,6 +32,7 @@ public class MethodBodyReplacementMutator(string mutationTargetPos, string repla
             _targetMethod.Body == null || _replacementMethod.Body == null) 
             return;
 
+        MutantGenerator.NumMutations++;
         var cloner = new Cloner();
         var targetMethodBody = _targetMethod.Body.Clone(cloner);
         if (_targetMethod.Body is DividedBlockStmt dBlockStmt1) {
@@ -53,6 +56,7 @@ public class MethodBodyReplacementMutator(string mutationTargetPos, string repla
     /// -----------------
     protected override void HandleMethod(Method method) {
         if (IsTarget(method)) {
+            MutantGenerator.MutatedNodes.Add(method);
             _targetMethod = method;
             if (_replacementMethod != null) {
                 ReplaceMethodsBodies();
@@ -61,6 +65,7 @@ public class MethodBodyReplacementMutator(string mutationTargetPos, string repla
         }
 
         if (IsReplacement(method)) {
+            MutantGenerator.MutatedNodes.Add(method);
             _replacementMethod = method;
             if (_targetMethod != null) {
                 ReplaceMethodsBodies();

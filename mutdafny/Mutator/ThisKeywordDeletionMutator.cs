@@ -23,11 +23,15 @@ public class ThisKeywordDeletionMutator(string mutationTargetPos, ErrorReporter 
         }
         
         TargetExpression = null;
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(mutatedExpr);
+        ForbidChildrenMutation(mutatedExpr);
         return mutatedExpr;
     }
     
     private bool IsTarget(ExprDotName exprDName) {
-        return exprDName.Center.pos == int.Parse(MutationTargetPos);
+        return exprDName.Center.pos == int.Parse(MutationTargetPos) &&
+               !AlreadyMutated(exprDName) && !ContainsMutatedChildren(exprDName);
     }
     
     /// -----------------

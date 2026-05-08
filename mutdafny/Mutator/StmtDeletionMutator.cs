@@ -4,6 +4,7 @@ namespace MutDafny.Mutator;
 
 public class StmtDeletionMutator(string mutationTargetPos, ErrorReporter reporter) : Mutator(mutationTargetPos, reporter)
 {
+    private BlockStmt? _parentBlock;
     private IfStmt? _parentStmt;
     
     private bool IsTarget(int tokenPos) {
@@ -26,7 +27,9 @@ public class StmtDeletionMutator(string mutationTargetPos, ErrorReporter reporte
         foreach (var member in decl.Members) {
             if (member is not ConstantField cf)
                 continue;
-            if (IsTarget(cf.Center.pos)) {
+            if (IsTarget(cf.Center.pos) && !AlreadyMutated(cf) && !ContainsMutatedChildren(cf)) {
+                MutantGenerator.NumMutations++;
+                MutantGenerator.MutatedNodes.Add(cf.Rhs);
                 cf.Rhs = null;
                 return;
             }
@@ -36,7 +39,11 @@ public class StmtDeletionMutator(string mutationTargetPos, ErrorReporter reporte
     
     protected override void HandleMethod(Method method) {
         if (method.Body == null) return;
-        if (IsTarget(method.StartToken.pos, method.EndToken.pos)) {
+        if (IsTarget(method.StartToken.pos, method.EndToken.pos) && 
+            !AlreadyMutated(method) && !ContainsMutatedChildren(method)) 
+        {
+            MutantGenerator.NumMutations++;
+            MutantGenerator.MutatedNodes.Add(method);
             method.Body = method.Body is DividedBlockStmt ? 
                 new DividedBlockStmt(method.Body.Origin, [], null, []) : 
                 new BlockStmt(method.Body.Origin, []);
@@ -48,12 +55,15 @@ public class StmtDeletionMutator(string mutationTargetPos, ErrorReporter reporte
     
     protected override void HandleBlock(BlockStmt blockStmt) {
         if (blockStmt is DividedBlockStmt dBlockStmt) {
+            _parentBlock = dBlockStmt;
             HandleBlock(dBlockStmt.BodyInit);
             HandleBlock(dBlockStmt.BodyProper);
             HandleBlock(dBlockStmt.Body);
         } else {
+            _parentBlock = blockStmt;
             HandleBlock(blockStmt.Body);
         }
+        _parentBlock = null;
     }
     
     protected override void HandleBlock(List<Statement> statements) {
@@ -62,6 +72,10 @@ public class StmtDeletionMutator(string mutationTargetPos, ErrorReporter reporte
             
             HandleStatement(stmt);
             if (!TargetFound()) continue; // else mutate
+            if (_parentBlock != null) {
+                MutantGenerator.NumMutations++;
+                MutantGenerator.MutatedNodes.Add(_parentBlock);
+            }
             TargetStatement = null;
             statements.Remove(stmt);
             return;
@@ -69,7 +83,9 @@ public class StmtDeletionMutator(string mutationTargetPos, ErrorReporter reporte
     }
     
     protected override void VisitStatement(ConcreteAssignStatement cAStmt) {
-        if (IsTarget(cAStmt.StartToken.pos, cAStmt.EndToken.pos)) {
+        if (IsTarget(cAStmt.StartToken.pos, cAStmt.EndToken.pos) && 
+            !AlreadyMutated(cAStmt) && !ContainsMutatedChildren(cAStmt)) 
+        {
             TargetStatement = cAStmt;
             return;
         }
@@ -77,7 +93,9 @@ public class StmtDeletionMutator(string mutationTargetPos, ErrorReporter reporte
     }
     
     protected override void VisitStatement(ProduceStmt pStmt) {
-        if (IsTarget(pStmt.StartToken.pos, pStmt.EndToken.pos)) {
+        if (IsTarget(pStmt.StartToken.pos, pStmt.EndToken.pos) && 
+            !AlreadyMutated(pStmt) && !ContainsMutatedChildren(pStmt)) 
+        {
             TargetStatement = pStmt;
             return;
         }
@@ -85,11 +103,17 @@ public class StmtDeletionMutator(string mutationTargetPos, ErrorReporter reporte
     }
     
     protected override void VisitStatement(IfStmt ifStmt) {
-        if (IsTarget(ifStmt.StartToken.pos, ifStmt.EndToken.pos)) {
+        if (IsTarget(ifStmt.StartToken.pos, ifStmt.EndToken.pos) && 
+            !AlreadyMutated(ifStmt) && !ContainsMutatedChildren(ifStmt)) 
+        {
             TargetStatement = ifStmt;
             return;
         }
-        if (IsTarget(ifStmt.Thn.StartToken.pos, ifStmt.Thn.EndToken.pos)) {
+        if (IsTarget(ifStmt.Thn.StartToken.pos, ifStmt.Thn.EndToken.pos) && 
+            !AlreadyMutated(ifStmt.Thn) && !ContainsMutatedChildren(ifStmt.Thn)) 
+        {
+            MutantGenerator.NumMutations++;
+            MutantGenerator.MutatedNodes.Add(ifStmt);
             if (ifStmt.Els != null) {
                 RecursivelyMutateIfStmt(ifStmt);
             } else {
@@ -98,7 +122,11 @@ public class StmtDeletionMutator(string mutationTargetPos, ErrorReporter reporte
             _parentStmt = null;
             return;
         } 
-        if (ifStmt.Els != null && IsTarget(ifStmt.Els.StartToken.pos, ifStmt.Els.EndToken.pos)) {
+        if (ifStmt.Els != null && IsTarget(ifStmt.Els.StartToken.pos, ifStmt.Els.EndToken.pos) && 
+            !AlreadyMutated(ifStmt.Els) && !ContainsMutatedChildren(ifStmt.Els)) 
+        {
+            MutantGenerator.NumMutations++;
+            MutantGenerator.MutatedNodes.Add(ifStmt);
             ifStmt.Els = null;
             _parentStmt = null;
             return;
@@ -124,7 +152,9 @@ public class StmtDeletionMutator(string mutationTargetPos, ErrorReporter reporte
     }
     
     protected override void VisitStatement(BreakOrContinueStmt bcStmt) {
-        if (IsTarget(bcStmt.StartToken.pos, bcStmt.EndToken.pos)) {
+        if (IsTarget(bcStmt.StartToken.pos, bcStmt.EndToken.pos) && 
+            !AlreadyMutated(bcStmt) && !ContainsMutatedChildren(bcStmt)) 
+        {
             TargetStatement = bcStmt;
             return;
         }
@@ -133,8 +163,11 @@ public class StmtDeletionMutator(string mutationTargetPos, ErrorReporter reporte
     
     protected override void VisitStatement(AlternativeLoopStmt altLStmt) {
         foreach (var alt in altLStmt.Alternatives) {
-            if (!IsTarget(alt.Guard.StartToken.pos, alt.Guard.EndToken.pos)) 
+            if (!IsTarget(alt.Guard.StartToken.pos, alt.Guard.EndToken.pos) || 
+                AlreadyMutated(altLStmt) || ContainsMutatedChildren(altLStmt)) 
                 continue;
+            MutantGenerator.NumMutations++;
+            MutantGenerator.MutatedNodes.Add(altLStmt);
             altLStmt.Alternatives.Remove(alt);
             return;
         }
@@ -143,8 +176,11 @@ public class StmtDeletionMutator(string mutationTargetPos, ErrorReporter reporte
     
     protected override void VisitStatement(NestedMatchStmt nMatchStmt) {
         foreach (var cs in nMatchStmt.Cases) {
-            if (!IsTarget(cs.StartToken.pos, cs.EndToken.pos))
+            if (!IsTarget(cs.StartToken.pos, cs.EndToken.pos) || 
+                AlreadyMutated(cs) || ContainsMutatedChildren(cs))
                 continue;
+            MutantGenerator.NumMutations++;
+            MutantGenerator.MutatedNodes.Add(nMatchStmt);
             nMatchStmt.Cases.Remove(cs);
             return;
         }
@@ -153,8 +189,11 @@ public class StmtDeletionMutator(string mutationTargetPos, ErrorReporter reporte
     
     protected override void VisitExpression(NestedMatchExpr nMExpr) {
         foreach (var cs in nMExpr.Cases) {
-            if (!IsTarget(cs.StartToken.pos, cs.EndToken.pos))
+            if (!IsTarget(cs.StartToken.pos, cs.EndToken.pos) || 
+                AlreadyMutated(cs) || ContainsMutatedChildren(cs))
                 continue;
+            MutantGenerator.NumMutations++;
+            MutantGenerator.MutatedNodes.Add(nMExpr);
             nMExpr.Cases.Remove(cs);
             return;
         }

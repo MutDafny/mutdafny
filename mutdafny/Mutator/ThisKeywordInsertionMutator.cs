@@ -24,11 +24,15 @@ public class ThisKeywordInsertionMutator(string mutationTargetPos, ErrorReporter
         }
 
         TargetExpression = null;
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(mutatedExpr);
+        ForbidChildrenMutation(mutatedExpr);
         return mutatedExpr;
     }
 
     private bool IsTarget(NameSegment nSegExpr) {
-        return nSegExpr.Center.pos == int.Parse(MutationTargetPos);
+        return nSegExpr.Center.pos == int.Parse(MutationTargetPos) && 
+               !AlreadyMutated(nSegExpr) && !ContainsMutatedChildren(nSegExpr);
     }
 
     /// -----------------

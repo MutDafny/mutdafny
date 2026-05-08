@@ -8,11 +8,15 @@ public class BinaryOpBoolMutator(string mutationTargetPos, string val, ErrorRepo
 {
     protected override Expression CreateMutatedExpression(Expression originalExpr) {
         TargetExpression = null;
-        return new LiteralExpr(originalExpr.Origin, bool.Parse(val));
+        var mutatedExpr = new LiteralExpr(originalExpr.Origin, bool.Parse(val));
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(mutatedExpr);
+        return mutatedExpr;
     }
     
     private bool IsTarget(BinaryExpr expr) {
-        return expr.Center.pos == int.Parse(MutationTargetPos);
+        return expr.Center.pos == int.Parse(MutationTargetPos) && 
+               !AlreadyMutated(expr) && !ContainsMutatedChildren(expr);
     }
     
     /// -----------------

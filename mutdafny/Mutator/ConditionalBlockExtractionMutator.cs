@@ -11,8 +11,12 @@ public class ConditionalBlockExtractionMutator(string mutationTargetPos, ErrorRe
         List<Statement> statements = new List<Statement>();
         if (TargetStatement is BlockStmt bStmt) {
             statements = bStmt.Body;
+            MutantGenerator.NumMutations++;
+            MutantGenerator.MutatedNodes.AddRange(statements);
         } else if (TargetStatement != null) {
             statements.Add(TargetStatement);
+            MutantGenerator.NumMutations++;
+            MutantGenerator.MutatedNodes.Add(TargetStatement);
         }
         TargetStatement = null;
         return statements;
@@ -22,7 +26,10 @@ public class ConditionalBlockExtractionMutator(string mutationTargetPos, ErrorRe
         TargetExpression = null;
         if (originalExpr is not ITEExpr iteExpr)
             return originalExpr;
-        return _isElseBlock ? iteExpr.Els : iteExpr.Thn;
+        var mutatedExpr = _isElseBlock ? iteExpr.Els : iteExpr.Thn;
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(mutatedExpr);
+        return mutatedExpr;
     }
     
     private bool IsTarget(int startTokenPos, int endTokenPos) {
@@ -52,11 +59,15 @@ public class ConditionalBlockExtractionMutator(string mutationTargetPos, ErrorRe
     }
     
     protected override void VisitStatement(IfStmt ifStmt) {
-        if (IsTarget(ifStmt.Thn.StartToken.pos, ifStmt.Thn.EndToken.pos)) {
+        if (IsTarget(ifStmt.Thn.StartToken.pos, ifStmt.Thn.EndToken.pos) && 
+            !AlreadyMutated(ifStmt) && !ContainsMutatedChildren(ifStmt))
+        {
             TargetStatement = ifStmt.Thn;
             return;
         }
-        if (ifStmt.Els != null && IsTarget(ifStmt.Els.StartToken.pos, ifStmt.Els.EndToken.pos)) {
+        if (ifStmt.Els != null && IsTarget(ifStmt.Els.StartToken.pos, ifStmt.Els.EndToken.pos) && 
+            !AlreadyMutated(ifStmt) && !ContainsMutatedChildren(ifStmt))
+        {
             TargetStatement = ifStmt.Els;
             _isElseBlock = true;
             return;
@@ -65,11 +76,15 @@ public class ConditionalBlockExtractionMutator(string mutationTargetPos, ErrorRe
     }
     
     protected override void VisitExpression(ITEExpr iteExpr) {
-        if (IsTarget(iteExpr.Thn.StartToken.pos, iteExpr.Thn.EndToken.pos)) {
+        if (IsTarget(iteExpr.Thn.StartToken.pos, iteExpr.Thn.EndToken.pos) && 
+            !AlreadyMutated(iteExpr) && !ContainsMutatedChildren(iteExpr)) 
+        {
             TargetExpression = iteExpr.Thn;
             return;
         }
-        if (IsTarget(iteExpr.Els.StartToken.pos, iteExpr.Els.EndToken.pos)) {
+        if (IsTarget(iteExpr.Els.StartToken.pos, iteExpr.Els.EndToken.pos) && 
+            !AlreadyMutated(iteExpr) && !ContainsMutatedChildren(iteExpr)) 
+        {
             TargetExpression = iteExpr.Els;
             _isElseBlock = true;
             return;

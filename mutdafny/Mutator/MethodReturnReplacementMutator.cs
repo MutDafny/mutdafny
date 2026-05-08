@@ -12,14 +12,19 @@ public class MethodReturnReplacementMutator(string mutationTargetPos, string val
     private bool _isAssignReplacement;
     
     private bool IsTarget(Expression expr) {
-        return expr.Center.pos == int.Parse(MutationTargetPos);
+        return expr.Center.pos == int.Parse(MutationTargetPos) && 
+               !AlreadyMutated(expr) && !ContainsMutatedChildren(expr);
     }
     
     protected override Expression CreateMutatedExpression(Expression originalExpr) {
         TargetExpression = null;
+        var mutatedExpr = originalExpr;
         if (_types.Count != 0 || _childSuffixExpr == null || _childSuffixExpr is not ApplySuffix appSufExpr)
-            return CreateDefaultExpression(_types[0], originalExpr);
-        return originalExpr;
+            mutatedExpr = CreateDefaultExpression(_types[0], originalExpr);
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(mutatedExpr);
+        ForbidChildrenMutation(mutatedExpr);
+        return mutatedExpr;
     }
     
     private List<AssignmentRhs> CreateMutatedRhss(Expression originalRhs) {
@@ -74,6 +79,9 @@ public class MethodReturnReplacementMutator(string mutationTargetPos, string val
         _isAssignReplacement = false;
         if (TargetExpression == null) return; // target not found
         aStmt.Rhss = CreateMutatedRhss(TargetExpression);
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(aStmt);
+        aStmt.Rhss.ForEach(ForbidChildrenMutation);
         TargetExpression = null;
         _childSuffixExpr = null;
     }

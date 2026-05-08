@@ -1,8 +1,5 @@
-﻿using System.Numerics;
-using Microsoft.BaseTypes;
-using Microsoft.Dafny;
+﻿using Microsoft.Dafny;
 using Expression = Microsoft.Dafny.Expression;
-using LiteralExpr = Microsoft.Dafny.LiteralExpr;
 
 namespace MutDafny.Mutator;
 
@@ -11,11 +8,15 @@ public class MethodCallReplacementMutator(string mutationTargetPos, string repla
     private SuffixExpr? _childSuffixExpr;
     
     private Expression CreateMutatedExpression(Expression originalExpr) {
-        if (_childSuffixExpr is ApplySuffix appSufExpr && appSufExpr.Lhs is NameSegment nSegExpr) {
-            nSegExpr.Name = replacementMethodName;
-            return appSufExpr;
-        }
-        return originalExpr;
+        if (_childSuffixExpr is not ApplySuffix appSufExpr || 
+            appSufExpr.Lhs is not NameSegment nSegExpr || 
+            AlreadyMutated(appSufExpr.Lhs))
+            return originalExpr;
+        
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(appSufExpr.Lhs);
+        nSegExpr.Name = replacementMethodName;
+        return appSufExpr;
     }
     
     private bool IsTarget(Expression expr) {
@@ -54,7 +55,7 @@ public class MethodCallReplacementMutator(string mutationTargetPos, string repla
     }
     
     protected override void VisitExpression(SuffixExpr suffixExpr) {
-        if (IsTarget(suffixExpr)) {
+        if (IsTarget(suffixExpr) && !AlreadyMutated(suffixExpr.Lhs)) {
             _childSuffixExpr = suffixExpr;
             TargetExpression = suffixExpr;
             return;

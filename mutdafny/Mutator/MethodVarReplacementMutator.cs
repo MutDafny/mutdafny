@@ -10,11 +10,17 @@ public class MethodVarReplacementMutator(string mutationTargetPos, string val, E
     
     protected override Expression CreateMutatedExpression(Expression originalExpr) {
         TargetExpression = null;
-        return new NameSegment(originalExpr.Origin, _vars[0], null);
+        var mutatedExpr = new NameSegment(originalExpr.Origin, _vars[0], null);
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(mutatedExpr);
+        return mutatedExpr;
     }
 
     private NameSegment CreateMutatedExpression(Expression originalExpr, string var) {
-        return new NameSegment(originalExpr.Origin, var, null);
+        var mutatedExpr = new NameSegment(originalExpr.Origin, var, null);
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(mutatedExpr);
+        return mutatedExpr;
     }
     
     private List<AssignmentRhs> CreateMutatedRhss() {
@@ -28,7 +34,8 @@ public class MethodVarReplacementMutator(string mutationTargetPos, string val, E
     }
 
     private bool IsTarget(SuffixExpr expr) {
-        return expr.Center.pos == int.Parse(MutationTargetPos);
+        return expr.Center.pos == int.Parse(MutationTargetPos) && 
+               !AlreadyMutated(expr) && !ContainsMutatedChildren(expr);
     }
     
     /// --------------------------

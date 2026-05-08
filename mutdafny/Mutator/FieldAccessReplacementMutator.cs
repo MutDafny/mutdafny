@@ -8,7 +8,8 @@ public class FieldAccessReplacementMutator(string mutationTargetPos, string fiel
     private ChainingExpression? _chainingExpressionParent;
 
     private bool IsTarget(ExprDotName exprDName) {
-        return exprDName.Center.pos == int.Parse(MutationTargetPos);
+        return exprDName.Center.pos == int.Parse(MutationTargetPos) &&
+               !AlreadyMutated(exprDName) && !ContainsMutatedChildren(exprDName);
     }
 
     protected override Expression CreateMutatedExpression(Expression originalExpr) {
@@ -31,6 +32,9 @@ public class FieldAccessReplacementMutator(string mutationTargetPos, string fiel
         }
         
         TargetExpression = null;
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(mutatedExpr);
+        ForbidChildrenMutation(mutatedExpr);
         return mutatedExpr;
     }
     

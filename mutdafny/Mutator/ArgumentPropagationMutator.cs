@@ -10,14 +10,18 @@ public class ArgumentPropagationMutator(string mutationTargetPos, string val, Er
     private bool _isAssignReplacement;
     
     private bool IsTarget(Expression expr) {
-        return expr.Center.pos == int.Parse(MutationTargetPos);
+        return expr.Center.pos == int.Parse(MutationTargetPos) && 
+               !AlreadyMutated(expr) && !ContainsMutatedChildren(expr);
     }
     
     protected override Expression CreateMutatedExpression(Expression originalExpr) {
         TargetExpression = null;
         if (_replacementArgsPos.Count == 0 || _childSuffixExpr == null || _childSuffixExpr is not ApplySuffix appSufExpr)
             return originalExpr;
-        return appSufExpr.Bindings.ArgumentBindings[_replacementArgsPos[0]].Actual;
+        var mutatedExpr = appSufExpr.Bindings.ArgumentBindings[_replacementArgsPos[0]].Actual;
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(mutatedExpr);
+        return mutatedExpr;
     }
     
     private List<AssignmentRhs> CreateArgumentPropagationRhss() {

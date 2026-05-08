@@ -22,6 +22,9 @@ public class SwapVarDeclMutator(string mutationTargetPos, string replacementPos,
             _replacementStmt.Assign is not AssignStatement aStmt2)
             return;
         
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(aStmt1);
+        MutantGenerator.MutatedNodes.Add(aStmt2);
         List<AssignmentRhs> targetStmtRhs = new List<AssignmentRhs>(aStmt1.Rhss);
         aStmt1.Rhss = aStmt2.Rhss;
         aStmt2.Rhss = targetStmtRhs;
@@ -32,6 +35,8 @@ public class SwapVarDeclMutator(string mutationTargetPos, string replacementPos,
     /// -----------------
     protected override void VisitStatement(VarDeclStmt vDeclStmt) {
         if (IsTarget(vDeclStmt)) {
+            if (AlreadyMutated(vDeclStmt)) return;
+            
             _targetStmt = vDeclStmt;
             TargetStatement = vDeclStmt;
             if (_replacementStmt != null) {
@@ -41,6 +46,8 @@ public class SwapVarDeclMutator(string mutationTargetPos, string replacementPos,
         }
 
         if (IsReplacement(vDeclStmt)) {
+            if (AlreadyMutated(vDeclStmt)) return;
+            
             _replacementStmt = vDeclStmt;
             if (_targetStmt != null) {
                 ReplaceStmtsRhss();

@@ -7,6 +7,8 @@ public class BreakInsertionMutator(string mutationTargetPos, ErrorReporter repor
     private void Mutate(BlockStmt blockStmt) {
         var breakStmt = new BreakOrContinueStmt(blockStmt.Origin, 1, false, null);
         blockStmt.Body.Insert(0, breakStmt);
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(breakStmt);
     }
     
     private bool IsTarget(Statement stmt) {
