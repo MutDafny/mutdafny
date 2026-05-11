@@ -6,6 +6,8 @@ public class ConditionalBlockExtractionMutator(string mutationTargetPos, ErrorRe
     : ExprReplacementMutator(mutationTargetPos, reporter)
 {
     private bool _isElseBlock;
+    private IfStmt? _parentIfStmt;
+    private ITEExpr? _parentITEExpr;
 
     private List<Statement> CreateMutatedStatement() {
         List<Statement> statements = new List<Statement>();
@@ -59,36 +61,40 @@ public class ConditionalBlockExtractionMutator(string mutationTargetPos, ErrorRe
     }
     
     protected override void VisitStatement(IfStmt ifStmt) {
+        _parentIfStmt ??= ifStmt;
         if (IsTarget(ifStmt.Thn.StartToken.pos, ifStmt.Thn.EndToken.pos) && 
-            !AlreadyMutated(ifStmt) && !ContainsMutatedChildren(ifStmt))
+            !AlreadyMutated(_parentIfStmt) && !ContainsMutatedChildren(_parentIfStmt))
         {
             TargetStatement = ifStmt.Thn;
             return;
         }
         if (ifStmt.Els != null && IsTarget(ifStmt.Els.StartToken.pos, ifStmt.Els.EndToken.pos) && 
-            !AlreadyMutated(ifStmt) && !ContainsMutatedChildren(ifStmt))
+            !AlreadyMutated(_parentIfStmt) && !ContainsMutatedChildren(_parentIfStmt))
         {
             TargetStatement = ifStmt.Els;
             _isElseBlock = true;
             return;
         }
         base.VisitStatement(ifStmt);
+        _parentIfStmt = null;
     }
     
     protected override void VisitExpression(ITEExpr iteExpr) {
+        _parentITEExpr ??= iteExpr;
         if (IsTarget(iteExpr.Thn.StartToken.pos, iteExpr.Thn.EndToken.pos) && 
-            !AlreadyMutated(iteExpr) && !ContainsMutatedChildren(iteExpr)) 
+            !AlreadyMutated(_parentITEExpr) && !ContainsMutatedChildren(_parentITEExpr)) 
         {
             TargetExpression = iteExpr.Thn;
             return;
         }
         if (IsTarget(iteExpr.Els.StartToken.pos, iteExpr.Els.EndToken.pos) && 
-            !AlreadyMutated(iteExpr) && !ContainsMutatedChildren(iteExpr)) 
+            !AlreadyMutated(_parentITEExpr) && !ContainsMutatedChildren(_parentITEExpr)) 
         {
             TargetExpression = iteExpr.Els;
             _isElseBlock = true;
             return;
         }
         base.VisitExpression(iteExpr);
+        _parentITEExpr = null;
     }
 }
