@@ -16,7 +16,8 @@ public abstract class Mutator(string mutationTargetPos, ErrorReporter reporter) 
         return MutantGenerator.MutatedNodes.Contains(nodeUnderMut);
     }
 
-    protected bool ContainsMutatedChildren(Node nodeUnderMut) {
+    protected bool ContainsMutatedChildren(Node? nodeUnderMut) {
+        if (nodeUnderMut == null) return false;
         var children = new List<INode>(nodeUnderMut.Children);
         if (nodeUnderMut is ParensExpression parensExpr) children.Add(parensExpr.E);
         

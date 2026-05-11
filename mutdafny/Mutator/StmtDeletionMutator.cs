@@ -104,13 +104,15 @@ public class StmtDeletionMutator(string mutationTargetPos, ErrorReporter reporte
     
     protected override void VisitStatement(IfStmt ifStmt) {
         if (IsTarget(ifStmt.StartToken.pos, ifStmt.EndToken.pos) && 
-            !AlreadyMutated(ifStmt) && !ContainsMutatedChildren(ifStmt)) 
+            !AlreadyMutated(ifStmt) && !ContainsMutatedChildren(ifStmt) &&
+            !ContainsMutatedChildren(ifStmt.Guard)) 
         {
             TargetStatement = ifStmt;
             return;
         }
         if (IsTarget(ifStmt.Thn.StartToken.pos, ifStmt.Thn.EndToken.pos) && 
-            !AlreadyMutated(ifStmt.Thn) && !ContainsMutatedChildren(ifStmt.Thn)) 
+            !AlreadyMutated(ifStmt.Thn) && !ContainsMutatedChildren(ifStmt.Thn) && 
+            !ContainsMutatedChildren(ifStmt.Guard)) 
         {
             MutantGenerator.NumMutations++;
             MutantGenerator.MutatedNodes.Add(ifStmt);
