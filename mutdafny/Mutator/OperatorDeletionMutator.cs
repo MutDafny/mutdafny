@@ -32,8 +32,8 @@ public class OperatorDeletionMutator : ExprReplacementMutator
 
     private bool IsTarget(BinaryExpr expr) {
         var containsMutatedChildren = _shouldDeleteLhs ? 
-            ContainsMutatedChildren(expr.E0) : 
-            ContainsMutatedChildren(expr.E1);
+            AlreadyMutated(expr.E0) || ContainsMutatedChildren(expr.E0) : 
+            AlreadyMutated(expr.E1) || ContainsMutatedChildren(expr.E1);
         return expr.Op == _op && !AlreadyMutated(expr) && !containsMutatedChildren;
     }
 
