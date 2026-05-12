@@ -32,6 +32,8 @@ public class ArgumentPropagationMutator(string mutationTargetPos, string val, Er
         foreach (var argPos in _replacementArgsPos) {
             var newExprRhs = new ExprRhs(appSufExpr.Bindings.ArgumentBindings[argPos].Actual);
             rhss.Add(newExprRhs);
+            MutantGenerator.NumMutations++;
+            MutantGenerator.MutatedNodes.Add(appSufExpr.Bindings.ArgumentBindings[argPos].Actual);
         }
         return rhss; 
     }

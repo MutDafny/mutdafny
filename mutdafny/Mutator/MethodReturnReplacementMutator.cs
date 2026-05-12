@@ -35,9 +35,13 @@ public class MethodReturnReplacementMutator(string mutationTargetPos, string val
     
     private List<AssignmentRhs> CreateDefaultRhss(Expression originalRhs) {
         var rhss = new List<AssignmentRhs>();
-        foreach (var type in _types) {
-            var newExprRhs = new ExprRhs(CreateDefaultExpression(type, originalRhs));
+        foreach (var type in _types)
+        {
+            var newRhs = CreateDefaultExpression(type, originalRhs);
+            var newExprRhs = new ExprRhs(newRhs);
             rhss.Add(newExprRhs);
+            MutantGenerator.NumMutations++;
+            MutantGenerator.MutatedNodes.Add(newRhs);
         }
         return rhss; 
     }
