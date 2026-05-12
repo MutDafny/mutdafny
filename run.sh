@@ -167,8 +167,12 @@ else
 
     done
 
-    if [ $(wc -l < targets.csv 2>/dev/null || echo 0) -lt $NUM_MUTS ]; then echo "Consumed all targets"; fi
-    if [ $NUM_TRIES -ge $MAX_TRIES ]; then echo "Reached max combination tries"; fi
+    line_count=$(wc -l < targets.csv 2>/dev/null || echo 0)
+    if [ "$line_count" -lt "$NUM_MUTS" ]; then 
+        echo "Consumed all targets"
+    else
+        echo "Reached max combination tries"
+    fi
 fi
 
 rm targets.csv
