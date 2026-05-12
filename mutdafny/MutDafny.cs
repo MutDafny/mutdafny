@@ -128,11 +128,12 @@ public class MutantGenerator(int numMutations, string mutationTargetPos, string 
                 _mutationTargetPos = toTryTargets[targetIdx].Item1;
                 _mutationOperator = toTryTargets[targetIdx].Item2;
                 _mutationArg = toTryTargets[targetIdx].Item3;
+                toTryTargets.RemoveAt(targetIdx);
+                if (_mutationOperator == "VDL") continue; // too difficult to conciliate with other types of mutation
+                
                 MutateProgram(program);
-
                 if (initialCount < NumMutations)
                     _usedTargets.Add((_mutationTargetPos, _mutationOperator, _mutationArg));
-                toTryTargets.RemoveAt(targetIdx);
             }
             
             // check if expected number of mutations was reached
