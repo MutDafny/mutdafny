@@ -8,6 +8,7 @@ public class ArgumentPropagationMutator(string mutationTargetPos, string val, Er
     private readonly List<int> _replacementArgsPos = val.Split('-').Select(int.Parse).ToList();
     private SuffixExpr? _childSuffixExpr;
     private bool _isAssignReplacement;
+    private bool _alreadyCountedMut;
     
     private bool IsTarget(Expression expr) {
         return expr.Center.pos == int.Parse(MutationTargetPos) && 
@@ -19,7 +20,10 @@ public class ArgumentPropagationMutator(string mutationTargetPos, string val, Er
         if (_replacementArgsPos.Count == 0 || _childSuffixExpr == null || _childSuffixExpr is not ApplySuffix appSufExpr)
             return originalExpr;
         var mutatedExpr = appSufExpr.Bindings.ArgumentBindings[_replacementArgsPos[0]].Actual;
-        MutantGenerator.NumMutations++;
+        if (!_alreadyCountedMut) {
+            MutantGenerator.NumMutations++;
+            _alreadyCountedMut = true;
+        }
         MutantGenerator.MutatedNodes.Add(mutatedExpr);
         return mutatedExpr;
     }
@@ -32,7 +36,10 @@ public class ArgumentPropagationMutator(string mutationTargetPos, string val, Er
         foreach (var argPos in _replacementArgsPos) {
             var newExprRhs = new ExprRhs(appSufExpr.Bindings.ArgumentBindings[argPos].Actual);
             rhss.Add(newExprRhs);
-            MutantGenerator.NumMutations++;
+            if (!_alreadyCountedMut) {
+                MutantGenerator.NumMutations++;
+                _alreadyCountedMut = true;
+            }
             MutantGenerator.MutatedNodes.Add(appSufExpr.Bindings.ArgumentBindings[argPos].Actual);
         }
         return rhss; 

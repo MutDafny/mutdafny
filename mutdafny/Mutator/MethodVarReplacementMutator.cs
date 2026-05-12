@@ -7,18 +7,25 @@ public class MethodVarReplacementMutator(string mutationTargetPos, string val, E
 {
     private readonly List<string> _vars = val.Split('-').ToList();
     private bool _isAssignReplacement;
+    private bool _alreadyCountedMut;
     
     protected override Expression CreateMutatedExpression(Expression originalExpr) {
         TargetExpression = null;
         var mutatedExpr = new NameSegment(originalExpr.Origin, _vars[0], null);
-        MutantGenerator.NumMutations++;
+        if (!_alreadyCountedMut) {
+            MutantGenerator.NumMutations++;
+            _alreadyCountedMut = true;
+        }
         MutantGenerator.MutatedNodes.Add(mutatedExpr);
         return mutatedExpr;
     }
 
     private NameSegment CreateMutatedExpression(Expression originalExpr, string var) {
         var mutatedExpr = new NameSegment(originalExpr.Origin, var, null);
-        MutantGenerator.NumMutations++;
+        if (!_alreadyCountedMut) {
+            MutantGenerator.NumMutations++;
+            _alreadyCountedMut = true;
+        }
         MutantGenerator.MutatedNodes.Add(mutatedExpr);
         return mutatedExpr;
     }

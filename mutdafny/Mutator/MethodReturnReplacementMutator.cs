@@ -10,6 +10,7 @@ public class MethodReturnReplacementMutator(string mutationTargetPos, string val
     private readonly List<string> _types = val.Split('-').ToList();
     private SuffixExpr? _childSuffixExpr;
     private bool _isAssignReplacement;
+    private bool _alreadyCountedMut;
     
     private bool IsTarget(Expression expr) {
         return expr.Center.pos == int.Parse(MutationTargetPos) && 
@@ -21,7 +22,10 @@ public class MethodReturnReplacementMutator(string mutationTargetPos, string val
         var mutatedExpr = originalExpr;
         if (_types.Count != 0 || _childSuffixExpr == null || _childSuffixExpr is not ApplySuffix appSufExpr)
             mutatedExpr = CreateDefaultExpression(_types[0], originalExpr);
-        MutantGenerator.NumMutations++;
+        if (!_alreadyCountedMut) {
+            MutantGenerator.NumMutations++;
+            _alreadyCountedMut = true;
+        }
         MutantGenerator.MutatedNodes.Add(mutatedExpr);
         ForbidChildrenMutation(mutatedExpr);
         return mutatedExpr;
@@ -40,7 +44,10 @@ public class MethodReturnReplacementMutator(string mutationTargetPos, string val
             var newRhs = CreateDefaultExpression(type, originalRhs);
             var newExprRhs = new ExprRhs(newRhs);
             rhss.Add(newExprRhs);
-            MutantGenerator.NumMutations++;
+            if (!_alreadyCountedMut) {
+                MutantGenerator.NumMutations++;
+                _alreadyCountedMut = true;
+            }
             MutantGenerator.MutatedNodes.Add(newRhs);
         }
         return rhss; 
@@ -83,8 +90,6 @@ public class MethodReturnReplacementMutator(string mutationTargetPos, string val
         _isAssignReplacement = false;
         if (TargetExpression == null) return; // target not found
         aStmt.Rhss = CreateMutatedRhss(TargetExpression);
-        MutantGenerator.NumMutations++;
-        MutantGenerator.MutatedNodes.Add(aStmt);
         aStmt.Rhss.ForEach(ForbidChildrenMutation);
         TargetExpression = null;
         _childSuffixExpr = null;
