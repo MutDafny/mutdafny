@@ -7,6 +7,7 @@ namespace MutDafny.Visitor;
 public class SpecHelperFinder(ErrorReporter reporter): Visitor("-1", reporter)
 {
     public static List<string> SpecHelpers { get; } = [];
+    public static List<string> Lemmas { get; } = [];
     private bool _isInsideSpec;
     
     /// ---------------------------
@@ -58,6 +59,8 @@ public class SpecHelperFinder(ErrorReporter reporter): Visitor("-1", reporter)
                 VisitReadsModifies(mf.Reads);
             }
             if (member is Method m) { // includes lemma
+                if (m is Lemma || m is ExtremeLemma || m is PrefixLemma || m is TwoStateLemma)
+                    Lemmas.Add(m.Name);
                 VisitReadsModifies(m.Mod);   
                 if (m.Body == null) return;
                 HandleBlock(m.Body);

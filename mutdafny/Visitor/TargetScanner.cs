@@ -83,4 +83,23 @@ public abstract class TargetScanner(string MutationTargetURI, List<string> opera
             base.Find(module);
         }
     }
+    
+    /// -----------------
+    /// Utils
+    /// -----------------
+    protected bool ContainsLemmaChild(Node node) {
+        var children = new List<INode>(node.Children);
+        if (node is ParensExpression parensExpr) children.Add(parensExpr.E);
+        
+        foreach (var child in children) {
+            if (child is not Node childNode) continue;
+            if (child is NameSegment nSegExpr && SpecHelperFinder.Lemmas.Contains(nSegExpr.Name))
+                return true;
+            if (child is MemberSelectExpr mSelExpr && SpecHelperFinder.Lemmas.Contains(mSelExpr.MemberName))
+                return true;
+            if (ContainsLemmaChild(childNode))
+                return true;
+        }
+        return false;
+    }
 }

@@ -217,7 +217,8 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
 
     private bool ExcludeSWSTarget(Statement stmt) {
         return stmt is PrintStmt || stmt is OpaqueBlock || stmt is PredicateStmt || stmt is CalcStmt ||
-               (stmt is VarDeclStmt && stmt.CoveredTokens.Select((e) => e.val).Contains("ghost"));
+               (stmt is VarDeclStmt && stmt.CoveredTokens.Select((e) => e.val).Contains("ghost")) ||
+               (stmt is AssignStatement aStmt && ContainsLemmaChild(aStmt));
     }
     
     /// -------------------------------------
@@ -335,6 +336,11 @@ public class PreResolveTargetScanner(string mutationTargetURI, List<string> oper
 
         if (_scanThisKeywordTargets) return;
         base.VisitStatement(cAStmt);
+    }
+    
+    protected override void VisitStatement(AssignStatement aStmt) {
+        if (ContainsLemmaChild(aStmt)) return;
+        base.VisitStatement(aStmt);
     }
     
     protected override void VisitStatement(VarDeclStmt vDeclStmt) {        

@@ -617,6 +617,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     }
     
     protected override void VisitStatement(AssignStatement aStmt) {
+        if (ContainsLemmaChild(aStmt)) return;
         base.VisitStatement(aStmt);
         VisitLhss(aStmt);
         
