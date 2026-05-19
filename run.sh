@@ -46,6 +46,7 @@ mkdir -p mutants
 mkdir -p mutants/alive
 mkdir -p mutants/timed-out
 mkdir -p mutants/killed
+mkdir -p mutants/invalid
 
 # ------------------------------------------------------------------------------ MutDafny utils
 
@@ -97,8 +98,8 @@ process_output() {
     if [[ -z $verification_finished ]]; then # verification did not finish due to invalid program
 
         if [ -f *.dfy ]; then
-            rm *.dfy
             echo Error: mutant is invalid
+            mv *.dfy mutants/invalid
         else
             echo Could not apply $NUM_MUTS mutations to the program
         fi
