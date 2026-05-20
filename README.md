@@ -27,8 +27,16 @@ cd mutdafny && dotnet build
 ```
 
 4. **Run mutdafny**
+
+4.1. **On a single file**
 ```
-./run.sh program_file
+bash run.sh program_file [--num_mutations n (default 1)]
+```
+
+4.2. **On multiple files in parallel**
+```
+bash gen-jobs.sh path_to_dataset [--num_mutations n (default 1)]
+bash run-jobs.sh
 ```
 
 ## Mutation Operators
