@@ -38,6 +38,7 @@ bash run.sh program_file [--num_mutations n (default 1)]
 bash gen-jobs.sh path_to_dataset [--num_mutations n (default 1)]
 bash run-jobs.sh
 ```
+**Note**: Requires [GNU Parallel](https://www.gnu.org/software/parallel/).
 
 ## Mutation Operators
 
