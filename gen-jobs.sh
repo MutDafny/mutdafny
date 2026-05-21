@@ -67,7 +67,8 @@ for program_file in "$INPUT_DATASET_DIR"/*.dfy; do
     echo "bash $master_job_script_file_path \
       \"$program_file\" \
       --num_mutations $NUM_MUTS \
-      --run_dir \"$job_script_dir_path\" > \"$job_log_file_path\" 2>&1" >> "$job_script_file_path"
+      --run_dir \"$job_script_dir_path\" \
+      --output_dir \"$SCRIPT_DIR/mutants/$NUM_MUTS-mut\" > \"$job_log_file_path\" 2>&1" >> "$job_script_file_path"
 done
 
 echo "Jobs have been created. Please run the $SCRIPT_DIR/run-jobs.sh script on the generated jobs, e.g., $SCRIPT_DIR/run-jobs.sh --jobs_dir_path $jobs_dir_path."

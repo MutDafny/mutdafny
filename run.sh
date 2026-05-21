@@ -10,7 +10,8 @@
 # run.sh
 #   <full path to the program under test, e.g., $SCRIPT_DIR/../DafnyBench/DafnyBench/dataset/ground_truth/630-dafny_tmp_tmpz2kokaiq_Solution.dfy> 
 #   [--num_mutations <the number of mutations to apply to the input program, e.g., 1 (by default)>]
-#   [--run_dir <the directory where the script should be run, e.g., ./ (by deafult)>]
+#   [--run_dir <the directory where the script should be run, e.g., $SCRIPT_DIR (by deafult)>]
+#   [--output_dir <the directory where the mutants will be stores, e.g., $SCRIPT_DIR (by deafult)>]
 #   [help]
 # ------------------------------------------------------------------------------ General utils
 
@@ -27,9 +28,10 @@ USAGE="Usage: ${BASH_SOURCE[0]}
    <full path to the program under test, e.g., $SCRIPT_DIR/../DafnyBench/DafnyBench/dataset/ground_truth/630-dafny_tmp_tmpz2kokaiq_Solution.dfy>
    [--num_mutations <the number of mutations to apply to the input program, e.g., 1 (by default)>]
    [--run_dir <the directory where the script should be run, e.g., ./ (by deafult)>]
+   [--output_dir <the directory where the mutants will be stores, e.g., $SCRIPT_DIR (by deafult)>]
    [help]"
 
-if [ "$#" -ne "1" ] && [ "$#" -ne "3" ] && [ "$#" -ne "5" ]; then
+if [ "$#" -ne "1" ] && [ "$#" -ne "3" ] && [ "$#" -ne "5" ] && [ "$#" -ne "7" ]; then
   die "$USAGE"
 fi
 
@@ -39,10 +41,11 @@ if [ "$#" -eq "1" ] && [ "$1" = "--help" ]; then
 fi
 
 PROGRAM=$1;
-PROGRAM="$(cd "$(dirname "$PROGRAM")" && pwd)/$(basename "$PROGRAM")"
+PROGRAM="$(cd "$(dirname "$PROGRAM")" && pwd)/$(basename "$PROGRAM")" # Get full path
 shift
 NUM_MUTS=1
-RUN_DIR="./"
+RUN_DIR="$SCRIPT_DIR"
+OUT_DIR="$SCRIPT_DIR/mutants"
 while [[ "$1" = --* ]]; do
   OPTION=$1; shift
   case $OPTION in
@@ -52,6 +55,9 @@ while [[ "$1" = --* ]]; do
     (--run_dir)
       RUN_DIR=$1;
       shift;;
+    (--output_dir)
+      OUT_DIR=$1;
+      shift;;
     (--help)
       echo "$USAGE";
       exit 0;;
@@ -60,16 +66,17 @@ while [[ "$1" = --* ]]; do
   esac
 done
 
-[ -d "$RUN_DIR" ] || die "[ERROR] $RUN_DIR does not exist!"
+# ------------------------------------------------------------------------------ Setup
 
-# ------------------------------------------------------------------------------ Cleanup
-
+mkdir -p "$RUN_DIR"
+mkdir -p "$OUT_DIR"
+OUT_DIR=$(cd "$OUT_DIR" && pwd) # Get full path
 mkdir -p "$SCRIPT_DIR/original"
-mkdir -p "$SCRIPT_DIR/mutants"
-mkdir -p "$SCRIPT_DIR/mutants/alive"
-mkdir -p "$SCRIPT_DIR/mutants/timed-out"
-mkdir -p "$SCRIPT_DIR/mutants/killed"
-mkdir -p "$SCRIPT_DIR/mutants/invalid"
+mkdir -p "$OUT_DIR"
+mkdir -p "$OUT_DIR/alive"
+mkdir -p "$OUT_DIR/timed-out"
+mkdir -p "$OUT_DIR/killed"
+mkdir -p "$OUT_DIR/invalid"
 
 # ------------------------------------------------------------------------------ MutDafny utils
 
@@ -122,7 +129,7 @@ process_output() {
 
         if [ -f *.dfy ]; then
             echo Error: mutant is invalid
-            mv *.dfy "$SCRIPT_DIR/mutants/invalid"
+            mv *.dfy "$OUT_DIR/invalid"
         else
             echo Could not apply $NUM_MUTS mutations to the program
         fi
@@ -132,13 +139,13 @@ process_output() {
         output_dir=""
         if [[ -n $timed_out ]]; then
             echo Verification timed out
-            output_dir="$SCRIPT_DIR/mutants/timed-out"
+            output_dir="$OUT_DIR/timed-out"
         elif [[ -n $verified ]]; then 
             echo Verification succeeded: mutant is alive
-            output_dir="$SCRIPT_DIR/mutants/alive"
+            output_dir="$OUT_DIR/alive"
         else 
             echo Verification failed: mutant was killed
-            output_dir="$SCRIPT_DIR/mutants/killed"
+            output_dir="$OUT_DIR/killed"
         fi
 
         mv *.dfy $output_dir
