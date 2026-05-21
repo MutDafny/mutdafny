@@ -7,7 +7,6 @@
 # Usage:
 # run-jobs.sh
 #   --jobs_dir_path <full path>
-#   [--seconds_per_job <time in seconds allowed to run each job, 360 seconds by default.]
 #   [--max_number_batches <maximum number of batches (where one batch is composed by many jobs), 32 by default>]
 #   [--memory <amount of RAM per job in MegaBytes, 1024 by default (only used on Clusters)>]
 #   [help]
@@ -150,7 +149,6 @@ _run_batch_script() {
 
 USAGE="Usage: ${BASH_SOURCE[0]} \
   [--jobs_dir_path <full path to jobs directory, $SCRIPT_DIR/jobs by default>] \
-  [--seconds_per_job <time in seconds allowed to run each job, 360 seconds by default>] \
   [--max_number_batches <maximum number of batches (where one batch is composed by many jobs), 32 by default>] \
   [--memory <amount of RAM per job in MegaBytes, 1024 by default (only used on Clusters)>] \
   [help]"
@@ -206,7 +204,7 @@ find "$JOBS_DIR_PATH" -mindepth 1 -maxdepth 1 -type f -name "batch-*.txt" -exec 
 # How many jobs have not been completed successfully?
 number_of_jobs_to_run=0
 while read -r script_file_path; do
-  log_file_path=$(echo "$script_file_path" | sed 's|/jobs/|/logs/|g' | sed 's|job.sh$|job.log|g')
+  log_file_path=$(echo "$script_file_path" | sed 's|job.sh$|job.log|g')
   if [ -s "$log_file_path" ]; then # Log exists and it is not empty
     if ! tail -n1 "$log_file_path" | grep -q "^DONE\!$"; then
       number_of_jobs_to_run=$((number_of_jobs_to_run+1))
@@ -231,7 +229,7 @@ if [ "$host_name" == "submit.grid.up.pt" ]; then # Cluster path (sbatch)
 
   while read -r script_file_path; do
     # Has this job been completed successfully?
-    log_file_path=$(echo "$script_file_path" | sed 's|/jobs/|/logs/|g' | sed 's|job.sh$|job.log|g')
+    log_file_path=$(echo "$script_file_path" | sed 's|job.sh$|job.log|g')
     if [ -s "$log_file_path" ]; then # Log exists and it is not empty
       if tail -n1 "$log_file_path" | grep -q "^DONE\!$"; then
         continue
@@ -303,7 +301,7 @@ else # Local path (GNU Parallel)
 
   while read -r script_file_path; do
     # Has this job been completed successfully?
-    log_file_path=$(echo "$script_file_path" | sed 's|/jobs/|/logs/|g' | sed 's|job.sh$|job.log|g')
+    log_file_path=$(echo "$script_file_path" | sed 's|job.sh$|job.log|g')
     if [ -s "$log_file_path" ]; then # Log exists and it is not empty
       if tail -n1 "$log_file_path" | grep -q "^DONE\!$"; then
         continue
@@ -317,7 +315,7 @@ else # Local path (GNU Parallel)
 
     timefactor=$(grep "^# timefactor:" "$script_file_path" | cut -f2 -d':')
     script_seconds_per_job=$(echo "$SECONDS_PER_JOB * $timefactor" | bc)
-    echo "timeout --signal=SIGTERM ${script_seconds_per_job}s bash \"$script_file_path\"" >> "$all_jobs_file_path"
+    echo "bash \"$script_file_path\"" >> "$all_jobs_file_path"
   done < <(find "$JOBS_DIR_PATH" -type f -name "job.sh" | shuf)
 
   number_of_cpus=$(_get_number_of_cpus)

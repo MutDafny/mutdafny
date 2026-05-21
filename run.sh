@@ -64,7 +64,6 @@ done
 
 # ------------------------------------------------------------------------------ Cleanup
 
-rm -rf targets.csv
 mkdir -p "$SCRIPT_DIR/original"
 mkdir -p "$SCRIPT_DIR/mutants"
 mkdir -p "$SCRIPT_DIR/mutants/alive"
@@ -152,6 +151,8 @@ process_output() {
 
 pushd . > /dev/null 2>&1
 cd "$RUN_DIR"
+rm -rf ./targets.csv
+rm -f ./*.dfy
 scan_program
 
 IFS=','

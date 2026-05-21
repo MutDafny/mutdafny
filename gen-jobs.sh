@@ -57,8 +57,9 @@ for program_file in "$INPUT_DATASET_DIR"/*.dfy; do
 
     job_script_dir_path="$jobs_dir_path/$program_name"
     job_script_file_path="$job_script_dir_path/job.sh"
+    job_log_file_path="$job_script_dir_path/job.log"
     mkdir -p "$job_script_dir_path"
-    touch "$job_script_file_path"
+    touch "$job_script_file_path" "$job_log_file_path"
 
     echo "#!/usr/bin/env bash" > "$job_script_file_path"
     echo "#"                  >> "$job_script_file_path"
@@ -66,7 +67,7 @@ for program_file in "$INPUT_DATASET_DIR"/*.dfy; do
     echo "bash $master_job_script_file_path \
       \"$program_file\" \
       --num_mutations $NUM_MUTS \
-      --run_dir \"$job_script_dir_path\" 2>&1" >> "$job_script_file_path"
+      --run_dir \"$job_script_dir_path\" > \"$job_log_file_path\" 2>&1" >> "$job_script_file_path"
 done
 
 echo "Jobs have been created. Please run the $SCRIPT_DIR/run-jobs.sh script on the generated jobs, e.g., $SCRIPT_DIR/run-jobs.sh --jobs_dir_path $jobs_dir_path."
