@@ -10,6 +10,7 @@
 # Usage:
 # run.sh
 #   <full path to the folder with the base dataset, e.g., $SCRIPT_DIR/../DafnyBench/DafnyBench/dataset/ground_truth/> 
+#   [--subjects_whitelist <optional file that indicates the programs in the dataset that are allowed to be mutated, e.g., none (by default)>]
 #   [--num_mutations <the number of mutations to apply to the input program, e.g., 1 (by default)>]
 #   [help]
 # ------------------------------------------------------------------------------ General utils
@@ -25,9 +26,10 @@ die() {
 
 USAGE="Usage: ${BASH_SOURCE[0]}
    <full path to the folder with the base dataset, e.g., $SCRIPT_DIR/../DafnyBench/DafnyBench/dataset/ground_truth> 
+   [--subjects_whitelist <optional file that indicates the programs in the dataset that are allowed to be mutated, e.g., none (by default)>]
    [--num_mutations <the number of mutations to apply to the input program, e.g., 1 (by default)>]
    [help]"
-if [ "$#" -ne "1" ] && [ "$#" -ne "3" ]; then
+if [ "$#" -ne "1" ] && [ "$#" -ne "3" ] && [ "$#" -ne "5" ]; then
   die "$USAGE"
 fi
 
@@ -42,6 +44,27 @@ if [ "$#" -eq "3" ]; then
     NUM_MUTS=$3
 fi
 
+INPUT_DATASET_DIR=$1
+shift
+NUM_MUTS=1
+WHITELIST_FILE=""
+while [[ "$1" = --* ]]; do
+  OPTION=$1; shift
+  case $OPTION in
+    (--num_mutations)
+      NUM_MUTS=$1;
+      shift;;
+    (--subjects_whitelist)
+      WHITELIST_FILE=$1;
+      shift;;
+    (--help)
+      echo "$USAGE";
+      exit 0;;
+    (*)
+      die "$USAGE";;
+  esac
+done
+
 # ------------------------------------------------------------------------- Main
 
 # Create jobs' directories
@@ -52,23 +75,28 @@ mkdir -p "$jobs_dir_path"
 
 # Create set of jobs
 for program_file in "$INPUT_DATASET_DIR"/*.dfy; do
-    echo "[DEBUG] $program_file"
-    program_name=$(basename $program_file .dfy)
+  if [ -f "$WHITELIST_FILE" ] && ! grep -q "$(basename "$program_file" .dfy)" "$WHITELIST_FILE"; then
+    continue
+  fi
 
-    job_script_dir_path="$jobs_dir_path/$program_name"
-    job_script_file_path="$job_script_dir_path/job.sh"
-    job_log_file_path="$job_script_dir_path/job.log"
-    mkdir -p "$job_script_dir_path"
-    touch "$job_script_file_path" "$job_log_file_path"
+  echo "[DEBUG] $program_file"
+  program_name=$(basename "$program_file" .dfy)
 
-    echo "#!/usr/bin/env bash" > "$job_script_file_path"
-    echo "#"                  >> "$job_script_file_path"
-    echo "# timefactor:1"     >> "$job_script_file_path"
-    echo "bash $master_job_script_file_path \
-      \"$program_file\" \
-      --num_mutations $NUM_MUTS \
-      --run_dir \"$job_script_dir_path\" \
-      --output_dir \"$SCRIPT_DIR/mutants/$NUM_MUTS-mut\" > \"$job_log_file_path\" 2>&1" >> "$job_script_file_path"
+  job_script_dir_path="$jobs_dir_path/$program_name"
+  job_script_file_path="$job_script_dir_path/job.sh"
+  job_log_file_path="$job_script_dir_path/job.log"
+  mkdir -p "$job_script_dir_path"
+  rm -f "$job_log_file_path"
+  touch "$job_script_file_path" "$job_log_file_path"
+
+  echo "#!/usr/bin/env bash" > "$job_script_file_path"
+  echo "#"                  >> "$job_script_file_path"
+  echo "# timefactor:1"     >> "$job_script_file_path"
+  echo "bash $master_job_script_file_path \
+    \"$program_file\" \
+    --num_mutations $NUM_MUTS \
+    --run_dir \"$job_script_dir_path\" \
+    --output_dir \"$SCRIPT_DIR/mutants/$NUM_MUTS-mut\" > \"$job_log_file_path\" 2>&1" >> "$job_script_file_path"
 done
 
 echo "Jobs have been created. Please run the $SCRIPT_DIR/run-jobs.sh script on the generated jobs, e.g., $SCRIPT_DIR/run-jobs.sh --jobs_dir_path $jobs_dir_path."
