@@ -82,28 +82,43 @@ mkdir -p "$OUT_DIR/invalid"
 
 scan_program() {
     echo Scanning $PROGRAM for mutation targets
-    dotnet "$SCRIPT_DIR/dafny/Binaries/Dafny.dll" verify $PROGRAM \
+
+    if echo "$PROGRAM" | grep -q "aws-encryption-sdk"; then
+        uri=$(echo $PROGRAM | sed "s|.*/aws-encryption-sdk/||")
+        dotnet "$SCRIPT_DIR/dafny/Binaries/Dafny.dll" verify $PROGRAM \
+        --solver-path "$SCRIPT_DIR/dafny/Binaries/z3" --allow-warnings --function-syntax:3 \
+        --plugin "$SCRIPT_DIR/mutdafny/bin/Debug/net8.0/mutdafny.dll","scan $uri" > /dev/null
+    elif echo "$PROGRAM" | grep -q "evm-dafny"; then
+        uri=$(echo $PROGRAM | sed "s|.*/evm-dafny/||")
+        dotnet "$SCRIPT_DIR/dafny/Binaries/Dafny.dll" verify $PROGRAM \
+        --solver-path "$SCRIPT_DIR/dafny/Binaries/z3" --allow-warnings \
+        --plugin "$SCRIPT_DIR/mutdafny/bin/Debug/net8.0/mutdafny.dll","scan $uri" > /dev/null
+    else
+        dotnet "$SCRIPT_DIR/dafny/Binaries/Dafny.dll" verify $PROGRAM \
         --solver-path "$SCRIPT_DIR/dafny/Binaries/z3" --allow-warnings \
         --plugin "$SCRIPT_DIR/mutdafny/bin/Debug/net8.0/mutdafny.dll",scan > /dev/null
+    fi
 }
 
 single_mutation() {
     local pos="$1"
     local op="$2"
     local arg="$3"
-
-    output=""
-    if [[ -z $arg ]]; 
-    then 
+    if [[ -z $arg ]]; then 
         echo Mutating position $pos: operator $op
-        output=$(dotnet "$SCRIPT_DIR/dafny/Binaries/Dafny.dll" verify $PROGRAM \
-            --solver-path "$SCRIPT_DIR/dafny/Binaries/z3" --allow-warnings \
-            --plugin "$SCRIPT_DIR/mutdafny/bin/Debug/net8.0/mutdafny.dll","mut $pos $op" 2>/dev/null)
     else
         echo Mutating position $pos: operator $op, argument $arg
+    fi
+
+    output=""
+    if echo "$PROGRAM" | grep -q "aws-encryption-sdk"; then
         output=$(dotnet "$SCRIPT_DIR/dafny/Binaries/Dafny.dll" verify $PROGRAM \
-            --solver-path "$SCRIPT_DIR/dafny/Binaries/z3" --allow-warnings \
-            --plugin "$SCRIPT_DIR/mutdafny/bin/Debug/net8.0/mutdafny.dll","mut $pos $op $arg" 2>/dev/null)
+        --solver-path "$SCRIPT_DIR/dafny/Binaries/z3" --allow-warnings --function-syntax:3 \
+        --plugin "$SCRIPT_DIR/mutdafny/bin/Debug/net8.0/mutdafny.dll","mut $pos $op $arg" 2>/dev/null)
+    else
+        output=$(dotnet "$SCRIPT_DIR/dafny/Binaries/Dafny.dll" verify $PROGRAM \
+        --solver-path "$SCRIPT_DIR/dafny/Binaries/z3" --allow-warnings \
+        --plugin "$SCRIPT_DIR/mutdafny/bin/Debug/net8.0/mutdafny.dll","mut $pos $op $arg" 2>/dev/null)
     fi
     echo $output
 }
