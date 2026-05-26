@@ -10,6 +10,7 @@
 # Usage:
 # run.sh
 #   <full path to the folder with the base dataset, e.g., $SCRIPT_DIR/../DafnyBench/DafnyBench/dataset/ground_truth/> 
+#   [--recursive <whether to recursively include dafny files in sub-directories of the dataset root, e.g., false (by default)>]
 #   [--subjects_whitelist <optional file that indicates the programs in the dataset that are allowed to be mutated, e.g., none (by default)>]
 #   [--num_mutations <the number of mutations to apply to the input program, e.g., 1 (by default)>]
 #   [help]
@@ -26,10 +27,11 @@ die() {
 
 USAGE="Usage: ${BASH_SOURCE[0]}
    <full path to the folder with the base dataset, e.g., $SCRIPT_DIR/../DafnyBench/DafnyBench/dataset/ground_truth> 
+   [--recursive (recursively include dafny files in sub-directories of the dataset root)]
    [--subjects_whitelist <optional file that indicates the programs in the dataset that are allowed to be mutated, e.g., none (by default)>]
    [--num_mutations <the number of mutations to apply to the input program, e.g., 1 (by default)>]
    [help]"
-if [ "$#" -ne "1" ] && [ "$#" -ne "3" ] && [ "$#" -ne "5" ]; then
+if [ "$#" -ne "1" ] && [ "$#" -ne "3" ] && [ "$#" -ne "5" ] && [ "$#" -ne "7" ]; then
   die "$USAGE"
 fi
 
@@ -46,16 +48,20 @@ fi
 
 INPUT_DATASET_DIR=$1
 shift
-NUM_MUTS=1
+RECURSIVE="false"
 WHITELIST_FILE=""
+NUM_MUTS=1
 while [[ "$1" = --* ]]; do
   OPTION=$1; shift
   case $OPTION in
-    (--num_mutations)
-      NUM_MUTS=$1;
+    (--recursive)
+      RECURSIVE=$1;
       shift;;
     (--subjects_whitelist)
       WHITELIST_FILE=$1;
+      shift;;
+    (--num_mutations)
+      NUM_MUTS=$1;
       shift;;
     (--help)
       echo "$USAGE";
@@ -73,9 +79,16 @@ master_job_script_file_path="$SCRIPT_DIR/run.sh"
 [ -s "$master_job_script_file_path" ] || die "[ERROR] $master_job_script_file_path does not exist or it is empty!"
 mkdir -p "$jobs_dir_path"
 
+dataset_files=""
+if [ "$RECURSIVE" = "true" ]; then
+  dataset_files=$(find "$INPUT_DATASET_DIR" -type f -name "*.dfy")
+else
+  dataset_files="$INPUT_DATASET_DIR"/*.dfy
+fi
+
 # Create set of jobs
-for program_file in "$INPUT_DATASET_DIR"/*.dfy; do
-  if [ -f "$WHITELIST_FILE" ] && ! grep -q "$(basename "$program_file" .dfy)" "$WHITELIST_FILE"; then
+for program_file in $dataset_files; do
+  if [ -f "$WHITELIST_FILE" ] && ! grep -q "^$(basename "$program_file" .dfy)$" "$WHITELIST_FILE"; then
     continue
   fi
 
