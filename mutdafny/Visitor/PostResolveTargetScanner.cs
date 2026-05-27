@@ -5,8 +5,8 @@ using Type = Microsoft.Dafny.Type;
 
 namespace MutDafny.Visitor;
 
-public class PostResolveTargetScanner(string mutationTargetURI, List<string> operatorsInUse, ErrorReporter reporter) 
-    : TargetScanner(mutationTargetURI, operatorsInUse, reporter)
+public class PostResolveTargetScanner(string mutationTargetURI, string mutationTargetMethod, (int, int) mutationTargetRange, List<string> operatorsInUse, ErrorReporter reporter) 
+    : TargetScanner(mutationTargetURI, mutationTargetRange, operatorsInUse, reporter)
 {
     private bool _skipChildUOIMutation;
     private bool _skipChildEVRMutation;
@@ -14,7 +14,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     private bool _skipChildDCRMutation;
     private bool _skipChildFARMutation;
     private string _childMethodCallPos = "";
-    private VarDeclStmt? _prevVarDeclStmt = null;
+    private VarDeclStmt? _prevVarDeclStmt;
     private ExprDotName? _childExprDotName;
     private List<string> _childMethodCallArgTypes = [];
     private Dictionary<string, Type> _currentScopeVars = [];
@@ -26,7 +26,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     private List<(string, int, Type)> _childClassAccessedVariables = [];
     
     private void ScanUOITargets(Expression expr) {
-        if (_skipChildUOIMutation) {
+        if (_skipChildUOIMutation || !IsIncludedInTarget(expr)) {
             _skipChildUOIMutation = false;
             return;
         }
@@ -54,7 +54,8 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     }
 
     private void ScanUODTargets(UnaryExpr uExpr) {
-        if (!(uExpr is UnaryOpExpr uOpExpr) || uOpExpr.Op != UnaryOpExpr.Opcode.Not)
+        if (uExpr is not UnaryOpExpr uOpExpr || uOpExpr.Op != UnaryOpExpr.Opcode.Not || 
+            !IsIncludedInTarget(uExpr))
             return;
         
         switch (uExpr.Type) {
@@ -70,7 +71,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     }
 
     private void ScanLVRTargets(LiteralExpr litExpr) {
-        if (!ShouldImplement("LVR")) return;
+        if (!ShouldImplement("LVR") || !IsIncludedInTarget(litExpr)) return;
         
         switch (litExpr.Type) {
             case IntType:
@@ -133,8 +134,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     }
     
     private void ScanEVRTargets(Expression expr) {
-        if (!ShouldImplement("EVR")) return;
-        if (_skipChildEVRMutation) return;
+        if (!ShouldImplement("EVR") || _skipChildEVRMutation || !IsIncludedInTarget(expr)) return;
         
         var exprLocation = $"{expr.StartToken.pos}-{expr.EndToken.pos}";
         switch (expr.Type) {
@@ -170,8 +170,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     }
     
     private void ScanEVRTargets(TypeRhs tpRhs) {
-        if (!ShouldImplement("EVR")) return;
-        if (_skipChildEVRMutation) return;
+        if (!ShouldImplement("EVR") || _skipChildEVRMutation || !IsIncludedInTarget(tpRhs)) return;
         
         if (tpRhs.Type is UserDefinedType uType && uType.ResolvedClass is NonNullTypeDecl nnTypeDecl && 
             nnTypeDecl.Class != null) {
@@ -180,7 +179,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     }
     
     private void ScanVERTargets(NameSegment nSegExpr) {
-        if (!ShouldImplement("VER")) return;
+        if (!ShouldImplement("VER") || !IsIncludedInTarget(nSegExpr)) return;
 
         foreach (var var in _currentScopeVars) {
             if (nSegExpr.Name == var.Key) continue;
@@ -190,7 +189,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     }
     
     private void ScanCIRTargets(Expression expr) {
-        if (!ShouldImplement("CIR")) return;
+        if (!ShouldImplement("CIR") || !IsIncludedInTarget(expr)) return;
         
         var exprLocation = $"{expr.StartToken.pos}-{expr.EndToken.pos}";
         string type, arg;
@@ -211,8 +210,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     }
 
     private void ScanCIRTargets(TypeRhs tpRhs) {
-        if (!ShouldImplement("CIR")) return;
-        if (tpRhs.ArrayDimensions == null) return;
+        if (!ShouldImplement("CIR") || tpRhs.ArrayDimensions == null || !IsIncludedInTarget(tpRhs)) return;
 
         var type = PrimitiveTypeToStr(tpRhs.EType);
         var exprLocation = $"{tpRhs.StartToken.pos}-{tpRhs.EndToken.pos}";
@@ -238,7 +236,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     }
     
     private void ScanMRRTargets(ConcreteAssignStatement cAStmt) {
-        if (!ShouldImplement("MRR")) return;
+        if (!ShouldImplement("MRR") || !IsIncludedInTarget(int.Parse(_childMethodCallPos))) return;
         
         var typeArg = "";
         foreach (var lhs in cAStmt.Lhss) {
@@ -254,7 +252,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     }
     
     private void ScanMRRTargets(SuffixExpr suffixExpr) {
-        if (!ShouldImplement("MRR")) return;
+        if (!ShouldImplement("MRR") || !IsIncludedInTarget(int.Parse(_childMethodCallPos))) return;
         
         var type = TypeToStr(suffixExpr.Type);
         if (type == "")
@@ -263,7 +261,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     }
 
     private void ScanMAPTargets(ConcreteAssignStatement cAStmt) {
-        if (!ShouldImplement("MAP")) return;
+        if (!ShouldImplement("MAP") || !IsIncludedInTarget(int.Parse(_childMethodCallPos))) return;
 
         var argProp = "";
         foreach (var lhs in cAStmt.Lhss) {
@@ -280,7 +278,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     }
     
     private void ScanMAPTargets(SuffixExpr suffixExpr) {
-        if (!ShouldImplement("MAP")) return;
+        if (!ShouldImplement("MAP") || !IsIncludedInTarget(int.Parse(_childMethodCallPos))) return;
 
         var type = TypeToStr(suffixExpr.Type);
         var methodArgPos = _childMethodCallArgTypes.IndexOf(type);
@@ -290,7 +288,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     }
 
     private void ScanMNRTargets(ConcreteAssignStatement cAStmt) {
-        if (!ShouldImplement("MNR") || _childExprDotName == null) 
+        if (!ShouldImplement("MNR") || _childExprDotName == null || !IsIncludedInTarget(int.Parse(_childMethodCallPos))) 
             return;
 
         if (cAStmt.Lhss.Count == 1 && // naked receiver can be applied if the types match or if they are inferred from context
@@ -299,7 +297,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     }
     
     private void ScanMNRTargets(SuffixExpr suffixExpr) {
-        if (!ShouldImplement("MNR") || _childExprDotName == null) 
+        if (!ShouldImplement("MNR") || _childExprDotName == null || !IsIncludedInTarget(int.Parse(_childMethodCallPos))) 
             return;
 
         if (suffixExpr.Type != null && suffixExpr.Type.ToString() == _childExprDotName.Lhs.Type.ToString())
@@ -310,7 +308,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
         if (!ShouldImplement("MCR")) return;
         
         foreach (var methodCall in _methodCalls) {
-            if (methodCall.Lhs is not NameSegment nSegExpr) continue;
+            if (!IsIncludedInTarget(methodCall) || methodCall.Lhs is not NameSegment nSegExpr) continue;
             var methodName = nSegExpr.Name;
             var method = _declaredMethods.FirstOrDefault(m => m.Name == methodName);
             if (method == null) continue;
@@ -341,7 +339,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     }
 
     private void ScanMVRTargets(ConcreteAssignStatement cAStmt) {
-        if (!ShouldImplement("MVR") || cAStmt.Lhss.Count == 0) 
+        if (!ShouldImplement("MVR") || cAStmt.Lhss.Count == 0 || !IsIncludedInTarget(int.Parse(_childMethodCallPos))) 
             return;
 
         var varsArg = "";
@@ -362,7 +360,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     }
 
     private void ScanMVRTargets(SuffixExpr suffixExpr) {
-        if (!ShouldImplement("MVR"))
+        if (!ShouldImplement("MVR") || !IsIncludedInTarget(int.Parse(_childMethodCallPos)))
             return;
         
         foreach (var var in _currentScopeVars) {
@@ -379,7 +377,8 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
             for (var j = i + 1; j < appSufExpr.Bindings.ArgumentBindings.Count; j++) {
                 var b1 = appSufExpr.Bindings.ArgumentBindings[i];
                 var b2 = appSufExpr.Bindings.ArgumentBindings[j];
-                if (b1.Actual.Type.ToString() != b2.Actual.Type.ToString()) 
+                if (b1.Actual.Type.ToString() != b2.Actual.Type.ToString() ||
+                    !IsIncludedInTarget(b1) || !IsIncludedInTarget(b2)) 
                     continue;
                 AddTarget(($"{b1.Actual.Center.pos}", "SAR", $"{b2.Actual.Center.pos}"));
             }
@@ -387,7 +386,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     }
 
     private void ScanDCRTargets(ApplySuffix appSufExpr) {
-        if (!ShouldImplement("DCR") || appSufExpr.Type.AsDatatype == null) return;
+        if (!ShouldImplement("DCR") || appSufExpr.Type.AsDatatype == null || !IsIncludedInTarget(appSufExpr)) return;
         
         if (appSufExpr.Lhs is not NameSegment nSegExpr) return;
         var dtCtor = nSegExpr.Name;
@@ -409,7 +408,8 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     }
     
     private void ScanDCRTargets(NameSegment nSegExpr) {
-        if (!ShouldImplement("DCR") || _skipChildDCRMutation || nSegExpr.Type.AsDatatype == null) 
+        if (!ShouldImplement("DCR") || _skipChildDCRMutation || 
+            nSegExpr.Type.AsDatatype == null || IsIncludedInTarget(nSegExpr)) 
             return;
         
         var dtCtor = nSegExpr.Name;
@@ -424,7 +424,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
 
         foreach (var fieldAccess in _accessedClassFields) {
             var classDecl1 = fieldAccess.Lhs.Type?.AsTopLevelTypeWithMembers;
-            if (classDecl1 == null) continue;
+            if (classDecl1 == null || !IsIncludedInTarget(fieldAccess)) continue;
             var parents = classDecl1.ParentTraitHeads.Select(t => t.ToString()).ToList();
             
             foreach (var field in _classFields) {
@@ -439,7 +439,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
     }
 
     private void ScanTARTargets(ExprDotName exprDName) {
-        if (!ShouldImplement("TAR")) return;
+        if (!ShouldImplement("TAR") || !IsIncludedInTarget(exprDName)) return;
 
         if (!(exprDName.Lhs is NameSegment nSegExpr && nSegExpr.Type is UserDefinedType uType &&
               uType.ResolvedClass != null && uType.ResolvedClass is TupleTypeDecl tupleDecl))
@@ -468,6 +468,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
                 var var2Parents = childClassVar2.Value.AsTopLevelTypeWithMembers.ParentTraitHeads;
                 if (var1Parents.All(var2Parents.Contains) && 
                     var1Parents.Count == var2Parents.Count && 
+                    IsIncludedInTarget(childClassVar1.Item2) &&
                     var1Class != var2Class)
                 {
                     AddTarget(($"{childClassVar1.Item2}", "PRV", childClassVar2.Key));
@@ -527,7 +528,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
             if (member is not ConstantField cf || cf.Rhs == null || !IsFieldOriginal(cf)) 
                 continue;
             
-            if (ShouldImplement("SDL")) {
+            if (ShouldImplement("SDL") && IsIncludedInTarget(cf)) {
                 var fieldType = TypeToStr(cf.Type);
                 if (fieldType != "")
                     AddTarget(($"{cf.Center.pos}", "SDL", ""));
@@ -665,7 +666,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, List<string> ope
             }
         }
         
-        if (canApplySWV && ShouldImplement("SWV"))
+        if (canApplySWV && ShouldImplement("SWV") && IsIncludedInTarget(vDeclStmt) && IsIncludedInTarget(_prevVarDeclStmt))
             AddTarget(($"{vDeclStmt.Center.pos}", "SWV", $"{_prevVarDeclStmt?.Center.pos}"));
         _prevVarDeclStmt = vDeclStmt;
     }

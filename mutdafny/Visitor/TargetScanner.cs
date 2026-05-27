@@ -2,7 +2,7 @@
 
 namespace MutDafny.Visitor;
 
-public abstract class TargetScanner(string MutationTargetURI, List<string> operatorsInUse, ErrorReporter reporter) : Visitor("-1", reporter)
+public abstract class TargetScanner(string mutationTargetURI, (int, int) mutationTargetRange, List<string> operatorsInUse, ErrorReporter reporter) : Visitor("-1", reporter)
 {
     protected List<(string, string, string)> Targets { get; } = ImportPreviousTargets();
     protected bool IsParentSpec;
@@ -76,17 +76,35 @@ public abstract class TargetScanner(string MutationTargetURI, List<string> opera
     public override void Find(ModuleDefinition module) {
         // only visit modules that may contain the mutation target
         if ((MutationTargetScanner.FirstCall && module.EndToken.pos == 0) || // default module
-            MutationTargetURI == "" ||
+            mutationTargetURI == "" ||
             (module.Origin.Uri != null && module.Origin.Uri.LocalPath != null &&
-             module.Origin.Uri.LocalPath.Contains(MutationTargetURI)))
+             module.Origin.Uri.LocalPath.Contains(mutationTargetURI)))
         {
             base.Find(module);
         }
     }
-    
+
     /// -----------------
     /// Utils
     /// -----------------
+    protected bool IsIncludedInTarget(Node node) {
+        return IsIncludedInTarget(node.StartToken.pos, node.EndToken.pos);
+    }
+    
+    protected bool IsIncludedInTarget(int tokenStartPos, int tokenEndPos) {
+        if (mutationTargetRange is { Item1: -1, Item2: -1 })
+            return true;
+        return mutationTargetRange.Item1 <= tokenStartPos && 
+               mutationTargetRange.Item2 >= tokenEndPos;
+    }
+    
+    protected bool IsIncludedInTarget(int tokenPos) {
+        if (mutationTargetRange is { Item1: -1, Item2: -1 })
+            return true;
+        return mutationTargetRange.Item1 <= tokenPos && 
+               mutationTargetRange.Item2 >= tokenPos;
+    }
+    
     protected bool ContainsLemmaChild(Node node) {
         var children = new List<INode>(node.Children);
         if (node is ParensExpression parensExpr) children.Add(parensExpr.E);

@@ -13,6 +13,8 @@ public class MutDafny : PluginConfiguration
     private bool _analyze;
 
     private List<string> OperatorsInUse { get; set; } = [];
+    private string MutationTargetMethod { get; set; } = "";
+    private (int, int) MutationTargetRange { get; set; } = (-1, -1);
     private string MutationTargetURI { get; set; } = "";
     private int NumMutations { get; set; } = -1;
     private string MutationTargetPos { get; set; } = "";
@@ -37,13 +39,26 @@ public class MutDafny : PluginConfiguration
 
     private void ParseScanArguments(string[] args) {
         if (args.Length == 1) return;
+        var nextPos = 1;
         if (args[1].EndsWith(".dfy")) {
             MutationTargetURI = args[1];
-            if (args.Length == 2) return;
-            OperatorsInUse = new List<string>(args[2..]);   
-        } else { 
-            OperatorsInUse = new List<string>(args[1..]);   
+            nextPos++;
+            if (args.Length == nextPos) return;
         }
+        if (!IsValidOperator(args[nextPos])) {
+            var positions = args[nextPos].Split("-");
+            if (positions.Length < 2) {
+                MutationTargetMethod = args[nextPos];
+            } else if (int.TryParse(positions[0], out var startPost) && 
+                       int.TryParse(positions[1], out var endPost)) 
+            {
+                MutationTargetRange = (startPost, endPost);
+            }
+            nextPos++;
+            if (args.Length == nextPos) return;
+        }
+        if (IsValidOperator(args[nextPos])) 
+            OperatorsInUse = [..args[nextPos..]];
     }
 
     private void ParseMutArguments(string[] args) {
@@ -63,12 +78,26 @@ public class MutDafny : PluginConfiguration
     public override Rewriter[] GetRewriters(ErrorReporter reporter) {
         return _mutate ? 
             [new MutantGenerator(NumMutations, MutationTargetPos, MutationOperator, MutationArg, reporter)] : 
-            (_scan ? [new MutationTargetScanner(MutationTargetURI, OperatorsInUse, reporter)] : 
+            (_scan ? [new MutationTargetScanner(MutationTargetURI, MutationTargetMethod, MutationTargetRange, OperatorsInUse, reporter)] : 
              _analyze ? [new ProgramAnalyzer(MutationTargetURI, reporter)] : []);
+    }
+
+    private bool IsValidOperator(string operatorName) {
+        return operatorName == "AOR" || operatorName == "ROR" || operatorName == "COR" || operatorName == "LOR" ||
+               operatorName == "SOR" || operatorName == "BBR" || operatorName == "AOI" || operatorName == "COI" ||
+               operatorName == "LOI" || operatorName == "AOD" || operatorName == "COD" || operatorName == "LOD" ||
+               operatorName == "LVR" || operatorName == "EVR" || operatorName == "VER" || operatorName == "LSR" ||
+               operatorName == "LBI" || operatorName == "MRR" || operatorName == "MAP" || operatorName == "MNR" ||
+               operatorName == "MCR" || operatorName == "MVR" || operatorName == "SAR" || operatorName == "CIR" ||
+               operatorName == "CBR" || operatorName == "CBE" || operatorName == "TAR" || operatorName == "DCR" ||
+               operatorName == "FAR" || operatorName == "SDL" || operatorName == "VDL" || operatorName == "SLD" ||
+               operatorName == "ODL" || operatorName == "THI" || operatorName == "THD" || operatorName == "AMR" ||
+               operatorName == "MMR" || operatorName == "PRV" || operatorName == "SWS" || operatorName == "SWV";
     }
 }
 
-public class MutationTargetScanner(string mutationTargetURI, List<string> operatorsInUse, ErrorReporter reporter) : Rewriter(reporter)
+public class MutationTargetScanner(string mutationTargetURI, string mutationTargetMethod, (int, int) mutationTargetRange, List<string> operatorsInUse, ErrorReporter reporter) 
+    : Rewriter(reporter)
 {
     public static bool FirstCall = true;
     
@@ -81,13 +110,13 @@ public class MutationTargetScanner(string mutationTargetURI, List<string> operat
         var specHelperFinder = new SpecHelperFinder(Reporter);
         specHelperFinder.Find(module);
         
-        var targetScanner = new PreResolveTargetScanner(mutationTargetURI, operatorsInUse, Reporter);
+        var targetScanner = new PreResolveTargetScanner(mutationTargetURI, mutationTargetMethod, mutationTargetRange, operatorsInUse, Reporter);
         targetScanner.Find(module);
         targetScanner.ExportTargets();
     }
 
     public override void PostResolve(ModuleDefinition module) {
-        var targetScanner = new PostResolveTargetScanner(mutationTargetURI, operatorsInUse, Reporter);
+        var targetScanner = new PostResolveTargetScanner(mutationTargetURI, mutationTargetMethod, mutationTargetRange, operatorsInUse, Reporter);
         targetScanner.Find(module);
         targetScanner.ExportTargets();
         FirstCall = false;

@@ -226,7 +226,7 @@ else
 fi
 
 rm targets.csv
-cp ./original/*.dfy "$SCRIPT_DIR/original"
+cp ./original/*.dfy "$SCRIPT_DIR/original" 2>/dev/null
 popd > /dev/null 2>&1
 
 echo "[INFO] Job finished"
