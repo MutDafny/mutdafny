@@ -12,6 +12,8 @@
 #   <full path to the folder with the base dataset, e.g., $SCRIPT_DIR/../DafnyBench/DafnyBench/dataset/ground_truth/> 
 #   [--recursive <whether to recursively include dafny files in sub-directories of the dataset root, e.g., false (by default)>]
 #   [--subjects_whitelist <optional file that indicates the programs in the dataset that are allowed to be mutated, e.g., none (by default)>]
+#   [--method <the specific method of the program to mutate, e.g., Main (none by default)>]
+#   [--range <the specific range of positions of the program to mutate, e.g., 150-300 (none by default)>]
 #   [--num_mutations <the number of mutations to apply to the input program, e.g., 1 (by default)>]
 #   [help]
 # ------------------------------------------------------------------------------ General utils
@@ -29,9 +31,11 @@ USAGE="Usage: ${BASH_SOURCE[0]}
    <full path to the folder with the base dataset, e.g., $SCRIPT_DIR/../DafnyBench/DafnyBench/dataset/ground_truth> 
    [--recursive (recursively include dafny files in sub-directories of the dataset root)]
    [--subjects_whitelist <optional file that indicates the programs in the dataset that are allowed to be mutated, e.g., none (by default)>]
+   [--method <the specific method of the program to mutate, e.g., Main (none by default)>]
+   [--range <the specific range of positions of the program to mutate, e.g., 150-300 (none by default)>]
    [--num_mutations <the number of mutations to apply to the input program, e.g., 1 (by default)>]
    [help]"
-if [ "$#" -ne "1" ] && [ "$#" -ne "3" ] && [ "$#" -ne "5" ] && [ "$#" -ne "7" ]; then
+if [ "$#" -ne "1" ] && [ "$#" -ne "3" ] && [ "$#" -ne "5" ] && [ "$#" -ne "7" ] && [ "$#" -ne "9" ] && [ "$#" -ne "11" ]; then
   die "$USAGE"
 fi
 
@@ -41,15 +45,11 @@ if [ "$#" -eq "1" ] && [ "$1" = "--help" ]; then
 fi
 
 INPUT_DATASET_DIR=$1
-NUM_MUTS=1
-if [ "$#" -eq "3" ]; then
-    NUM_MUTS=$3
-fi
-
-INPUT_DATASET_DIR=$1
 shift
 RECURSIVE="false"
 WHITELIST_FILE=""
+METHOD=""
+RANGE=""
 NUM_MUTS=1
 while [[ "$1" = --* ]]; do
   OPTION=$1; shift
@@ -59,6 +59,12 @@ while [[ "$1" = --* ]]; do
       shift;;
     (--subjects_whitelist)
       WHITELIST_FILE=$1;
+      shift;;
+    (--method)
+      METHOD=$1;
+      shift;;
+    (--range)
+      RANGE=$1;
       shift;;
     (--num_mutations)
       NUM_MUTS=$1;
@@ -107,6 +113,8 @@ for program_file in $dataset_files; do
   echo "# timefactor:1"     >> "$job_script_file_path"
   echo "bash $master_job_script_file_path \
     \"$program_file\" \
+    --method $METHOD \
+    --range $RANGE \
     --num_mutations $NUM_MUTS \
     --run_dir \"$job_script_dir_path\" \
     --output_dir \"$SCRIPT_DIR/mutants/$NUM_MUTS-mut\" > \"$job_log_file_path\" 2>&1" >> "$job_script_file_path"

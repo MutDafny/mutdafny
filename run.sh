@@ -9,6 +9,8 @@
 # Usage:
 # run.sh
 #   <full path to the program under test, e.g., $SCRIPT_DIR/../DafnyBench/DafnyBench/dataset/ground_truth/630-dafny_tmp_tmpz2kokaiq_Solution.dfy> 
+#   [--method <the specific method of the program to mutate, e.g., Main (none by default)>]
+#   [--range <the specific range of positions of the program to mutate, e.g., 150-300 (none by default)>]
 #   [--num_mutations <the number of mutations to apply to the input program, e.g., 1 (by default)>]
 #   [--run_dir <the directory where the script should be run, e.g., $SCRIPT_DIR (by deafult)>]
 #   [--output_dir <the directory where the mutants will be stores, e.g., $SCRIPT_DIR (by deafult)>]
@@ -26,12 +28,14 @@ die() {
 
 USAGE="Usage: ${BASH_SOURCE[0]}
    <full path to the program under test, e.g., $SCRIPT_DIR/../DafnyBench/DafnyBench/dataset/ground_truth/630-dafny_tmp_tmpz2kokaiq_Solution.dfy>
+   [--method <the specific method of the program to mutate, e.g., Main (none by default)>]
+   [--range <the specific range of positions of the program to mutate, e.g., 150-300 (none by default)>]
    [--num_mutations <the number of mutations to apply to the input program, e.g., 1 (by default)>]
    [--run_dir <the directory where the script should be run, e.g., ./ (by deafult)>]
    [--output_dir <the directory where the mutants will be stores, e.g., $SCRIPT_DIR (by deafult)>]
    [help]"
 
-if [ "$#" -ne "1" ] && [ "$#" -ne "3" ] && [ "$#" -ne "5" ] && [ "$#" -ne "7" ]; then
+if [ "$#" -ne "1" ] && [ "$#" -ne "3" ] && [ "$#" -ne "5" ] && [ "$#" -ne "7" ] && [ "$#" -ne "9" ]&& [ "$#" -ne "11" ]; then
   die "$USAGE"
 fi
 
@@ -43,12 +47,20 @@ fi
 PROGRAM=$1;
 PROGRAM="$(cd "$(dirname "$PROGRAM")" && pwd)/$(basename "$PROGRAM")" # Get full path
 shift
+METHOD=""
+RANGE=""
 NUM_MUTS=1
 RUN_DIR="$SCRIPT_DIR"
 OUT_DIR="$SCRIPT_DIR/mutants"
 while [[ "$1" = --* ]]; do
   OPTION=$1; shift
   case $OPTION in
+    (--method)
+      METHOD=$1;
+      shift;;
+    (--range)
+      RANGE=$1;
+      shift;;
     (--num_mutations)
       NUM_MUTS=$1;
       shift;;
@@ -80,23 +92,35 @@ mkdir -p "$OUT_DIR/invalid"
 
 # ------------------------------------------------------------------------------ MutDafny utils
 
+get_scan_program() {
+    uri=""
+    if echo "$PROGRAM" | grep -q "aws-encryption-sdk"; then
+        uri=$(echo $PROGRAM | sed "s|.*/aws-encryption-sdk/||")
+    elif echo "$PROGRAM" | grep -q "evm-dafny"; then
+        uri=$(echo $PROGRAM | sed "s|.*/evm-dafny/||")
+    fi
+
+    if [[ -n $RANGE ]]; then 
+        echo $RANGE
+    elif [[ -n $METHOD ]]; then
+        echo $METHOD
+    else
+        echo $uri
+    fi
+}
+
 scan_program() {
     echo Scanning $PROGRAM for mutation targets
 
+    scan_arg=$(get_scan_program)
     if echo "$PROGRAM" | grep -q "aws-encryption-sdk"; then
-        uri=$(echo $PROGRAM | sed "s|.*/aws-encryption-sdk/||")
         dotnet "$SCRIPT_DIR/dafny/Binaries/Dafny.dll" verify $PROGRAM \
         --solver-path "$SCRIPT_DIR/dafny/Binaries/z3" --allow-warnings --function-syntax:3 \
-        --plugin "$SCRIPT_DIR/mutdafny/bin/Debug/net8.0/mutdafny.dll","scan $uri" > /dev/null
-    elif echo "$PROGRAM" | grep -q "evm-dafny"; then
-        uri=$(echo $PROGRAM | sed "s|.*/evm-dafny/||")
-        dotnet "$SCRIPT_DIR/dafny/Binaries/Dafny.dll" verify $PROGRAM \
-        --solver-path "$SCRIPT_DIR/dafny/Binaries/z3" --allow-warnings \
-        --plugin "$SCRIPT_DIR/mutdafny/bin/Debug/net8.0/mutdafny.dll","scan $uri" > /dev/null
+        --plugin "$SCRIPT_DIR/mutdafny/bin/Debug/net8.0/mutdafny.dll","scan $scan_arg" > /dev/null
     else
         dotnet "$SCRIPT_DIR/dafny/Binaries/Dafny.dll" verify $PROGRAM \
         --solver-path "$SCRIPT_DIR/dafny/Binaries/z3" --allow-warnings \
-        --plugin "$SCRIPT_DIR/mutdafny/bin/Debug/net8.0/mutdafny.dll",scan > /dev/null
+        --plugin "$SCRIPT_DIR/mutdafny/bin/Debug/net8.0/mutdafny.dll","scan $scan_arg" > /dev/null
     fi
 }
 
