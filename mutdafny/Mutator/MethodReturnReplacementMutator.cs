@@ -76,7 +76,7 @@ public class MethodReturnReplacementMutator(string mutationTargetPos, string val
         foreach (var member in decl.Members) {
             if (member is not ConstantField cf)
                 continue;
-            if (IsTarget(cf.Rhs)) {
+            if (cf.Rhs != null && IsTarget(cf.Rhs)) {
                 cf.Rhs = CreateMutatedExpression(cf.Rhs);
                 return;
             }

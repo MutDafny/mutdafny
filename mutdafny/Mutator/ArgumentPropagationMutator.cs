@@ -52,7 +52,7 @@ public class ArgumentPropagationMutator(string mutationTargetPos, string val, Er
         foreach (var member in decl.Members) {
             if (member is not ConstantField cf)
                 continue;
-            if (IsTarget(cf.Rhs)) {
+            if (cf.Rhs != null && IsTarget(cf.Rhs)) {
                 cf.Rhs = CreateMutatedExpression(cf.Rhs);
                 return;
             }

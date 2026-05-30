@@ -773,7 +773,8 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
             if (appSufExpr.Type != null && appSufExpr.Type.IsDatatype)
                 ScanDCRTargets(appSufExpr);
             foreach (var binding in appSufExpr.Bindings.ArgumentBindings) {
-                _childMethodCallArgTypes.Add(TypeToStr(binding.Actual.Type));
+                var type = TypeToStr(binding.Actual.Type);
+                if (type != "") _childMethodCallArgTypes.Add(type);
             }
             ScanSARTargets(appSufExpr);
 
@@ -799,8 +800,11 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         _skipChildVERMutation = true;
         _skipChildDCRMutation = true;
         var prevChildMethodCallPos = _childMethodCallPos;
+        var prevChildMethodCallArgTypes = _childMethodCallArgTypes;
+        _childMethodCallArgTypes = [];
         base.VisitExpression(suffixExpr);
         _childMethodCallPos = prevChildMethodCallPos;
+        _childMethodCallArgTypes = prevChildMethodCallArgTypes;
         _skipChildEVRMutation = false;
         _skipChildVERMutation = false;
         _skipChildDCRMutation = false;
