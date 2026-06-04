@@ -30,6 +30,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
             _skipChildUOIMutation = false;
             return;
         }
+        if (expr is LiteralExpr { Value: 0 }) return;
         
         var exprLocation = $"{expr.StartToken.pos}-{expr.EndToken.pos}";
         switch (expr.Type) {
@@ -685,7 +686,12 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     protected override void VisitExpression(BinaryExpr bExpr) {
         ScanUOITargets(bExpr);
         ScanEVRTargets(bExpr);
-        base.VisitExpression(bExpr);
+        if (bExpr.Op == BinaryExpr.Opcode.Mod)
+            _skipChildUOIMutation = true;
+        HandleExpression(bExpr.E0);
+        if (bExpr.Op == BinaryExpr.Opcode.Mod)
+            _skipChildUOIMutation = true;
+        HandleExpression(bExpr.E1);
     }
     
     protected override void VisitExpression(UnaryExpr uExpr) {
