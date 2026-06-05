@@ -30,15 +30,72 @@ cd mutdafny && dotnet build
 
 4.1. **On a single file**
 ```
-bash run.sh program_file [--num_mutations n (default 1)]
+bash run.sh <full path to the program under test>
+   [--method <the method of the program to mutate (all by default)>]
+   [--line <the line of the program to mutate (all by default)>]
+   [--range <the range of positions of the program to mutate (all by default)>]
+   [--num_mutations <the number of mutations to apply to the input program (1 by default)>]
+   [help]
 ```
 
 4.2. **On multiple files in parallel**
 ```
-bash gen-jobs.sh path_to_dataset [--num_mutations n (default 1)]
+bash gen-jobs.sh <full path to the folder with the base dataset> 
+   [--method <the method of the program to mutate (all by default)>]
+   [--line <the line of the program to mutate (all by default)>]
+   [--range <the specific range of positions of the program to mutate (all by default)>]
+   [--num_mutations <the number of mutations to apply to the input program (1 by default)>]
+   [help]
+
 bash run-jobs.sh
 ```
 **Note**: Requires [GNU Parallel](https://www.gnu.org/software/parallel/).
+
+## Directly Running the MutDafny plugin
+
+**Scan for all mutation targets**
+```
+dotnet dafny/Binaries/Dafny.dll verify <full path to the program under test> \
+    --plugin mutdafny/bin/Debug/net8.0/mutdafny.dll,scan
+```
+
+**Scan for mutation targets in specific method**
+```
+dotnet dafny/Binaries/Dafny.dll verify <full path to the program under test> \
+    --plugin mutdafny/bin/Debug/net8.0/mutdafny.dll,scan\ method:<method name>
+```
+
+**Scan for mutation targets in specific line**
+```
+dotnet dafny/Binaries/Dafny.dll verify <full path to the program under test> \
+    --plugin mutdafny/bin/Debug/net8.0/mutdafny.dll,scan\ line:<line number>
+```
+
+**Scan for mutation targets in specific position range**
+```
+dotnet dafny/Binaries/Dafny.dll verify <full path to the program under test> \
+    --plugin mutdafny/bin/Debug/net8.0/mutdafny.dll,scan\ range:<start position number-end position number>
+```
+
+**Scan for mutation targets using only specific mutation operators**
+```
+dotnet dafny/Binaries/Dafny.dll verify <full path to the program under test> \
+    --plugin mutdafny/bin/Debug/net8.0/mutdafny.dll,scan\ <list of operators separated by a space, e.g., AOR\ ROR\ COR\ LOR\ SOR>
+```
+**Note**: Can be used together with the previous options.
+
+**Apply specific mutation**
+```
+dotnet dafny/Binaries/Dafny.dll verify <full path to the program under test> \
+    --plugin mutdafny/bin/Debug/net8.0/mutdafny.dll,mut\ <mutation position>\ <mutation operator>\ <mutation argument, if applicable>
+```
+
+**Apply combinations of mutations while there are unexplored targets**
+```
+dotnet dafny/Binaries/Dafny.dll verify <full path to the program under test> \
+    --plugin mutdafny/bin/Debug/net8.0/mutdafny.dll,mut\ <number of mutations>
+```
+**Note**: Requires `targets.csv` file available in the execution directory, generated via the `scan` option.
 
 ## Mutation Operators
 
