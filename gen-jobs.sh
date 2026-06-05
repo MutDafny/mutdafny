@@ -13,6 +13,7 @@
 #   [--recursive <whether to recursively include dafny files in sub-directories of the dataset root, e.g., false (by default)>]
 #   [--subjects_whitelist <optional file that indicates the programs in the dataset that are allowed to be mutated, e.g., none (by default)>]
 #   [--method <the specific method of the program to mutate, e.g., Main (none by default)>]
+#   [--line <the specific line of the program to mutate, e.g., 3 (none by default)>]
 #   [--range <the specific range of positions of the program to mutate, e.g., 150-300 (none by default)>]
 #   [--num_mutations <the number of mutations to apply to the input program, e.g., 1 (by default)>]
 #   [help]
@@ -32,6 +33,7 @@ USAGE="Usage: ${BASH_SOURCE[0]}
    [--recursive (recursively include dafny files in sub-directories of the dataset root)]
    [--subjects_whitelist <optional file that indicates the programs in the dataset that are allowed to be mutated, e.g., none (by default)>]
    [--method <the specific method of the program to mutate, e.g., Main (none by default)>]
+   [--line <the specific line of the program to mutate, e.g., 3 (none by default)>]
    [--range <the specific range of positions of the program to mutate, e.g., 150-300 (none by default)>]
    [--num_mutations <the number of mutations to apply to the input program, e.g., 1 (by default)>]
    [help]"
@@ -49,6 +51,7 @@ shift
 RECURSIVE="false"
 WHITELIST_FILE=""
 METHOD=""
+LINE=""
 RANGE=""
 NUM_MUTS=1
 while [[ "$1" = --* ]]; do
@@ -62,6 +65,9 @@ while [[ "$1" = --* ]]; do
       shift;;
     (--method)
       METHOD=$1;
+      shift;;
+    (--line)
+      LINE=$1;
       shift;;
     (--range)
       RANGE=$1;
@@ -114,6 +120,7 @@ for program_file in $dataset_files; do
   echo "bash $master_job_script_file_path \
     \"$program_file\" \
     --method $METHOD \
+    --line $LINE \
     --range $RANGE \
     --num_mutations $NUM_MUTS \
     --run_dir \"$job_script_dir_path\" \

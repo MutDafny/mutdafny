@@ -5,15 +5,15 @@ using Type = Microsoft.Dafny.Type;
 
 namespace MutDafny.Visitor;
 
-public class PostResolveTargetScanner(string mutationTargetURI, string mutationTargetMethod, (int, int) mutationTargetRange, List<string> operatorsInUse, ErrorReporter reporter) 
-    : TargetScanner(mutationTargetURI, mutationTargetRange, operatorsInUse, reporter)
+public class PostResolveTargetScanner(string mutationTargetURI, string mutationTargetMethod, int mutationTargetLine, (int, int) mutationTargetRange, List<string> operatorsInUse, ErrorReporter reporter) 
+    : TargetScanner(mutationTargetURI, mutationTargetLine, mutationTargetRange, operatorsInUse, reporter)
 {
     private bool _skipChildUOIMutation;
     private bool _skipChildEVRMutation;
     private bool _skipChildVERMutation;
     private bool _skipChildDCRMutation;
     private bool _skipChildFARMutation;
-    private string _childMethodCallPos = "";
+    private Token? _childMethodCallPos;
     private VarDeclStmt? _prevVarDeclStmt;
     private ExprDotName? _childExprDotName;
     private List<string> _childMethodCallArgTypes = [];
@@ -23,7 +23,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     private readonly List<(string, ClassLikeDecl, Type)> _classFields = []; // field name, class type, field type
     private readonly List<ExprDotName> _accessedClassFields = [];
     private Dictionary<string, Type> _currentScopeChildClassVariables = [];
-    private List<(string, int, Type)> _childClassAccessedVariables = [];
+    private List<(string, Token, Type)> _childClassAccessedVariables = [];
     
     private void ScanUOITargets(Expression expr) {
         if (_skipChildUOIMutation || !IsIncludedInTarget(expr)) {
@@ -237,7 +237,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     }
     
     private void ScanMRRTargets(ConcreteAssignStatement cAStmt) {
-        if (!ShouldImplement("MRR") || !IsIncludedInTarget(int.Parse(_childMethodCallPos))) return;
+        if (!ShouldImplement("MRR") || !IsIncludedInTarget(_childMethodCallPos)) return;
         
         var typeArg = "";
         foreach (var lhs in cAStmt.Lhss) {
@@ -249,20 +249,20 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
             typeArg = typeArg == "" ? type : $"{typeArg}-{type}";
         }
         if (typeArg != "")
-            AddTarget((_childMethodCallPos, "MRR", typeArg));
+            AddTarget(($"{_childMethodCallPos?.pos}", "MRR", typeArg));
     }
     
     private void ScanMRRTargets(SuffixExpr suffixExpr) {
-        if (!ShouldImplement("MRR") || !IsIncludedInTarget(int.Parse(_childMethodCallPos))) return;
+        if (!ShouldImplement("MRR") || !IsIncludedInTarget(_childMethodCallPos)) return;
         
         var type = TypeToStr(suffixExpr.Type);
         if (type == "")
             return;
-        AddTarget((_childMethodCallPos, "MRR", type));
+        AddTarget(($"{_childMethodCallPos?.pos}", "MRR", type));
     }
 
     private void ScanMAPTargets(ConcreteAssignStatement cAStmt) {
-        if (!ShouldImplement("MAP") || !IsIncludedInTarget(int.Parse(_childMethodCallPos))) return;
+        if (!ShouldImplement("MAP") || !IsIncludedInTarget(_childMethodCallPos)) return;
 
         var argProp = "";
         foreach (var lhs in cAStmt.Lhss) {
@@ -275,34 +275,34 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
             argProp = argProp == "" ? $"{methodArgPos}" : $"{argProp}-{methodArgPos}";
         }
         if (argProp != "")
-            AddTarget((_childMethodCallPos, "MAP", argProp));
+            AddTarget(($"{_childMethodCallPos?.pos}", "MAP", argProp));
     }
     
     private void ScanMAPTargets(SuffixExpr suffixExpr) {
-        if (!ShouldImplement("MAP") || !IsIncludedInTarget(int.Parse(_childMethodCallPos))) return;
+        if (!ShouldImplement("MAP") || !IsIncludedInTarget(_childMethodCallPos)) return;
 
         var type = TypeToStr(suffixExpr.Type);
         var methodArgPos = _childMethodCallArgTypes.IndexOf(type);
         if (methodArgPos == -1)
             return;
-        AddTarget((_childMethodCallPos, "MAP", $"{methodArgPos}"));
+        AddTarget(($"{_childMethodCallPos?.pos}", "MAP", $"{methodArgPos}"));
     }
 
     private void ScanMNRTargets(ConcreteAssignStatement cAStmt) {
-        if (!ShouldImplement("MNR") || _childExprDotName == null || !IsIncludedInTarget(int.Parse(_childMethodCallPos))) 
+        if (!ShouldImplement("MNR") || _childExprDotName == null || !IsIncludedInTarget(_childMethodCallPos)) 
             return;
 
         if (cAStmt.Lhss.Count == 1 && // naked receiver can be applied if the types match or if they are inferred from context
             cAStmt.Lhss[0].Type.ToString() == _childExprDotName.Lhs.Type.ToString())
-            AddTarget((_childMethodCallPos, "MNR", ""));
+            AddTarget(($"{_childMethodCallPos?.pos}", "MNR", ""));
     }
     
     private void ScanMNRTargets(SuffixExpr suffixExpr) {
-        if (!ShouldImplement("MNR") || _childExprDotName == null || !IsIncludedInTarget(int.Parse(_childMethodCallPos))) 
+        if (!ShouldImplement("MNR") || _childExprDotName == null || !IsIncludedInTarget(_childMethodCallPos)) 
             return;
 
         if (suffixExpr.Type != null && suffixExpr.Type.ToString() == _childExprDotName.Lhs.Type.ToString())
-            AddTarget((_childMethodCallPos, "MNR", ""));
+            AddTarget(($"{_childMethodCallPos?.pos}", "MNR", ""));
     }
     
     private void ScanMCRTargets() {
@@ -340,7 +340,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     }
 
     private void ScanMVRTargets(ConcreteAssignStatement cAStmt) {
-        if (!ShouldImplement("MVR") || cAStmt.Lhss.Count == 0 || !IsIncludedInTarget(int.Parse(_childMethodCallPos))) 
+        if (!ShouldImplement("MVR") || cAStmt.Lhss.Count == 0 || !IsIncludedInTarget(_childMethodCallPos)) 
             return;
 
         var varsArg = "";
@@ -357,17 +357,17 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
             varsArg = varsArg == "" ? $"{selectedVar}" : $"{varsArg}-{selectedVar}";
         }
         
-        AddTarget((_childMethodCallPos, "MVR", varsArg));
+        AddTarget(($"{_childMethodCallPos?.pos}", "MVR", varsArg));
     }
 
     private void ScanMVRTargets(SuffixExpr suffixExpr) {
-        if (!ShouldImplement("MVR") || !IsIncludedInTarget(int.Parse(_childMethodCallPos)))
+        if (!ShouldImplement("MVR") || !IsIncludedInTarget(_childMethodCallPos))
             return;
         
         foreach (var var in _currentScopeVars) {
             if (suffixExpr.Type == null || var.Value.ToString() != suffixExpr.Type.ToString())
                 continue;
-            AddTarget((_childMethodCallPos, "MVR", var.Key));
+            AddTarget(($"{_childMethodCallPos?.pos}", "MVR", var.Key));
         }
     }
 
@@ -580,7 +580,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     protected override void HandleFunction(Function function) {
         _declaredMethods.Add(function);
         base.HandleFunction(function);
-        _childMethodCallPos = "";
+        _childMethodCallPos = null;
     }
 
     /// -------------------------------------
@@ -590,8 +590,8 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         if (!IsStatementOriginal(stmt))
             return;
         
-        var prevChildMethodCallPos = _childMethodCallPos;
-        _childMethodCallPos = "";
+        var prevChildMethodCallPos = CloneToken(_childMethodCallPos);
+        _childMethodCallPos = null;
         base.HandleStatement(stmt);
         _childMethodCallPos = prevChildMethodCallPos;
     }
@@ -623,7 +623,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         base.VisitStatement(aStmt);
         VisitLhss(aStmt);
         
-        if (_childMethodCallPos != "") // rhs is method call
+        if (_childMethodCallPos != null) // rhs is method call
             ScanMethodTargets(aStmt);
         _childMethodCallArgTypes = [];
         _childExprDotName = null;
@@ -633,7 +633,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         base.VisitStatement(aStStmt);
         VisitLhss(aStStmt);
 
-        if (_childMethodCallPos != "") // rhs is method call
+        if (_childMethodCallPos != null) // rhs is method call
             ScanMethodTargets(aStStmt);
         _childMethodCallArgTypes = [];
         _childExprDotName = null;
@@ -743,9 +743,9 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         var classDecl = nSegExpr.Type.AsTopLevelTypeWithMembers;
         if (classDecl != null && classDecl is ClassDecl && 
             classDecl.ParentTraitHeads.Count > 0 && 
-            !_childClassAccessedVariables.Contains((nSegExpr.Name, nSegExpr.Center.pos, nSegExpr.Type)))
+            !_childClassAccessedVariables.Contains((nSegExpr.Name, nSegExpr.Center, nSegExpr.Type)))
         {
-            _childClassAccessedVariables.Add((nSegExpr.Name, nSegExpr.Center.pos, nSegExpr.Type));
+            _childClassAccessedVariables.Add((nSegExpr.Name, nSegExpr.Center, nSegExpr.Type));
         }
         
         ScanUOITargets(nSegExpr);
@@ -772,7 +772,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     }
     
     protected override void VisitExpression(SuffixExpr suffixExpr) {
-        _childMethodCallPos = $"{suffixExpr.Center.pos}";
+        _childMethodCallPos = suffixExpr.Center;
         if (suffixExpr is ApplySuffix appSufExpr) {
             if (appSufExpr.Lhs is NameSegment)
                 _methodCalls.Add(appSufExpr);
@@ -805,7 +805,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         _skipChildEVRMutation = true;
         _skipChildVERMutation = true;
         _skipChildDCRMutation = true;
-        var prevChildMethodCallPos = _childMethodCallPos;
+        var prevChildMethodCallPos = CloneToken(_childMethodCallPos);
         var prevChildMethodCallArgTypes = _childMethodCallArgTypes;
         _childMethodCallArgTypes = [];
         base.VisitExpression(suffixExpr);

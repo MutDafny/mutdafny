@@ -2,7 +2,7 @@
 
 namespace MutDafny.Visitor;
 
-public abstract class TargetScanner(string mutationTargetURI, (int, int) mutationTargetRange, List<string> operatorsInUse, ErrorReporter reporter) : Visitor("-1", reporter)
+public abstract class TargetScanner(string mutationTargetURI, int mutationTargetLine, (int, int) mutationTargetRange, List<string> operatorsInUse, ErrorReporter reporter) : Visitor("-1", reporter)
 {
     protected List<(string, string, string)> Targets { get; } = ImportPreviousTargets();
     protected bool IsParentSpec;
@@ -69,6 +69,14 @@ public abstract class TargetScanner(string mutationTargetURI, (int, int) mutatio
         }
         return false;
     }
+
+    protected Token? CloneToken(Token? token) {
+        if (token == null) return null;
+        var tokenClone = new Token(token.line, token.pos) {
+            pos = token.pos
+        };
+        return tokenClone;
+    }
     
     /// -----------------
     /// Overriden visitor
@@ -88,21 +96,29 @@ public abstract class TargetScanner(string mutationTargetURI, (int, int) mutatio
     /// Utils
     /// -----------------
     protected bool IsIncludedInTarget(Node node) {
-        return IsIncludedInTarget(node.StartToken.pos, node.EndToken.pos);
+        return IsIncludedInTarget(node.StartToken, node.EndToken);
     }
     
-    protected bool IsIncludedInTarget(int tokenStartPos, int tokenEndPos) {
-        if (mutationTargetRange is { Item1: -1, Item2: -1 })
-            return true;
-        return mutationTargetRange.Item1 <= tokenStartPos && 
-               mutationTargetRange.Item2 >= tokenEndPos;
+    protected bool IsIncludedInTarget(Token? start, Token? end) {
+        if (start == null || end == null)
+            return mutationTargetLine == -1 && mutationTargetRange is { Item1: -1, Item2: -1 };
+        if (mutationTargetLine != -1)
+            return mutationTargetLine == start.line && mutationTargetLine == end.line;
+        if (mutationTargetRange is not { Item1: -1, Item2: -1 })
+            return mutationTargetRange.Item1 <= start.pos && 
+                   mutationTargetRange.Item2 >= end.pos;
+        return true;
     }
     
-    protected bool IsIncludedInTarget(int tokenPos) {
-        if (mutationTargetRange is { Item1: -1, Item2: -1 })
-            return true;
-        return mutationTargetRange.Item1 <= tokenPos && 
-               mutationTargetRange.Item2 >= tokenPos;
+    protected bool IsIncludedInTarget(Token? token) {
+        if (token == null)
+            return mutationTargetLine == -1 && mutationTargetRange is { Item1: -1, Item2: -1 };
+        if (mutationTargetLine != -1)
+            return mutationTargetLine == token.line;
+        if (mutationTargetRange is not { Item1: -1, Item2: -1 })
+            return mutationTargetRange.Item1 <= token.pos && 
+                   mutationTargetRange.Item2 >= token.pos;
+        return true;
     }
     
     protected bool ContainsLemmaChild(Node node) {

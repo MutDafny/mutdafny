@@ -10,6 +10,7 @@
 # run.sh
 #   <full path to the program under test, e.g., $SCRIPT_DIR/../DafnyBench/DafnyBench/dataset/ground_truth/630-dafny_tmp_tmpz2kokaiq_Solution.dfy> 
 #   [--method <the specific method of the program to mutate, e.g., Main (none by default)>]
+#   [--line <the specific line of the program to mutate, e.g., 3 (none by default)>]
 #   [--range <the specific range of positions of the program to mutate, e.g., 150-300 (none by default)>]
 #   [--num_mutations <the number of mutations to apply to the input program, e.g., 1 (by default)>]
 #   [--run_dir <the directory where the script should be run, e.g., $SCRIPT_DIR (by deafult)>]
@@ -29,6 +30,7 @@ die() {
 USAGE="Usage: ${BASH_SOURCE[0]}
    <full path to the program under test, e.g., $SCRIPT_DIR/../DafnyBench/DafnyBench/dataset/ground_truth/630-dafny_tmp_tmpz2kokaiq_Solution.dfy>
    [--method <the specific method of the program to mutate, e.g., Main (none by default)>]
+   [--line <the specific line of the program to mutate, e.g., 3 (none by default)>]
    [--range <the specific range of positions of the program to mutate, e.g., 150-300 (none by default)>]
    [--num_mutations <the number of mutations to apply to the input program, e.g., 1 (by default)>]
    [--run_dir <the directory where the script should be run, e.g., ./ (by deafult)>]
@@ -48,6 +50,7 @@ PROGRAM=$1;
 PROGRAM="$(cd "$(dirname "$PROGRAM")" && pwd)/$(basename "$PROGRAM")" # Get full path
 shift
 METHOD=""
+LINE=""
 RANGE=""
 NUM_MUTS=1
 RUN_DIR="$SCRIPT_DIR"
@@ -57,6 +60,9 @@ while [[ "$1" = --* ]]; do
   case $OPTION in
     (--method)
       METHOD=$1;
+      shift;;
+    (--line)
+      LINE=$1;
       shift;;
     (--range)
       RANGE=$1;
@@ -101,11 +107,13 @@ get_scan_program() {
     fi
 
     if [[ -n $RANGE ]]; then 
-        echo $RANGE
+        echo "range:$RANGE"
     elif [[ -n $METHOD ]]; then
-        echo $METHOD
+        echo "method:$METHOD"
+    elif [[ -n $LINE ]]; then
+        echo "line:$LINE"
     else
-        echo $uri
+        echo "uri:$uri"
     fi
 }
 

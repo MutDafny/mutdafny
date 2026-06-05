@@ -2,13 +2,13 @@
 
 namespace MutDafny.Visitor;
 
-public class PreResolveTargetScanner(string mutationTargetURI, string mutationTargetMethod, (int, int) mutationTargetRange, List<string> operatorsInUse, ErrorReporter reporter)
-    : TargetScanner(mutationTargetURI, mutationTargetRange, operatorsInUse, reporter)
+public class PreResolveTargetScanner(string mutationTargetURI, string mutationTargetMethod, int mutationTargetLine, (int, int) mutationTargetRange, List<string> operatorsInUse, ErrorReporter reporter)
+    : TargetScanner(mutationTargetURI, mutationTargetLine, mutationTargetRange, operatorsInUse, reporter)
 {
     private List<string> _coveredVariableNames = [];
     private List<string> _varsToDelete = [];
     private static readonly List<BinaryExpr.Opcode> CoveredOperators = [];
-    private string _currentScope = "-";
+    private (Token?, Token?) _currentScope;
     private List<string> _currentMethodIns = [];
     private List<string> _currentMethodOuts = [];
     private List<string> _currentInitMethodOuts = [];
@@ -229,13 +229,13 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
     /// -------------------------------------
     public override void Find(ModuleDefinition module) {
         if (module.EndToken.pos != 0)
-            _currentScope = $"{module.StartToken.pos}-{module.EndToken.pos}";
+            _currentScope = (module.StartToken, module.EndToken);
         base.Find(module);
     }
     
     protected override void HandleMemberDecls(TopLevelDeclWithMembers decl) {
-        var prevCurrentScope = _currentScope;
-        _currentScope = $"{decl.StartToken.pos}-{decl.EndToken.pos}";
+        var prevCurrentScope = (CloneToken(_currentScope.Item1), CloneToken(_currentScope.Item2));
+        _currentScope = (decl.StartToken, decl.EndToken);
         _currentSourceDeclFields = [];
         
         foreach (var member in decl.Members) {
@@ -247,10 +247,10 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
             if (member is not ConstantField cf) continue;
             OriginalFields.Add(cf);
             
-            if (!ShouldImplement("VDL") || mutationTargetMethod != "" || mutationTargetRange != (-1, -1)) 
+            if (!ShouldImplement("VDL") || mutationTargetMethod != "" || mutationTargetRange != (-1, -1) || mutationTargetLine != -1)
                 break;
             _varsToDelete.Add(cf.Name);
-            AddTarget((_currentScope, "VDL", cf.Name));
+            AddTarget(($"{_currentScope.Item1?.pos}-{_currentScope.Item2?.pos}", "VDL", cf.Name));
         }
         base.HandleMemberDecls(decl);
         IsFirstVisit = false;
@@ -286,8 +286,8 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
     }
 
     protected override void HandleBlock(BlockStmt blockStmt) {
-        var prevCurrentScope = _currentScope;
-        _currentScope = $"{blockStmt.StartToken.pos}-{blockStmt.EndToken.pos}";
+        var prevCurrentScope = (CloneToken(_currentScope.Item1), CloneToken(_currentScope.Item2));
+        _currentScope = (blockStmt.StartToken, blockStmt.EndToken);
         var prevVarsToDelete = _varsToDelete.Select(item => (string)item.Clone()).ToList();
         
         base.HandleBlock(blockStmt);
@@ -354,11 +354,11 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
         _isParentVarDeclStmt = true;
         foreach (var var in vDeclStmt.Locals) {
             if (!ShouldImplement("VDL") || 
-                !IsIncludedInTarget(int.Parse(_currentScope.Split("-")[0]), int.Parse(_currentScope.Split("-")[1]))) 
+                !IsIncludedInTarget(_currentScope.Item1, _currentScope.Item2))
                 break;
             if (_varsToDelete.Contains(var.Name)) continue;
             _varsToDelete.Add(var.Name);
-            AddTarget((_currentScope, "VDL", var.Name));
+            AddTarget(($"{_currentScope.Item1?.pos}-{_currentScope.Item2?.pos}", "VDL", var.Name));
         }
 
         base.VisitStatement(vDeclStmt);
@@ -566,8 +566,9 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
                 AddTarget(($"{bExpr.Center.pos}", opName, replacement.ToString()));
         }
         
-        if (ShouldImplement("ODL") && !CoveredOperators.Contains(bExpr.Op)
-            && mutationTargetRange == (-1, -1) && mutationTargetMethod == "") {
+        if (ShouldImplement("ODL") && !CoveredOperators.Contains(bExpr.Op) &&
+            mutationTargetMethod == "" && mutationTargetRange == (-1, -1) && mutationTargetLine == -1) 
+        {
             CoveredOperators.Add(bExpr.Op);
             AddTarget(("-", "ODL", $"{bExpr.Op.ToString()}-left"));
             AddTarget(("-", "ODL", $"{bExpr.Op.ToString()}-right"));
