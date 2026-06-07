@@ -219,6 +219,22 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
         return true;
     }
 
+    private bool IsBORTargetAllowed(BinaryExpr bExpr, BinaryExpr.Opcode replacementOp) {
+        // a.Length == 0 <==> a.Length <= 0
+        if ((bExpr.E0 is UnaryOpExpr uOpExpr1 && uOpExpr1.Op is UnaryOpExpr.Opcode.Cardinality ||
+             bExpr.E0 is ExprDotName exprDName1 && exprDName1.SuffixName == "Length") &&
+            ((bExpr.Op is BinaryExpr.Opcode.Eq && replacementOp is BinaryExpr.Opcode.Le) ||
+             (bExpr.Op is BinaryExpr.Opcode.Le && replacementOp is BinaryExpr.Opcode.Eq)))
+            return false;
+        // 0 == a.Length <==> 0 >= a.Length
+        if ((bExpr.E1 is UnaryOpExpr uOpExpr2 && uOpExpr2.Op is UnaryOpExpr.Opcode.Cardinality ||
+             bExpr.E1 is ExprDotName exprDName2 && exprDName2.SuffixName == "Length") &&
+            ((bExpr.Op is BinaryExpr.Opcode.Eq && replacementOp is BinaryExpr.Opcode.Ge) ||
+             (bExpr.Op is BinaryExpr.Opcode.Ge && replacementOp is BinaryExpr.Opcode.Eq)))
+            return false;
+        return true;
+    }
+
     private bool ExcludeSWSTarget(Statement stmt) {
         return stmt is PrintStmt || stmt is OpaqueBlock || stmt is PredicateStmt || stmt is CalcStmt ||
                (stmt is VarDeclStmt && stmt.CoveredTokens.Select((e) => e.val).Contains("ghost")) ||
@@ -598,8 +614,10 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
         if (!_replacementOpType.TryGetValue(bExpr.Op, out var opName))
             return;
         if (ShouldImplement(opName) && IsIncludedInTarget(bExpr)) {
-            foreach (var replacement in replacementList)
-                AddTarget(($"{bExpr.Center.pos}", opName, replacement.ToString()));
+            foreach (var replacement in replacementList) {
+                if (IsBORTargetAllowed(bExpr, replacement))
+                    AddTarget(($"{bExpr.Center.pos}", opName, replacement.ToString()));
+            }
         }
         
         if (ShouldImplement("ODL") && !CoveredOperators.Contains(bExpr.Op) &&
@@ -643,7 +661,8 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
                 return;
             if (ShouldImplement(opName) && IsIncludedInTarget(e)) {
                 foreach (var replacement in replacementList) {
-                    AddTarget(($"{e.Center.pos}", opName, replacement.ToString()));
+                    if (IsBORTargetAllowed(new BinaryExpr(null, op, e, cExpr.Operands[i + 1]), replacement))
+                        AddTarget(($"{e.Center.pos}", opName, replacement.ToString()));
                 }
             }
 
