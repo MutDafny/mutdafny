@@ -6,6 +6,7 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
     : TargetScanner(mutationTargetURI, mutationTargetLine, mutationTargetRange, operatorsInUse, reporter)
 {
     private List<string> _coveredVariableNames = [];
+    private List<string> _prevCoveredVariableNames = [];
     private List<string> _varsToDelete = [];
     private static readonly List<BinaryExpr.Opcode> CoveredOperators = [];
     private (Token?, Token?) _currentScope;
@@ -223,6 +224,38 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
                (stmt is VarDeclStmt && stmt.CoveredTokens.Select((e) => e.val).Contains("ghost")) ||
                (stmt is AssignStatement aStmt && ContainsLemmaChild(aStmt));
     }
+
+    private bool IsSWSTargetAllowed(Statement currStmt, Statement prevStmt) {
+        if ((currStmt is ReturnStmt && prevStmt is not VarDeclStmt) || 
+            currStmt is BreakOrContinueStmt || prevStmt is ReturnStmt || prevStmt is BreakOrContinueStmt)
+            return true;
+        
+        // prevStmt initializes variables used in currStmt (SWS will be invalid)
+        if (prevStmt is VarDeclStmt vDeclStmt1 && 
+            vDeclStmt1.Locals.Select(e => e.Name)
+                .Intersect(_coveredVariableNames).Any())
+            return false;
+        // prevStmt does not update variables used in currStmt (SWS will have no effect)
+        if (prevStmt is AssignStatement aStmt1 && 
+            aStmt1.Lhss.Select(lhs => (lhs as NameSegment)?.Name)
+                .Intersect(_coveredVariableNames).Any())
+            return false;
+        
+        // currStmt does not update variables used in prevStmt (SWS will have no effect)
+        if (currStmt is VarDeclStmt vDeclStmt2 && 
+            !vDeclStmt2.Locals.Select(e => e.Name).
+                Intersect(_prevCoveredVariableNames).Any())
+            return false;
+        if (currStmt is AssignStatement aStmt2 && 
+            !aStmt2.Lhss.Select(lhs => (lhs as NameSegment)?.Name)
+                .Intersect(_prevCoveredVariableNames).Any())
+            return false;
+        
+        if (!_coveredVariableNames.Intersect(_prevCoveredVariableNames).Any())
+            return false;
+        
+        return true;
+    }
     
     /// -------------------------------------
     /// Group of overriden top level visitors
@@ -299,8 +332,10 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
     protected override void HandleBlock(List<Statement> statements) {
         Statement? prevStmt = null;
         var allCoveredVariableNames = _coveredVariableNames;
+        var allPrevCoveredVariableNames = _prevCoveredVariableNames;
             
         foreach (var stmt in statements) {
+            _prevCoveredVariableNames = _coveredVariableNames;
             _coveredVariableNames = []; // collect vars used in next statement
             if (stmt is not PredicateStmt && stmt is not CalcStmt)
                 _parentBlockHasStmt = true;
@@ -313,12 +348,13 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
             }
             
             if (IsIncludedInTarget(prevStmt) && IsIncludedInTarget(prevStmt) && 
-                (prevStmt is not VarDeclStmt vDeclStmt || !vDeclStmt.Locals.Select(e => e.Name).Intersect(_coveredVariableNames).Any()))
+                IsSWSTargetAllowed(stmt, prevStmt))
                 AddTarget(($"{stmt.StartToken.pos}-{stmt.EndToken.pos}", "SWS", ""));
             prevStmt = stmt;
             allCoveredVariableNames = allCoveredVariableNames.Concat(_coveredVariableNames).ToList();
         }
         _coveredVariableNames = allCoveredVariableNames;
+        _prevCoveredVariableNames = allPrevCoveredVariableNames;
     }
     
     protected override void VisitStatement(ConcreteAssignStatement cAStmt) {
