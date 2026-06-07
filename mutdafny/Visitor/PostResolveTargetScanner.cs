@@ -30,7 +30,10 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
             _skipChildUOIMutation = false;
             return;
         }
-        if (expr is LiteralExpr { Value: 0 }) return;
+        if (expr is LiteralExpr litExpr && 
+            ((litExpr.Value is BigInteger bi && bi == BigInteger.Zero) || 
+            (litExpr.Value is BigDec bd && bd == BigDec.ZERO))) 
+            return;
         
         var exprLocation = $"{expr.StartToken.pos}-{expr.EndToken.pos}";
         switch (expr.Type) {
