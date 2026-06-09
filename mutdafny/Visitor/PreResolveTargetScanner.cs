@@ -1,4 +1,5 @@
-﻿using Microsoft.Dafny;
+﻿using System.Numerics;
+using Microsoft.Dafny;
 
 namespace MutDafny.Visitor;
 
@@ -14,6 +15,11 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
     private List<string> _currentMethodOuts = [];
     private List<string> _currentInitMethodOuts = [];
     private List<string> _currentSourceDeclFields = [];
+    private Dictionary<string, Expression> _assigns = [];
+    private List<Expression> _loopBoundVarUpdates = [];
+    private Statement? _parentLoopGuardBody;
+    private NameSegment? _currentLoopBoundVar;
+    private bool _visitFurther = true;
     private bool _isCurrentMethodVoid;
     private bool _parentBlockHasStmt;
     private bool _isChildIfBlock;
@@ -223,16 +229,60 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
         // a.Length == 0 <==> a.Length <= 0
         if ((bExpr.E0 is UnaryOpExpr uOpExpr1 && uOpExpr1.Op is UnaryOpExpr.Opcode.Cardinality ||
              bExpr.E0 is ExprDotName exprDName1 && exprDName1.SuffixName == "Length") &&
+            bExpr.E1 is LiteralExpr litExpr1 && litExpr1.Value is BigInteger bi1 && bi1 == BigInteger.Zero &&
             ((bExpr.Op is BinaryExpr.Opcode.Eq && replacementOp is BinaryExpr.Opcode.Le) ||
              (bExpr.Op is BinaryExpr.Opcode.Le && replacementOp is BinaryExpr.Opcode.Eq)))
             return false;
         // 0 == a.Length <==> 0 >= a.Length
         if ((bExpr.E1 is UnaryOpExpr uOpExpr2 && uOpExpr2.Op is UnaryOpExpr.Opcode.Cardinality ||
              bExpr.E1 is ExprDotName exprDName2 && exprDName2.SuffixName == "Length") &&
+            bExpr.E1 is LiteralExpr litExpr2 && litExpr2.Value is BigInteger bi2 && bi2 == BigInteger.Zero &&
             ((bExpr.Op is BinaryExpr.Opcode.Eq && replacementOp is BinaryExpr.Opcode.Ge) ||
              (bExpr.Op is BinaryExpr.Opcode.Ge && replacementOp is BinaryExpr.Opcode.Eq)))
             return false;
+        
+        if (IsEquivalentRORLoopGuardTarget(bExpr)) {
+            // a.Length > n <==> a.Length != n; in a loop guard if n is initially 0 and incremented 1 at a time
+            if ((bExpr.E0 is UnaryOpExpr uOpExpr3 && uOpExpr3.Op is UnaryOpExpr.Opcode.Cardinality ||
+                 bExpr.E0 is ExprDotName exprDName3 && exprDName3.SuffixName == "Length") &&
+                ((bExpr.Op is BinaryExpr.Opcode.Gt && replacementOp is BinaryExpr.Opcode.Neq) ||
+                 (bExpr.Op is BinaryExpr.Opcode.Neq && replacementOp is BinaryExpr.Opcode.Gt)))
+                return false;
+            // n < a.Length <==> n != a.Length; in a loop guard if n is initially 0 and incremented 1 at a time
+            if ((bExpr.E1 is UnaryOpExpr uOpExpr4 && uOpExpr4.Op is UnaryOpExpr.Opcode.Cardinality ||
+                 bExpr.E1 is ExprDotName exprDName4 && exprDName4.SuffixName == "Length") &&
+                ((bExpr.Op is BinaryExpr.Opcode.Lt && replacementOp is BinaryExpr.Opcode.Neq) ||
+                 (bExpr.Op is BinaryExpr.Opcode.Neq && replacementOp is BinaryExpr.Opcode.Lt)))
+                return false;
+        }
         return true;
+    }
+
+    private bool IsEquivalentRORLoopGuardTarget(BinaryExpr bExpr) {
+        if (_parentLoopGuardBody == null) return false;
+        _currentLoopBoundVar = bExpr.E0 is NameSegment nSegExpr0 ? nSegExpr0 :
+            bExpr.E1 is NameSegment nSegExpr1 ? nSegExpr1 : null; 
+        if (_currentLoopBoundVar == null) return false;
+        
+        if (!(_assigns.TryGetValue(_currentLoopBoundVar.Name, out var val) &&
+              val is LiteralExpr litExpr3 && litExpr3.Value is BigInteger bi3 && bi3 == BigInteger.Zero))
+            return false;
+        
+        _loopBoundVarUpdates = [];
+        _visitFurther = false;
+        HandleStatement(_parentLoopGuardBody);
+        _visitFurther = true;
+        if (_loopBoundVarUpdates.Count != 1 || _loopBoundVarUpdates[0] is not BinaryExpr incrementExpr) 
+            return false;
+        if (incrementExpr.E0 is NameSegment nSegExpr2 && nSegExpr2.Name == _currentLoopBoundVar.Name && 
+            incrementExpr.E1 is LiteralExpr litExpr1 && litExpr1.Value is BigInteger bi1 && bi1 == BigInteger.One &&
+            incrementExpr.Op == BinaryExpr.Opcode.Add)
+            return true;
+        if (incrementExpr.E0 is LiteralExpr litExpr2 && litExpr2.Value is BigInteger bi2 && bi2 == BigInteger.One && 
+            incrementExpr.E1 is NameSegment nSegExpr3 && nSegExpr3.Name == _currentLoopBoundVar.Name && 
+            incrementExpr.Op == BinaryExpr.Opcode.Add)
+            return true;
+        return false;
     }
 
     private bool ExcludeSWSTarget(Statement stmt) {
@@ -337,11 +387,13 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
     protected override void HandleBlock(BlockStmt blockStmt) {
         var prevCurrentScope = (CloneToken(_currentScope.Item1), CloneToken(_currentScope.Item2));
         _currentScope = (blockStmt.StartToken, blockStmt.EndToken);
+        var prevAssigns = new Dictionary<string, Expression>(_assigns);
         var prevVarsToDelete = _varsToDelete.Select(item => (string)item.Clone()).ToList();
         
         base.HandleBlock(blockStmt);
         
         _currentScope = prevCurrentScope;
+        _assigns = prevAssigns;
         _varsToDelete = prevVarsToDelete;
     }
     
@@ -399,6 +451,13 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
     
     protected override void VisitStatement(AssignStatement aStmt) {
         if (ContainsLemmaChild(aStmt)) return;
+        foreach (var (lhs, i) in aStmt.Lhss.Select((lhs, i) => (lhs, i))) {
+            if (lhs != null && aStmt.Rhss[i] is ExprRhs rhs) {
+                _assigns.AddOrUpdate(lhs.ToString(), rhs.Expr, (_, _) => rhs.Expr);
+                if (_currentLoopBoundVar != null && lhs.ToString() == _currentLoopBoundVar.Name)
+                    _loopBoundVarUpdates.Add(rhs.Expr);
+            }
+        }
         base.VisitStatement(aStmt);
     }
     
@@ -487,7 +546,13 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
         if (ShouldImplement("LBI") && IsIncludedInTarget(whileStmt))
             AddTarget(($"{whileStmt.StartToken.pos}-{whileStmt.EndToken.pos}", "LBI", ""));
         VisitStatement(whileStmt as LoopStmt);
-        base.VisitStatement(whileStmt);
+        
+        if (IsWorthVisiting(whileStmt.Guard.StartToken.pos, whileStmt.Guard.EndToken.pos)) {
+            _parentLoopGuardBody = whileStmt.Body;
+            HandleExpression(whileStmt.Guard);
+            _parentLoopGuardBody = null;
+        }
+        if (whileStmt.Body != null) HandleBlock(whileStmt.Body);  
     }
     
     protected override void VisitStatement(ForLoopStmt forStmt) {
@@ -608,6 +673,12 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
     /// --------------------------------------
     /// Group of overriden expression visitors
     /// --------------------------------------
+    protected override void HandleExpression(Expression expr) {
+        if (!_visitFurther)
+            return;
+        base.HandleExpression(expr);
+    }
+    
     protected override void VisitExpression(BinaryExpr bExpr) {
         if (!_replacementList.TryGetValue(bExpr.Op, out var replacementList)) 
             return;
