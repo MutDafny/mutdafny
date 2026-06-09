@@ -226,36 +226,60 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
     }
 
     private bool ExcludeBORTarget(BinaryExpr bExpr, BinaryExpr.Opcode replacementOp) {
-        // a.Length == 0 <==> a.Length <= 0
-        if ((bExpr.E0 is UnaryOpExpr uOpExpr1 && uOpExpr1.Op is UnaryOpExpr.Opcode.Cardinality ||
-             bExpr.E0 is ExprDotName exprDName1 && exprDName1.SuffixName == "Length") &&
-            bExpr.E1 is LiteralExpr litExpr1 && litExpr1.Value is BigInteger bi1 && bi1 == BigInteger.Zero &&
-            ((bExpr.Op is BinaryExpr.Opcode.Eq && replacementOp is BinaryExpr.Opcode.Le) ||
-             (bExpr.Op is BinaryExpr.Opcode.Le && replacementOp is BinaryExpr.Opcode.Eq)))
+        // n % i <= 0 <==> n % i == 0
+        if (IsModuleComparisonWithZero(bExpr.E0, bExpr.E1) && 
+            ((bExpr.Op == BinaryExpr.Opcode.Le && replacementOp == BinaryExpr.Opcode.Eq) ||
+             (bExpr.Op == BinaryExpr.Opcode.Eq && replacementOp == BinaryExpr.Opcode.Le)))
             return true;
-        // 0 == a.Length <==> 0 >= a.Length
-        if ((bExpr.E1 is UnaryOpExpr uOpExpr2 && uOpExpr2.Op is UnaryOpExpr.Opcode.Cardinality ||
-             bExpr.E1 is ExprDotName exprDName2 && exprDName2.SuffixName == "Length") &&
-            bExpr.E1 is LiteralExpr litExpr2 && litExpr2.Value is BigInteger bi2 && bi2 == BigInteger.Zero &&
-            ((bExpr.Op is BinaryExpr.Opcode.Eq && replacementOp is BinaryExpr.Opcode.Ge) ||
-             (bExpr.Op is BinaryExpr.Opcode.Ge && replacementOp is BinaryExpr.Opcode.Eq)))
+        // 0 >= n % i <==> 0 == n % i
+        if (IsModuleComparisonWithZero(bExpr.E1, bExpr.E0) && 
+            ((bExpr.Op == BinaryExpr.Opcode.Ge && replacementOp == BinaryExpr.Opcode.Eq) ||
+             (bExpr.Op == BinaryExpr.Opcode.Eq && replacementOp == BinaryExpr.Opcode.Ge)))
             return true;
         
-        if (IsEquivalentRORLoopGuardTarget(bExpr)) {
-            // a.Length > n <==> a.Length != n; in a loop guard if n is initially 0 and incremented 1 at a time
-            if ((bExpr.E0 is UnaryOpExpr uOpExpr3 && uOpExpr3.Op is UnaryOpExpr.Opcode.Cardinality ||
-                 bExpr.E0 is ExprDotName exprDName3 && exprDName3.SuffixName == "Length") &&
-                ((bExpr.Op is BinaryExpr.Opcode.Gt && replacementOp is BinaryExpr.Opcode.Neq) ||
-                 (bExpr.Op is BinaryExpr.Opcode.Neq && replacementOp is BinaryExpr.Opcode.Gt)))
-                return true;
-            // n < a.Length <==> n != a.Length; in a loop guard if n is initially 0 and incremented 1 at a time
-            if ((bExpr.E1 is UnaryOpExpr uOpExpr4 && uOpExpr4.Op is UnaryOpExpr.Opcode.Cardinality ||
-                 bExpr.E1 is ExprDotName exprDName4 && exprDName4.SuffixName == "Length") &&
-                ((bExpr.Op is BinaryExpr.Opcode.Lt && replacementOp is BinaryExpr.Opcode.Neq) ||
-                 (bExpr.Op is BinaryExpr.Opcode.Neq && replacementOp is BinaryExpr.Opcode.Lt)))
-                return true;
-        }
+        // a.Length == 0 <==> a.Length <= 0
+        if (IsCollectionLengthComparisonWithZero(bExpr.E0, bExpr.E1) &&
+            ((bExpr.Op == BinaryExpr.Opcode.Eq && replacementOp == BinaryExpr.Opcode.Le) ||
+             (bExpr.Op == BinaryExpr.Opcode.Le && replacementOp == BinaryExpr.Opcode.Eq)))
+            return true;
+        // 0 == a.Length <==> 0 >= a.Length
+        if (IsCollectionLengthComparisonWithZero(bExpr.E1, bExpr.E0) &&
+            ((bExpr.Op == BinaryExpr.Opcode.Eq && replacementOp == BinaryExpr.Opcode.Ge) ||
+             (bExpr.Op == BinaryExpr.Opcode.Ge && replacementOp == BinaryExpr.Opcode.Eq)))
+            return true;
+
+        if (!IsEquivalentRORLoopGuardTarget(bExpr)) return false;
+        // a.Length > n <==> a.Length != n; in a loop guard if n is initially 0 and incremented 1 at a time
+        if ((bExpr.E0 is UnaryOpExpr uOpExpr3 && uOpExpr3.Op is UnaryOpExpr.Opcode.Cardinality ||
+             bExpr.E0 is ExprDotName exprDName3 && exprDName3.SuffixName == "Length") &&
+            ((bExpr.Op == BinaryExpr.Opcode.Gt && replacementOp == BinaryExpr.Opcode.Neq) ||
+             (bExpr.Op == BinaryExpr.Opcode.Neq && replacementOp == BinaryExpr.Opcode.Gt)))
+            return true;
+        // n < a.Length <==> n != a.Length; in a loop guard if n is initially 0 and incremented 1 at a time
+        if ((bExpr.E1 is UnaryOpExpr uOpExpr4 && uOpExpr4.Op is UnaryOpExpr.Opcode.Cardinality ||
+             bExpr.E1 is ExprDotName exprDName4 && exprDName4.SuffixName == "Length") &&
+            ((bExpr.Op == BinaryExpr.Opcode.Lt && replacementOp == BinaryExpr.Opcode.Neq) ||
+             (bExpr.Op == BinaryExpr.Opcode.Neq && replacementOp == BinaryExpr.Opcode.Lt)))
+            return true;
+        
         return false;
+    }
+    
+    private bool IsModuleComparisonWithZero(Expression expr0, Expression expr1) {
+        if (expr0 is not BinaryExpr bExpr || bExpr.Op != BinaryExpr.Opcode.Mod)
+            return false;
+        if (expr1 is not LiteralExpr litExpr || litExpr.Value is not BigInteger bi || bi != BigInteger.Zero)
+            return false;
+        return true;
+    }
+
+    private bool IsCollectionLengthComparisonWithZero(Expression expr0, Expression expr1) {
+        if ((expr0 is not UnaryOpExpr uOpExpr || uOpExpr.Op is not UnaryOpExpr.Opcode.Cardinality) &&
+            (expr0 is not ExprDotName exprDName || exprDName.SuffixName == "Length"))
+            return false;
+        if (expr1 is not LiteralExpr litExpr || litExpr.Value is not BigInteger bi || bi != BigInteger.Zero)
+            return false;
+        return true;
     }
 
     private bool IsEquivalentRORLoopGuardTarget(BinaryExpr bExpr) {
