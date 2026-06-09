@@ -1,4 +1,5 @@
-﻿using Microsoft.Dafny;
+﻿using System.Numerics;
+using Microsoft.Dafny;
 
 namespace MutDafny.Visitor;
 
@@ -135,5 +136,13 @@ public abstract class TargetScanner(string mutationTargetURI, int mutationTarget
                 return true;
         }
         return false;
+    }
+    
+    protected bool IsModuleComparisonWithZero(Expression expr0, Expression expr1) {
+        if (expr0 is not BinaryExpr bExpr || bExpr.Op != BinaryExpr.Opcode.Mod)
+            return false;
+        if (expr1 is not LiteralExpr litExpr || litExpr.Value is not BigInteger bi || bi != BigInteger.Zero)
+            return false;
+        return true;
     }
 }

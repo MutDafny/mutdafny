@@ -264,14 +264,6 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
         
         return false;
     }
-    
-    private bool IsModuleComparisonWithZero(Expression expr0, Expression expr1) {
-        if (expr0 is not BinaryExpr bExpr || bExpr.Op != BinaryExpr.Opcode.Mod)
-            return false;
-        if (expr1 is not LiteralExpr litExpr || litExpr.Value is not BigInteger bi || bi != BigInteger.Zero)
-            return false;
-        return true;
-    }
 
     private bool IsCollectionLengthComparisonWithZero(Expression expr0, Expression expr1) {
         if ((expr0 is not UnaryOpExpr uOpExpr || uOpExpr.Op is not UnaryOpExpr.Opcode.Cardinality) &&
