@@ -225,21 +225,21 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
         return true;
     }
 
-    private bool IsBORTargetAllowed(BinaryExpr bExpr, BinaryExpr.Opcode replacementOp) {
+    private bool ExcludeBORTarget(BinaryExpr bExpr, BinaryExpr.Opcode replacementOp) {
         // a.Length == 0 <==> a.Length <= 0
         if ((bExpr.E0 is UnaryOpExpr uOpExpr1 && uOpExpr1.Op is UnaryOpExpr.Opcode.Cardinality ||
              bExpr.E0 is ExprDotName exprDName1 && exprDName1.SuffixName == "Length") &&
             bExpr.E1 is LiteralExpr litExpr1 && litExpr1.Value is BigInteger bi1 && bi1 == BigInteger.Zero &&
             ((bExpr.Op is BinaryExpr.Opcode.Eq && replacementOp is BinaryExpr.Opcode.Le) ||
              (bExpr.Op is BinaryExpr.Opcode.Le && replacementOp is BinaryExpr.Opcode.Eq)))
-            return false;
+            return true;
         // 0 == a.Length <==> 0 >= a.Length
         if ((bExpr.E1 is UnaryOpExpr uOpExpr2 && uOpExpr2.Op is UnaryOpExpr.Opcode.Cardinality ||
              bExpr.E1 is ExprDotName exprDName2 && exprDName2.SuffixName == "Length") &&
             bExpr.E1 is LiteralExpr litExpr2 && litExpr2.Value is BigInteger bi2 && bi2 == BigInteger.Zero &&
             ((bExpr.Op is BinaryExpr.Opcode.Eq && replacementOp is BinaryExpr.Opcode.Ge) ||
              (bExpr.Op is BinaryExpr.Opcode.Ge && replacementOp is BinaryExpr.Opcode.Eq)))
-            return false;
+            return true;
         
         if (IsEquivalentRORLoopGuardTarget(bExpr)) {
             // a.Length > n <==> a.Length != n; in a loop guard if n is initially 0 and incremented 1 at a time
@@ -247,15 +247,15 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
                  bExpr.E0 is ExprDotName exprDName3 && exprDName3.SuffixName == "Length") &&
                 ((bExpr.Op is BinaryExpr.Opcode.Gt && replacementOp is BinaryExpr.Opcode.Neq) ||
                  (bExpr.Op is BinaryExpr.Opcode.Neq && replacementOp is BinaryExpr.Opcode.Gt)))
-                return false;
+                return true;
             // n < a.Length <==> n != a.Length; in a loop guard if n is initially 0 and incremented 1 at a time
             if ((bExpr.E1 is UnaryOpExpr uOpExpr4 && uOpExpr4.Op is UnaryOpExpr.Opcode.Cardinality ||
                  bExpr.E1 is ExprDotName exprDName4 && exprDName4.SuffixName == "Length") &&
                 ((bExpr.Op is BinaryExpr.Opcode.Lt && replacementOp is BinaryExpr.Opcode.Neq) ||
                  (bExpr.Op is BinaryExpr.Opcode.Neq && replacementOp is BinaryExpr.Opcode.Lt)))
-                return false;
+                return true;
         }
-        return true;
+        return false;
     }
 
     private bool IsEquivalentRORLoopGuardTarget(BinaryExpr bExpr) {
@@ -291,36 +291,36 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
                (stmt is AssignStatement aStmt && ContainsLemmaChild(aStmt));
     }
 
-    private bool IsSWSTargetAllowed(Statement currStmt, Statement prevStmt) {
+    private bool ExcludeSWSTarget(Statement currStmt, Statement prevStmt) {
         if ((currStmt is ReturnStmt && prevStmt is not VarDeclStmt) || 
             currStmt is BreakOrContinueStmt || prevStmt is ReturnStmt || prevStmt is BreakOrContinueStmt)
-            return true;
+            return false;
         
         // prevStmt initializes variables used in currStmt (SWS will be invalid)
         if (prevStmt is VarDeclStmt vDeclStmt1 && 
             vDeclStmt1.Locals.Select(e => e.Name)
                 .Intersect(_coveredVariableNames).Any())
-            return false;
+            return true;
         // prevStmt does not update variables used in currStmt (SWS will have no effect)
         if (prevStmt is AssignStatement aStmt1 && 
             aStmt1.Lhss.Select(lhs => (lhs as NameSegment)?.Name)
                 .Intersect(_coveredVariableNames).Any())
-            return false;
+            return true;
         
         // currStmt does not update variables used in prevStmt (SWS will have no effect)
         if (currStmt is VarDeclStmt vDeclStmt2 && 
             !vDeclStmt2.Locals.Select(e => e.Name).
                 Intersect(_prevCoveredVariableNames).Any())
-            return false;
+            return true;
         if (currStmt is AssignStatement aStmt2 && 
             !aStmt2.Lhss.Select(lhs => (lhs as NameSegment)?.Name)
                 .Intersect(_prevCoveredVariableNames).Any())
-            return false;
+            return true;
         
         if (!_coveredVariableNames.Intersect(_prevCoveredVariableNames).Any())
-            return false;
+            return true;
         
-        return true;
+        return false;
     }
     
     /// -------------------------------------
@@ -416,7 +416,7 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
             }
             
             if (IsIncludedInTarget(prevStmt) && IsIncludedInTarget(prevStmt) && 
-                IsSWSTargetAllowed(stmt, prevStmt))
+                !ExcludeSWSTarget(stmt, prevStmt))
                 AddTarget(($"{stmt.StartToken.pos}-{stmt.EndToken.pos}", "SWS", ""));
             prevStmt = stmt;
             allCoveredVariableNames = allCoveredVariableNames.Concat(_coveredVariableNames).ToList();
@@ -686,7 +686,7 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
             return;
         if (ShouldImplement(opName) && IsIncludedInTarget(bExpr)) {
             foreach (var replacement in replacementList) {
-                if (IsBORTargetAllowed(bExpr, replacement))
+                if (!ExcludeBORTarget(bExpr, replacement))
                     AddTarget(($"{bExpr.Center.pos}", opName, replacement.ToString()));
             }
         }
@@ -732,7 +732,7 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
                 return;
             if (ShouldImplement(opName) && IsIncludedInTarget(e)) {
                 foreach (var replacement in replacementList) {
-                    if (IsBORTargetAllowed(new BinaryExpr(null, op, e, cExpr.Operands[i + 1]), replacement))
+                    if (!ExcludeBORTarget(new BinaryExpr(null, op, e, cExpr.Operands[i + 1]), replacement))
                         AddTarget(($"{e.Center.pos}", opName, replacement.ToString()));
                 }
             }
