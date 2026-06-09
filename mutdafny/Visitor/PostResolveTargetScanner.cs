@@ -650,9 +650,10 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         if (vDeclStmt.IsGhost) return;
         base.VisitStatement(vDeclStmt);
 
-        bool canApplySWV = _prevVarDeclStmt != null && vDeclStmt.Assign is AssignStatement && 
-                           _prevVarDeclStmt.Assign is AssignStatement && 
-                           vDeclStmt.Locals.Count == _prevVarDeclStmt.Locals.Count;
+        bool canApplySWV = _prevVarDeclStmt != null && vDeclStmt.Assign is AssignStatement aStmt1 && 
+                           _prevVarDeclStmt.Assign is AssignStatement aStmt2 && 
+                           vDeclStmt.Locals.Count == _prevVarDeclStmt.Locals.Count &&
+                           String.Join(",", aStmt1.Rhss) != String.Join(",", aStmt2.Rhss);
         
         foreach (var (var, i) in vDeclStmt.Locals.Select((var, i) => (var, i)).ToList()) {
             if (canApplySWV && var.Type.ToString() != _prevVarDeclStmt?.Locals[i].Type.ToString())
