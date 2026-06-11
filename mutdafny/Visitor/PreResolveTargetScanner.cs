@@ -841,12 +841,18 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
     }
     
     protected override void VisitExpression(SeqSelectExpr seqSExpr) {
-        if (!seqSExpr.SelectOne && seqSExpr.E0 != null && 
+        var lowIsZero = seqSExpr.E0 != null && seqSExpr.E0 is LiteralExpr litExpr && 
+                        litExpr.Value is BigInteger bi && bi == BigInteger.Zero;
+        var highIsLength = seqSExpr.E1 != null && seqSExpr.E1 is UnaryOpExpr uOpExpr && uOpExpr.Op is UnaryOpExpr.Opcode.Cardinality && 
+                           uOpExpr.E is NameSegment nSegExpr1 && seqSExpr.Seq is NameSegment nSegExpr2 && nSegExpr1.Name == nSegExpr2.Name;
+            
+        if (!seqSExpr.SelectOne && seqSExpr.E0 != null && !lowIsZero &&
             ShouldImplement("SLD") && IsIncludedInTarget(seqSExpr.E0))
             AddTarget(($"{seqSExpr.E0.Center.pos}", "SLD", ""));
-        if (!seqSExpr.SelectOne && seqSExpr.E1 != null && 
+        if (!seqSExpr.SelectOne && seqSExpr.E1 != null && !highIsLength &&
             ShouldImplement("SLD") && IsIncludedInTarget(seqSExpr.E1))
             AddTarget(($"{seqSExpr.E1.Center.pos}", "SLD", ""));
+        
         base.VisitExpression(seqSExpr);
     }
     
