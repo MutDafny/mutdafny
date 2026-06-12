@@ -468,7 +468,7 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
     protected override void VisitStatement(AssignStatement aStmt) {
         if (ContainsLemmaChild(aStmt)) return;
         foreach (var (lhs, i) in aStmt.Lhss.Select((lhs, i) => (lhs, i))) {
-            if (lhs != null && aStmt.Rhss[i] is ExprRhs rhs) {
+            if (lhs != null && i < aStmt.Rhss.Count && aStmt.Rhss[i] is ExprRhs rhs) {
                 _assigns.AddOrUpdate(lhs.ToString(), rhs.Expr, (_, _) => rhs.Expr);
                 if (_currentLoopBoundVar != null && lhs.ToString() == _currentLoopBoundVar.Name)
                     _loopBoundVarUpdates.Add(rhs.Expr);
