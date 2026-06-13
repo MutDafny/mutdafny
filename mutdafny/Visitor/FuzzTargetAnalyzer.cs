@@ -47,4 +47,8 @@ public class FuzzTargetAnalyzer(string programName, string mutationTargetPos, st
         
         FuzzInfo.Add((moduleName, className, methodName, types));
     }
+    
+    protected override bool IsWorthVisiting(int tokenStartPos, int tokenEndPos) {
+        return MutationTargetPos == "-" || base.IsWorthVisiting(tokenStartPos, tokenEndPos);
+    }
 }

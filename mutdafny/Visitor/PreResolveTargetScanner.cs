@@ -350,7 +350,9 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
     
     protected override void HandleMemberDecls(TopLevelDeclWithMembers decl) {
         var prevCurrentScope = (CloneToken(_currentScope.Item1), CloneToken(_currentScope.Item2));
-        _currentScope = (decl.StartToken, decl.EndToken);
+        if ((_currentScope.Item1 == null || decl.StartToken.pos != 0) && 
+            (_currentScope.Item2 == null ||  decl.EndToken.pos != 0))
+            _currentScope = (decl.StartToken, decl.EndToken);
         _currentSourceDeclFields = [];
         
         foreach (var member in decl.Members) {

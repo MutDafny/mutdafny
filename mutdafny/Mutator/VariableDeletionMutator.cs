@@ -58,15 +58,16 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
     private bool IsTarget(string name) {
         var positions = MutationTargetPos.Split("-");
         var currentPositions = _currentScope.Split("-");
-
-        return name == var && 
-               (MutationTargetPos == "-" || 
-               (int.Parse(positions[0]) == int.Parse(currentPositions[0]) && 
-                int.Parse(positions[1]) == int.Parse(currentPositions[1])));
+        return name == var && (MutationTargetPos == "-" || 
+           (int.Parse(positions[0]) <= int.Parse(currentPositions[0]) && 
+            int.Parse(positions[1]) >= int.Parse(currentPositions[1])));
     }
     
     private bool IsTarget(ConstantField cf) {
-        return MutationTargetPos == "-" && cf.Name == var;
+        var positions = MutationTargetPos.Split("-");
+        return cf.Name == var && (MutationTargetPos == "-" || (_currentScope != "-" && 
+           int.Parse(positions[0]) <= cf.Center.pos && 
+           int.Parse(positions[1]) >= cf.Center.pos));
     }
     
     protected override void VisitExpression(NameSegment nSegExpr) {
@@ -77,6 +78,12 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
     /// ---------------------------
     /// Group of top level visitors
     /// ---------------------------
+    public override void Find(ModuleDefinition module) {
+        if (module.EndToken.pos != 0)
+            _currentScope = $"{module.StartToken.pos}-{module.EndToken.pos}";
+        base.Find(module);
+    }
+    
     protected override  void HandleSourceDecls(ModuleDefinition module) {
         foreach (var decl in module.SourceDecls.ToList()) {
             // only visit declarations that may contain the mutation target
@@ -116,9 +123,15 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
     }
     
     protected override void HandleMemberDecls(TopLevelDeclWithMembers decl) {
+        var prevCurrentScope = _currentScope;
+        if ((_currentScope != "-" || decl.StartToken.pos != 0) && 
+            (_currentScope != "-" ||  decl.EndToken.pos != 0))
+            _currentScope = $"{decl.StartToken.pos}-{decl.EndToken.pos}";
+        
         foreach (var member in decl.Members.ToList()) {
             // only visit members that may contain the mutation target
-            if (!IsWorthVisiting(member.StartToken.pos, member.EndToken.pos)) continue;
+            if (!IsWorthVisiting(member.StartToken.pos, member.EndToken.pos))
+                continue;
             if (member is Method m) { // includes constructor
                 HandleMethod(m);  
             } else if (member is Function func) { // includes predicate
@@ -135,6 +148,8 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
                 }
             }
         }
+        
+        _currentScope = prevCurrentScope;
     }
     
     protected override void HandleFunction(Function function) {
@@ -1129,8 +1144,8 @@ public class VariableDeletionMutator(string mutationTargetPos, string var, Error
         if (MutationTargetPos == "-") return true;
         var positions = MutationTargetPos.Split("-");
         if (positions.Length < 2) return false;
-        return (tokenStartPos <= int.Parse(positions[0]) &&
-                int.Parse(positions[1]) <= tokenEndPos);
+        return (tokenStartPos <= int.Parse(positions[0]) && int.Parse(positions[1]) <= tokenEndPos) ||
+               (tokenStartPos >= int.Parse(positions[0]) && int.Parse(positions[1]) >= tokenEndPos);
     }
 
     private void IncrementNumMutations() {
