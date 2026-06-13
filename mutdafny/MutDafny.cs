@@ -18,9 +18,10 @@ public class MutDafny : PluginConfiguration
     private (int, int) MutationTargetRange { get; set; } = (-1, -1);
     private string MutationTargetURI { get; set; } = "";
     private int NumMutations { get; set; } = -1;
-    private string MutationTargetPos { get; set; } = "";
-    private string MutationOperator { get; set; } = "";
+    private string? MutationTargetPos { get; set; }
+    private string? MutationOperator { get; set; }
     private string? MutationArg { get; set; }
+    private bool FuzzInfo { get; set; }
     
     public override void ParseArguments(string[] args) {
         if (args.Length == 0) return;
@@ -59,22 +60,31 @@ public class MutDafny : PluginConfiguration
     }
 
     private void ParseMutArguments(string[] args) {
-        if (args.Length == 2) {
-            NumMutations = int.Parse(args[1]);
-        } else {
-            MutationTargetPos = args[1];
-            MutationOperator = args[2];
-            MutationArg = args.Length switch {
-                3 => null,
-                4 => args[3],
-                _ => string.Join(" ", new List<string>(args[new Range(3, args.Length)]))
-            };
+        if (args.Contains("fuzzInfo"))
+            FuzzInfo = true;
+        
+        foreach (var (arg, i) in args.Select((arg, i) => (arg, i))) {
+            if (i == 0 || arg == "fuzzInfo")
+                continue;
+            
+            if (args.Length == (FuzzInfo ? 3 : 2)) {
+                NumMutations = int.Parse(arg);
+            } else if (MutationTargetPos == null) {
+                MutationTargetPos = arg;
+            } else if (MutationOperator == null) {
+                MutationOperator = arg;
+            } else if (args.Length == (FuzzInfo ? 5 : 4)) {
+                MutationArg = arg;
+            } else {
+                MutationArg = string.Join(" ", args[i..]);
+                break;
+            }
         }
     }
 
     public override Rewriter[] GetRewriters(ErrorReporter reporter) {
         return _mutate ? 
-            [new MutantGenerator(NumMutations, MutationTargetPos, MutationOperator, MutationArg, reporter)] : 
+            [new MutantGenerator(NumMutations, MutationTargetPos, MutationOperator, MutationArg, FuzzInfo, reporter)] : 
             (_scan ? [new MutationTargetScanner(MutationTargetURI, MutationTargetMethod, MutationTargetLine, MutationTargetRange, OperatorsInUse, reporter)] : 
              _analyze ? [new ProgramAnalyzer(MutationTargetURI, reporter)] : []);
     }
@@ -131,7 +141,7 @@ public class MutationTargetScanner(string mutationTargetURI, string mutationTarg
     }
 }
 
-public class MutantGenerator(int numMutations, string mutationTargetPos, string mutationOperator, string? mutationArg, ErrorReporter reporter) : Rewriter(reporter)
+public class MutantGenerator(int numMutations, string mutationTargetPos, string mutationOperator, string? mutationArg, bool fuzzInfo, ErrorReporter reporter) : Rewriter(reporter)
 {
     public static List<Node> MutatedNodes { get; private set; } = [];
     public static int NumMutations = 0; // incremented upon mutating in child mutator classes
@@ -168,6 +178,13 @@ public class MutantGenerator(int numMutations, string mutationTargetPos, string 
             ExportUpdatedTargets(allTargets);
         }
         StoreProgram(program);
+    }
+
+    public override void PostResolve(Program program) {
+        if (!fuzzInfo) return;
+        var analyzer = new FuzzTargetAnalyzer(program.Name, mutationTargetPos, mutationOperator, mutationArg, Reporter);
+        analyzer.Find(program);
+        analyzer.ExportData();
     }
 
     private void MutateProgram(Program program) {
