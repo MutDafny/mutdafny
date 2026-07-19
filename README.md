@@ -3,6 +3,19 @@ MutDafny is a tool for automatically signaling potential weaknesses in Dafny spe
 Using a mutation testing approach, it introduces mutations into the code and relies on formal specifications for detecting them. 
 If a program with a mutant verifies, this may indicate a *weakness in the specification*. 
 
+**_MutDafny: A Mutation-Based Approach to Assess Dafny Specifications_ - ICSE 2026**
+
+Please use the following reference to cite our work:
+```
+@inproceedings{amaral2025mutdafny,
+  title={MutDafny: A Mutation-Based Approach to Assess Dafny Specifications},
+  author={Amaral, Isabel and Mendes, Alexandra and Campos, Jos{\'e}},
+  booktitle={2026 IEEE/ACM 48th International Conference on Software Engineering (ICSE)},
+  year={2026},
+  organization={ACM}
+}
+```
+
 ## Running the Project
 
 1. **Build dafny**
@@ -141,3 +154,4 @@ dotnet dafny/Binaries/Dafny.dll verify <full path to the program under test> \
 | PRV (Polymorphic Reference Replacement) | Replacement of a child reference assignment to a parent with a child reference of a different type | The name of the replacement variable |
 | SWS (Swap Statement) | Swap a statement with the one either immediately below or above it | NA |
 | SWV (Swap Variable Declaration) | Swap the RHS of a variable declaration statement with the one from the variable declaration immediately below or above it | The position of the variable declaration with the replacement RHS |
+
