@@ -1,4 +1,5 @@
-﻿using Microsoft.Dafny;
+﻿using System.Numerics;
+using Microsoft.Dafny;
 
 namespace MutDafny.Visitor;
 
@@ -753,11 +754,16 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
         base.VisitExpression(nMExpr);
     }
     
+    // filtering: s[0..e] and s[..e] are the same expression.
+    private static bool IsZeroLiteral(Expression expr) {
+        return expr is LiteralExpr { Value: BigInteger bi } && bi == BigInteger.Zero;
+    }
+
     protected override void VisitExpression(SeqSelectExpr seqSExpr) {
-        if (!seqSExpr.SelectOne && seqSExpr.E0 != null && 
+        if (!seqSExpr.SelectOne && seqSExpr.E0 != null && !IsZeroLiteral(seqSExpr.E0) &&
             ShouldImplement("SLD") && IsIncludedInTarget(seqSExpr.E0))
             AddTarget(($"{seqSExpr.E0.Center.pos}", "SLD", ""));
-        if (!seqSExpr.SelectOne && seqSExpr.E1 != null && 
+        if (!seqSExpr.SelectOne && seqSExpr.E1 != null &&
             ShouldImplement("SLD") && IsIncludedInTarget(seqSExpr.E1))
             AddTarget(($"{seqSExpr.E1.Center.pos}", "SLD", ""));
         base.VisitExpression(seqSExpr);
