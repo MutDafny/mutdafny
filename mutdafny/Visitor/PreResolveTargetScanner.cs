@@ -394,6 +394,12 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
             AddTarget(($"{method.StartToken.pos}-{method.EndToken.pos}", "SDL", ""));
     }
 
+    protected override void HandleFunction(Function function) {
+        if (mutationTargetMethod != "")
+            return;
+        base.HandleFunction(function);
+    }
+
     /// -------------------------------------
     /// Group of overriden statement visitors
     /// -------------------------------------

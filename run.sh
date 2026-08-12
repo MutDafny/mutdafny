@@ -106,15 +106,19 @@ get_scan_program() {
         uri=$(echo $PROGRAM | sed "s|.*/evm-dafny/||")
     fi
 
-    if [[ -n $RANGE ]]; then 
-        echo "range:$RANGE"
-    elif [[ -n $METHOD ]]; then
-        echo "method:$METHOD"
-    elif [[ -n $LINE ]]; then
-        echo "line:$LINE"
-    else
-        echo "uri:$uri"
+    scan_arg=""
+    if [[ -n $METHOD ]]; then
+        scan_arg="method:$METHOD"
     fi
+    if [[ -n $RANGE ]]; then
+        scan_arg="$scan_arg range:$RANGE"
+    elif [[ -n $LINE ]]; then
+        scan_arg="$scan_arg line:$LINE"
+    fi
+    if [[ -z $scan_arg ]]; then
+        scan_arg="uri:$uri"
+    fi
+    echo "$scan_arg" | sed 's/^ *//'
 }
 
 scan_program() {
@@ -187,15 +191,27 @@ process_output() {
         if [[ -n $timed_out ]]; then
             echo Verification timed out
             output_dir="$OUT_DIR/timed-out"
-        elif [[ -n $verified ]]; then 
+        elif [[ -n $verified ]]; then
             echo Verification succeeded: mutant is alive
             output_dir="$OUT_DIR/alive"
-        else 
+        else
             echo Verification failed: mutant was killed
             output_dir="$OUT_DIR/killed"
         fi
 
+        dfy_file=$(ls *.dfy 2>/dev/null | head -1)
         mv *.dfy $output_dir
+        # Preserve this mutant's own verification timing (MyStopwatch.cs
+        # writes parsing_time,plugin_time,resolution_time,verification_time,
+        # dafny_time in ms to elapsed-time.csv each iteration; the caller
+        # below unconditionally rm's it before the next mutant overwrites
+        # it) as a sidecar next to the mutant file, so callers that want
+        # per-mutant timing (not just aggregate) can read it -- copy, not
+        # move, since the outer loop's `rm elapsed-time.csv` is still the
+        # single source of truth for "did this iteration produce one".
+        if [[ -n $dfy_file && -f elapsed-time.csv ]]; then
+            cp elapsed-time.csv "$output_dir/${dfy_file%.dfy}.elapsed-time.csv"
+        fi
     else
         echo Could not apply $NUM_MUTS mutations to the program
     fi

@@ -556,8 +556,11 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     }
     
     protected override void HandleMethod(Method method) {
+        if (mutationTargetMethod != "" && method.Name != mutationTargetMethod)
+            return;
+
         _declaredMethods.Add(method);
-        
+
         var methodIndependentVars = new Dictionary<string, Type>(_currentScopeVars);
         var methodIndependentChildClassVars = new Dictionary<string, Type>(_currentScopeChildClassVariables);
         foreach (var formal in method.Ins) {
@@ -581,6 +584,9 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     }
     
     protected override void HandleFunction(Function function) {
+        if (mutationTargetMethod != "")
+            return;
+
         _declaredMethods.Add(function);
         base.HandleFunction(function);
         _childMethodCallPos = null;
