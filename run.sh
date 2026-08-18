@@ -125,10 +125,6 @@ get_scan_program() {
     if [[ -z $scan_arg ]]; then
         scan_arg="uri:$uri"
     fi
-    # Appended after the uri fallback above (not folded into the emptiness
-    # check that triggers it) so --operators alone, with no --method/--line/
-    # --range, still scans by uri instead of accidentally satisfying that
-    # fallback's "nothing else was given" condition.
     if [[ -n $OPERATORS ]]; then
         scan_arg="$scan_arg $OPERATORS"
     fi
