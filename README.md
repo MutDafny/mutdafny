@@ -48,6 +48,7 @@ bash run.sh <full path to the program under test>
    [--line <the line of the program to mutate (all by default)>]
    [--range <the range of positions of the program to mutate (all by default)>]
    [--num_mutations <the number of mutations to apply to the input program (1 by default)>]
+   [--operators <comma-separated operator codes to restrict to, e.g., AOR,ROR,LVR (all by default)>]
    [help]
 ```
 

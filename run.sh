@@ -15,6 +15,7 @@
 #   [--num_mutations <the number of mutations to apply to the input program, e.g., 1 (by default)>]
 #   [--run_dir <the directory where the script should be run, e.g., $SCRIPT_DIR (by deafult)>]
 #   [--output_dir <the directory where the mutants will be stores, e.g., $SCRIPT_DIR (by deafult)>]
+#   [--operators <comma-separated operator codes to restrict scanning to, e.g., AOR,ROR,LVR (all operators by default)>]
 #   [help]
 # ------------------------------------------------------------------------------ General utils
 
@@ -35,9 +36,11 @@ USAGE="Usage: ${BASH_SOURCE[0]}
    [--num_mutations <the number of mutations to apply to the input program, e.g., 1 (by default)>]
    [--run_dir <the directory where the script should be run, e.g., ./ (by deafult)>]
    [--output_dir <the directory where the mutants will be stores, e.g., $SCRIPT_DIR (by deafult)>]
+   [--operators <comma-separated operator codes to restrict scanning to, e.g., AOR,ROR,LVR (all operators by default)>]
    [help]"
 
-if [ "$#" -ne "1" ] && [ "$#" -ne "3" ] && [ "$#" -ne "5" ] && [ "$#" -ne "7" ] && [ "$#" -ne "9" ]&& [ "$#" -ne "11" ]; then
+# 1 (program only), or program + an odd number of --flag/value tokens.
+if [ "$#" -lt "1" ] || [ "$(( ($# - 1) % 2 ))" -ne "0" ]; then
   die "$USAGE"
 fi
 
@@ -55,6 +58,7 @@ RANGE=""
 NUM_MUTS=1
 RUN_DIR="$SCRIPT_DIR"
 OUT_DIR="$SCRIPT_DIR/mutants"
+OPERATORS=""
 while [[ "$1" = --* ]]; do
   OPTION=$1; shift
   case $OPTION in
@@ -75,6 +79,9 @@ while [[ "$1" = --* ]]; do
       shift;;
     (--output_dir)
       OUT_DIR=$1;
+      shift;;
+    (--operators)
+      OPERATORS=$(echo "$1" | tr ',' ' ');
       shift;;
     (--help)
       echo "$USAGE";
@@ -117,6 +124,13 @@ get_scan_program() {
     fi
     if [[ -z $scan_arg ]]; then
         scan_arg="uri:$uri"
+    fi
+    # Appended after the uri fallback above (not folded into the emptiness
+    # check that triggers it) so --operators alone, with no --method/--line/
+    # --range, still scans by uri instead of accidentally satisfying that
+    # fallback's "nothing else was given" condition.
+    if [[ -n $OPERATORS ]]; then
+        scan_arg="$scan_arg $OPERATORS"
     fi
     echo "$scan_arg" | sed 's/^ *//'
 }
