@@ -17,6 +17,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     private VarDeclStmt? _prevVarDeclStmt;
     private ExprDotName? _childExprDotName;
     private List<string> _childMethodCallArgTypes = [];
+    private Method? _currentMethod = null;
     private Dictionary<string, Type> _currentScopeVars = [];
     private List<MethodOrFunction> _declaredMethods = [];
     private List<ApplySuffix> _methodCalls = [];
@@ -223,6 +224,43 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
             return;
         var arg = hasInit ? "" : type;
         AddTarget((exprLocation, "CIR", arg));
+    }
+    
+    private void ScanCUSTargets() {
+        if (!ShouldImplement("CUS") || _currentMethod == null || !IsIncludedInTarget(_currentMethod)) return;
+        
+        foreach (var (o, i) in _currentMethod.Outs.Select((o, i) => (o, i))) {
+            var location = $"{_currentMethod.EndToken.pos}-{i}";
+            ScanCUSUpdateElementTargets(o.Type, location);
+        }
+    }
+    
+    private void ScanCUSTargets(AssignStatement aStmt) {
+        if (!ShouldImplement("CUS") || !IsIncludedInTarget(aStmt)) return;
+        
+        foreach (var (lhs, i) in aStmt.Lhss.Select((lhs, i) => (lhs, i))) {
+            var location = $"{aStmt.StartToken.pos}-{aStmt.EndToken.pos}-{i}";
+            if (lhs is SeqSelectExpr seqSExpr) {
+                ScanCUSUpdateElementTargets(seqSExpr.Seq.Type, location);
+            } else if (lhs is NameSegment nSegExpr) {
+                ScanCUSUpdateElementTargets(nSegExpr.Type, location);
+            }
+        }   
+    }
+
+    private void ScanCUSUpdateElementTargets(Type collectionType, string location) {
+        if (collectionType is not SetType && collectionType is not MultiSetType && 
+            collectionType is not SeqType && collectionType is not MapType && 
+            !collectionType.IsArrayType && collectionType.ToString() != "string")
+            return;
+        if (collectionType.TypeArgs.Any(t => !IsPrimitiveType(t))) return;
+
+        var collectionTypeStr = collectionType.ToString() != "string" ? collectionType.ToString() : "seq<char>";
+        collectionTypeStr = collectionTypeStr.Replace(" ", "").Replace(",", "-");
+        AddTarget((location, "CUS-fstElem", collectionTypeStr)); // mutation will update collection's first element
+        if (collectionType is SeqType || collectionType.IsArrayType || 
+            collectionType.ToString() == "string") // remaining collections are unordered so we update a single arbitrary element
+            AddTarget((location, "CUS-lstElem", collectionTypeStr)); // mutation will update collection's last element
     }
 
     private void ScanMethodTargets(ConcreteAssignStatement cAStmt) {
@@ -489,6 +527,11 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         if (type.IsCharType) return "char";
         return type.IsStringType ? "string" : "";
     }
+
+    private bool IsPrimitiveType(Type type) {
+        return type.IsIntegerType || type.IsRealType || type.IsBitVectorType || 
+               type.IsBoolType || type.IsCharType || type.IsStringType;
+    }
     
     private string TypeToStr(Type type) {
         return type switch {
@@ -559,6 +602,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         if (mutationTargetMethod != "" && method.Name != mutationTargetMethod)
             return;
 
+        _currentMethod = method;
         _declaredMethods.Add(method);
 
         var methodIndependentVars = new Dictionary<string, Type>(_currentScopeVars);
@@ -576,7 +620,11 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
             }
         }
         base.HandleMethod(method);
+        if (method.Body != null)
+            ScanCUSTargets();
         ScanPRVTargets();
+        
+        _currentMethod = null;
         _currentScopeVars = methodIndependentVars;
         _currentScopeChildClassVariables = methodIndependentChildClassVars;
         _childClassAccessedVariables = [];
@@ -628,6 +676,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     }
     
     protected override void VisitStatement(AssignStatement aStmt) {
+        ScanCUSTargets(aStmt);
         if (ContainsLemmaChild(aStmt)) return;
         base.VisitStatement(aStmt);
         VisitLhss(aStmt);

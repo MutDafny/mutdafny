@@ -38,7 +38,9 @@ public class MutatorFactory(ErrorReporter reporter)
                 new SwapArgMutator(mutationTargetPos, mutationArg, reporter),
             "CIR" => mutationArg == null ? 
                 new CollectionInitReplacementMutator(mutationTargetPos, "", reporter) :
-                new CollectionInitReplacementMutator(mutationTargetPos, mutationArg, reporter), 
+                new CollectionInitReplacementMutator(mutationTargetPos, mutationArg, reporter),
+            _ when mutationOperator.StartsWith("CUS") => mutationArg == null ? null :
+                new CollectionUpdateStmtMutator(mutationTargetPos, mutationArg, mutationOperator.Split("-")[1], reporter),
             "CBR" => new CaseBlockReplacementMutator(mutationTargetPos, reporter),
             "CBE" => new ConditionalBlockExtractionMutator(mutationTargetPos, reporter),
             "TAR" => mutationArg == null ? null :
