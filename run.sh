@@ -122,7 +122,7 @@ get_scan_program() {
     elif [[ -n $LINE ]]; then
         scan_arg="$scan_arg line:$LINE"
     fi
-    if [[ -z $scan_arg ]]; then
+    if [[ -n $uri ]] && [[ -z $scan_arg ]]; then
         scan_arg="uri:$uri"
     fi
     if [[ -n $OPERATORS ]]; then
