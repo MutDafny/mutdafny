@@ -11,6 +11,7 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
     private int _assignLhsIndex = -1;
     private int _methodOutsIndex = -1;
     private BlockStmt? _currentBlock;
+    private IOrigin? _mutOrigin;
     
     private Statement? Mutate(AssignStatement aStmt) {
         if (_currentBlock == null) return null;
@@ -24,7 +25,8 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
             }
         }
         if (collection == null) return null;
-        
+
+        _mutOrigin = aStmt.EndToken;
         var collectionUpdateStmt = CreateCollectionUpdateStmt(collection);
         if (collectionUpdateStmt == null) return null;
         _currentBlock.Body.Insert(_currentBlock.Body.IndexOf(aStmt) + 1, collectionUpdateStmt);
@@ -35,10 +37,11 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
         if (method.Body == null) return null;
         NameSegment? collection = null;
         if (_methodOutsIndex != -1 && method.Outs.Count > _methodOutsIndex) {
-            collection = new NameSegment(null, method.Outs[_methodOutsIndex].Name, null);
+            collection = new NameSegment(_mutOrigin, method.Outs[_methodOutsIndex].Name, null);
         }
         if (collection == null) return null;
         
+        _mutOrigin = method.EndToken;
         var collectionUpdateStmt = CreateCollectionUpdateStmt(collection);
         if (collectionUpdateStmt == null) return null;
         method.Body.Body.Add(collectionUpdateStmt);
@@ -49,10 +52,14 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
         return collectionUpdateType switch {
             "fstElem" => CreateElementUpdateStmt(collection, true),
             "lstElem" => CreateElementUpdateStmt(collection, false),
+            "copy" => CreateCollectionCopy(collection),
             _ => null,
         };
     }
 
+    /// ---------------------------
+    /// CUS-fstElem and CUS-lstElem
+    /// ---------------------------
     private Statement? CreateElementUpdateStmt(NameSegment collection, bool firstElem) {
         return collectionTypeStr switch {
             _ when collectionTypeStr.StartsWith("seq<") => CreateSeqUpdateStmt(collection, firstElem),
@@ -66,82 +73,163 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
 
     private Statement CreateSeqUpdateStmt(NameSegment collection, bool firstElem) {
         var collectionIndex = CreateCollectionIndexExpr(collection, firstElem);
-        var defaultValue = CreateDefaultValueExpr();
-        var seqUpdateExpr = new SeqUpdateExpr(null, collection, collectionIndex, defaultValue);
-        return new AssignStatement(null, [collection], [new ExprRhs(seqUpdateExpr)]);
+        var defaultValue = CreateDefaultArgValueExpr();
+        var seqUpdateExpr = new SeqUpdateExpr(_mutOrigin, collection, collectionIndex, defaultValue);
+        return new AssignStatement(_mutOrigin, [collection], [new ExprRhs(seqUpdateExpr)]);
     }
     
     private Statement CreateArrayUpdateStmt(NameSegment collection, bool firstElem) {
         var collectionIndex = CreateCollectionIndexExpr(collection, firstElem);
-        var defaultValue = CreateDefaultValueExpr();
-        var arraySelectExpr = new SeqSelectExpr(null, true, collection, collectionIndex, null);
-        return new AssignStatement(null, [arraySelectExpr], [new ExprRhs(defaultValue)]);
+        var defaultValue = CreateDefaultArgValueExpr();
+        var arraySelectExpr = new SeqSelectExpr(_mutOrigin, true, collection, collectionIndex, null);
+        return new AssignStatement(_mutOrigin, [arraySelectExpr], [new ExprRhs(defaultValue)]);
     }
 
     private Expression CreateCollectionIndexExpr(NameSegment collection, bool firstElem) {
         Expression lengthExpr = collectionTypeStr.StartsWith("seq<")
-            ? new UnaryOpExpr(null, UnaryOpExpr.Opcode.Cardinality, collection)
-            : new ExprDotName(null, collection, new Name("Length"), null);
-        return firstElem ? new LiteralExpr(null, 0) : 
-            new BinaryExpr(null, BinaryExpr.Opcode.Sub, lengthExpr, new LiteralExpr(null, 1));
+            ? new UnaryOpExpr(_mutOrigin, UnaryOpExpr.Opcode.Cardinality, collection)
+            : new ExprDotName(_mutOrigin, collection, new Name("Length"), null);
+        return firstElem ? new LiteralExpr(_mutOrigin, 0) : 
+            new BinaryExpr(_mutOrigin, BinaryExpr.Opcode.Sub, lengthExpr, new LiteralExpr(_mutOrigin, 1));
     }
 
     private Statement CreateSetUpdateStmt(NameSegment collection) {
         var setElemSelectStmt = CreateUnorderedCollectionElemSelectStmt(collection, false);
-        var elemSelectVar = new NameSegment(null, setElemSelectStmt.Locals[0].Name, null);
-        var elemSelectSubset = new SetDisplayExpr(null, true, [elemSelectVar]);
-        var setRemoveElemExpr = new BinaryExpr(null, BinaryExpr.Opcode.Sub, collection, elemSelectSubset);
-        var defaultValue = new SetDisplayExpr(null, true, [CreateDefaultValueExpr()]);
-        var setUpdateExpr = new BinaryExpr(null, BinaryExpr.Opcode.Add, setRemoveElemExpr, defaultValue);
-        var setUpdateStmt = new AssignStatement(null, [collection], [new ExprRhs(setUpdateExpr)]);
-        var emptySetExpr = new SetDisplayExpr(null, true, []);
+        var elemSelectVar = new NameSegment(_mutOrigin, setElemSelectStmt.Locals[0].Name, null);
+        var elemSelectSubset = new SetDisplayExpr(_mutOrigin, true, [elemSelectVar]);
+        var setRemoveElemExpr = new BinaryExpr(_mutOrigin, BinaryExpr.Opcode.Sub, collection, elemSelectSubset);
+        var defaultValue = new SetDisplayExpr(_mutOrigin, true, [CreateDefaultArgValueExpr()]);
+        var setUpdateExpr = new BinaryExpr(_mutOrigin, BinaryExpr.Opcode.Add, setRemoveElemExpr, defaultValue);
+        var setUpdateStmt = new AssignStatement(_mutOrigin, [collection], [new ExprRhs(setUpdateExpr)]);
+        var emptySetExpr = new SetDisplayExpr(_mutOrigin, true, []);
         return CreateUnorderedCollectionNotEmptyStmt(collection, emptySetExpr, false, 
-            new BlockStmt(null, [setElemSelectStmt, setUpdateStmt]));
+            new BlockStmt(_mutOrigin, [setElemSelectStmt, setUpdateStmt]));
     }
 
     private Statement CreateMultisetUpdateStmt(NameSegment collection) {
         var multisetElemSelectStmt = CreateUnorderedCollectionElemSelectStmt(collection, false);
-        var elemSelectVar = new NameSegment(null, multisetElemSelectStmt.Locals[0].Name, null);
-        var elemSelectSubset = new MultiSetDisplayExpr(null, [elemSelectVar]);
-        var multisetRemoveElemExpr = new BinaryExpr(null, BinaryExpr.Opcode.Sub, collection, elemSelectSubset);
-        var defaultValue = new MultiSetDisplayExpr(null, [CreateDefaultValueExpr()]);
-        var multisetUpdateExpr = new BinaryExpr(null, BinaryExpr.Opcode.Add, multisetRemoveElemExpr, defaultValue);
-        var multisetUpdateStmt = new AssignStatement(null, [collection], [new ExprRhs(multisetUpdateExpr)]);
-        var emptyMultisetExpr = new MultiSetDisplayExpr(null, []);
+        var elemSelectVar = new NameSegment(_mutOrigin, multisetElemSelectStmt.Locals[0].Name, null);
+        var elemSelectSubset = new MultiSetDisplayExpr(_mutOrigin, [elemSelectVar]);
+        var multisetRemoveElemExpr = new BinaryExpr(_mutOrigin, BinaryExpr.Opcode.Sub, collection, elemSelectSubset);
+        var defaultValue = new MultiSetDisplayExpr(_mutOrigin, [CreateDefaultArgValueExpr()]);
+        var multisetUpdateExpr = new BinaryExpr(_mutOrigin, BinaryExpr.Opcode.Add, multisetRemoveElemExpr, defaultValue);
+        var multisetUpdateStmt = new AssignStatement(_mutOrigin, [collection], [new ExprRhs(multisetUpdateExpr)]);
+        var emptyMultisetExpr = new MultiSetDisplayExpr(_mutOrigin, []);
         return CreateUnorderedCollectionNotEmptyStmt(collection, emptyMultisetExpr, false, 
-            new BlockStmt(null, [multisetElemSelectStmt, multisetUpdateStmt]));
+            new BlockStmt(_mutOrigin, [multisetElemSelectStmt, multisetUpdateStmt]));
     }
 
     private Statement CreateMapUpdateStmt(NameSegment collection) {
         var mapElemSelectStmt = CreateUnorderedCollectionElemSelectStmt(collection, true);
-        var elemSelectVar = new NameSegment(null, mapElemSelectStmt.Locals[0].Name, null);
-        var defaultValue = CreateDefaultValueExpr();
-        var mapUpdateExpr = new SeqUpdateExpr(null, collection, elemSelectVar, defaultValue);
-        var mapUpdateStmt = new AssignStatement(null, [collection], [new ExprRhs(mapUpdateExpr)]);
-        var emptyMapExpr = new SetDisplayExpr(null, true, []);
+        var elemSelectVar = new NameSegment(_mutOrigin, mapElemSelectStmt.Locals[0].Name, null);
+        var defaultValue = CreateDefaultArgValueExpr();
+        var mapUpdateExpr = new SeqUpdateExpr(_mutOrigin, collection, elemSelectVar, defaultValue);
+        var mapUpdateStmt = new AssignStatement(_mutOrigin, [collection], [new ExprRhs(mapUpdateExpr)]);
+        var emptyMapExpr = new SetDisplayExpr(_mutOrigin, true, []);
         return CreateUnorderedCollectionNotEmptyStmt(collection, emptyMapExpr, true, 
-            new BlockStmt(null, [mapElemSelectStmt, mapUpdateStmt]));
+            new BlockStmt(_mutOrigin, [mapElemSelectStmt, mapUpdateStmt]));
     }
 
     private VarDeclStmt CreateUnorderedCollectionElemSelectStmt(NameSegment collection, bool isMap) {
-        var arbitraryElemVar = new NameSegment(null, "arbitraryAuxVar'", null);
-        var localVar = new LocalVariable(null, arbitraryElemVar.Name, null, false);
+        var arbitraryElemVar = new NameSegment(_mutOrigin, "arbitraryAuxVar'", null);
+        var localVar = new LocalVariable(_mutOrigin, arbitraryElemVar.Name, null, false);
         Expression arbitraryElemSource = !isMap ? collection : 
-            new ExprDotName(null, collection, new Name("Keys"), null);
-        var arbitraryVarSelectExpr = new BinaryExpr(null, BinaryExpr.Opcode.In, arbitraryElemVar, arbitraryElemSource);
-        var varDeclAssign = new AssignSuchThatStmt(null, [arbitraryElemVar], arbitraryVarSelectExpr, null, null);
-        return new VarDeclStmt(null, [localVar], varDeclAssign);
+            new ExprDotName(_mutOrigin, collection, new Name("Keys"), null);
+        var arbitraryVarSelectExpr = new BinaryExpr(_mutOrigin, BinaryExpr.Opcode.In, arbitraryElemVar, arbitraryElemSource);
+        var varDeclAssign = new AssignSuchThatStmt(_mutOrigin, [arbitraryElemVar], arbitraryVarSelectExpr, null, null);
+        return new VarDeclStmt(_mutOrigin, [localVar], varDeclAssign);
     }
 
     private IfStmt CreateUnorderedCollectionNotEmptyStmt(NameSegment collection, Expression emptyCollection, bool isMap, BlockStmt ifBody) {
         Expression collectionToCheck = !isMap ? collection : 
-            new ExprDotName(null, collection, new Name("Keys"), null);
-        var collectionIsNotEmptyExpr = new BinaryExpr(null, BinaryExpr.Opcode.Neq,
+            new ExprDotName(_mutOrigin, collection, new Name("Keys"), null);
+        var collectionIsNotEmptyExpr = new BinaryExpr(_mutOrigin, BinaryExpr.Opcode.Neq,
             collectionToCheck, emptyCollection);
-        return new IfStmt(null, false, collectionIsNotEmptyExpr, ifBody, null, null);
+        return new IfStmt(_mutOrigin, false, collectionIsNotEmptyExpr, ifBody, null, null);
     }
 
-    private LiteralExpr? CreateDefaultValueExpr() {
+    /// --------
+    /// CUS-copy
+    /// --------
+    private Statement? CreateCollectionCopy(NameSegment collection) {
+        var args = collectionTypeStr.Split("<->");
+        if (args.Length != 3) return null;
+        var sourceCollection = new NameSegment(_mutOrigin, args[0], null);
+        var lhsCollectionType = args[1];
+        var rhsCollectionType = args[2];
+
+        AssignmentRhs? copyAssignRhs = null;
+        if (lhsCollectionType == rhsCollectionType) {
+            copyAssignRhs = new ExprRhs(sourceCollection);
+        } else if (lhsCollectionType.StartsWith("seq<") && rhsCollectionType.StartsWith("array<")) {
+            copyAssignRhs = CreateSeqFromSubsequence(sourceCollection);
+        } else if (lhsCollectionType.StartsWith("array<") && rhsCollectionType.StartsWith("seq<")) {
+            copyAssignRhs = CreateArrayFromComprehensionExpr(sourceCollection, lhsCollectionType);
+        } else if (lhsCollectionType.StartsWith("set<") && (rhsCollectionType.StartsWith("seq<") || rhsCollectionType.StartsWith("multiset<"))) {
+            copyAssignRhs = CreateSetFromComprehensionExpr(sourceCollection, lhsCollectionType);
+        } else if (lhsCollectionType.StartsWith("set<") && rhsCollectionType.StartsWith("map<")) {
+            copyAssignRhs = CreateSetFromMapKeyValueSets(sourceCollection, rhsCollectionType);
+        } else if (lhsCollectionType.StartsWith("multiset<")) {
+            copyAssignRhs = CreateMultisetFromSet(sourceCollection, lhsCollectionType, rhsCollectionType);
+        }
+        return copyAssignRhs == null ? null : new AssignStatement(_mutOrigin, [collection], [copyAssignRhs]);
+    }
+
+    private ExprRhs CreateSeqFromSubsequence(NameSegment array) {
+        var seqInitExpr = new SeqSelectExpr(_mutOrigin, false, array, null, null);
+        return new ExprRhs(seqInitExpr);
+    }
+
+    private TypeRhs? CreateArrayFromComprehensionExpr(NameSegment collection, string lhsCollectionType) {
+        var arrayType = CreateArgTypeFromStr(lhsCollectionType);
+        if (arrayType == null) return null;
+        var arrayDimensions = new UnaryOpExpr(_mutOrigin, UnaryOpExpr.Opcode.Cardinality, collection);
+        var indexBoundVar = new BoundVar(_mutOrigin, "indexAuxVar'", new IntType());
+        var indexVar = new NameSegment(_mutOrigin, "indexAuxVar'", null);
+        var lowerBound = new LiteralExpr(_mutOrigin, 0);
+        var rangeExpr = new ChainingExpression(_mutOrigin, [lowerBound, indexVar, arrayDimensions],
+            [BinaryExpr.Opcode.Le, BinaryExpr.Opcode.Lt], 
+            [null, null], [null, null]);
+        var element = new SeqSelectExpr(_mutOrigin, true, collection, indexVar, null);
+        var arrayComprehension = new LambdaExpr(_mutOrigin, [indexBoundVar], 
+            rangeExpr, new Specification<FrameExpression>(), element);
+        return new TypeRhs(_mutOrigin, arrayType, [arrayDimensions], arrayComprehension);
+    }
+
+    private ExprRhs? CreateSetFromComprehensionExpr(NameSegment collection, string lhsCollectionType) {
+        var setType = CreateArgTypeFromStr(lhsCollectionType);
+        if (setType == null) return null;
+        var elemBoundVar = new BoundVar(_mutOrigin, "elemAuxVar'", setType);
+        var elemVar = new NameSegment(_mutOrigin, "elemAuxVar'", null);
+        var elemVarId = new IdentifierExpr(_mutOrigin, "elemAuxVar'");
+        var rangeExpr = new BinaryExpr(_mutOrigin, BinaryExpr.Opcode.In, elemVar, collection);
+        var setComprehension = new SetComprehension(_mutOrigin, true, [elemBoundVar], rangeExpr, elemVarId, null);
+        return new ExprRhs(setComprehension);
+    }
+
+    private ExprRhs CreateSetFromMapKeyValueSets(NameSegment collection, string rhsCollectionType) {
+        var isSourceMapKeys = rhsCollectionType.EndsWith("->");
+        var keyValueSetField = new Name(_mutOrigin, isSourceMapKeys ? "Keys" : "Values");
+        var mapKeyValueSet = new ExprDotName(_mutOrigin, collection, keyValueSetField, null);
+        return new ExprRhs(mapKeyValueSet);
+    }
+
+    private ExprRhs? CreateMultisetFromSet(NameSegment collection, string lhsCollectionType, string rhsCollectionType) {
+        var setSource = rhsCollectionType switch {
+            _ when rhsCollectionType.StartsWith("seq<") => CreateSetFromComprehensionExpr(collection, lhsCollectionType)?.Expr,
+            _ when rhsCollectionType.StartsWith("set<") => collection,
+            _ when rhsCollectionType.StartsWith("map<") => CreateSetFromMapKeyValueSets(collection, rhsCollectionType).Expr,
+            _ => null
+        };
+        if (setSource == null) return null;
+        var multisetInitExpr = new MultiSetFormingExpr(_mutOrigin, setSource);
+        return new ExprRhs(multisetInitExpr);
+    }
+
+    /// --------
+    /// Utils
+    /// --------
+    private LiteralExpr? CreateDefaultArgValueExpr() {
         var firstIndex = collectionTypeStr.IndexOf('<') + 1;
         var lastIndex = collectionTypeStr.LastIndexOf('>');
         var strLength = lastIndex - firstIndex;
@@ -149,12 +237,28 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
         if (collectionTypeStr.StartsWith("map<"))
             elementType = elementType.Split("-")[1];
         return elementType switch {
-            "int" or "nat" => new LiteralExpr(null, 0),
-            "real" => new LiteralExpr(null, BigDec.ZERO),
-            _ when elementType.StartsWith("bv") => new LiteralExpr(null, BigInteger.Zero),
-            "bool" => new LiteralExpr(null, false),
-            "char" => new CharLiteralExpr(null, "0"),
-            "string" => new StringLiteralExpr(null, "", false),
+            "int" or "nat" => new LiteralExpr(_mutOrigin, 0),
+            "real" => new LiteralExpr(_mutOrigin, BigDec.ZERO),
+            _ when elementType.StartsWith("bv") => new LiteralExpr(_mutOrigin, BigInteger.Zero),
+            "bool" => new LiteralExpr(_mutOrigin, false),
+            "char" => new CharLiteralExpr(_mutOrigin, "0"),
+            "string" => new StringLiteralExpr(_mutOrigin, "", false),
+            _ => null
+        };
+    }
+
+    private Type? CreateArgTypeFromStr(string type) {
+        var firstIndex = type.IndexOf('<') + 1;
+        var lastIndex = type.LastIndexOf('>');
+        var strLength = lastIndex - firstIndex;
+        type = type.Substring(firstIndex, strLength);
+        return type switch {
+            "int" or "nat" => new IntType(),
+            "real" => new RealType(),
+            _ when type.StartsWith("bv") => new BitvectorType(null, int.Parse(type[2..])),
+            "bool" => new BoolType(),
+            "char" => new CharType(),
+            "string" => new UserDefinedType(_mutOrigin, "string", []),
             _ => null
         };
     }

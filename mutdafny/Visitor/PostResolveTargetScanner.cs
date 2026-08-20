@@ -231,7 +231,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         
         foreach (var (o, i) in _currentMethod.Outs.Select((o, i) => (o, i))) {
             var location = $"{_currentMethod.EndToken.pos}-{i}";
-            ScanCUSUpdateElementTargets(o.Type, location);
+            ScanCUSUpdateElementTargets(o.Name, o.Type, location);
         }
     }
     
@@ -240,23 +240,39 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         
         foreach (var (lhs, i) in aStmt.Lhss.Select((lhs, i) => (lhs, i))) {
             var location = $"{aStmt.StartToken.pos}-{aStmt.EndToken.pos}-{i}";
-            if (lhs is SeqSelectExpr seqSExpr) {
-                ScanCUSUpdateElementTargets(seqSExpr.Seq.Type, location);
+            if (lhs is SeqSelectExpr seqSExpr && seqSExpr.Seq is NameSegment seqNSegExpr) {
+                ScanCUSUpdateElementTargets(seqNSegExpr.Name, seqSExpr.Seq.Type, location);
             } else if (lhs is NameSegment nSegExpr) {
-                ScanCUSUpdateElementTargets(nSegExpr.Type, location);
+                ScanCUSUpdateElementTargets(nSegExpr.Name, nSegExpr.Type, location);
             }
         }   
     }
 
-    private void ScanCUSUpdateElementTargets(Type collectionType, string location) {
-        if (collectionType is not SetType && collectionType is not MultiSetType && 
-            collectionType is not SeqType && collectionType is not MapType && 
-            !collectionType.IsArrayType && collectionType.ToString() != "string")
+    private void ScanCUSUpdateElementTargets(string collection, Type collectionType, string location) {
+        if (collectionType.IsArrayType && collectionType.TypeArgs.Any(t => !IsPrimitiveType(t)))
             return;
-        if (collectionType.TypeArgs.Any(t => !IsPrimitiveType(t))) return;
-
         var collectionTypeStr = collectionType.ToString() != "string" ? collectionType.ToString() : "seq<char>";
         collectionTypeStr = collectionTypeStr.Replace(" ", "").Replace(",", "-");
+        foreach (var scopeVar in _currentScopeVars) {
+            if (scopeVar.Key == collection) continue;
+            if (!AreCollectionTypesReplacementCompatible(collectionType, scopeVar.Value)) continue; 
+            var replacementCollectionTypeStr = scopeVar.Value.ToString() != "string" ? scopeVar.Value.ToString() : "seq<char>";
+            replacementCollectionTypeStr = replacementCollectionTypeStr.Replace(" ", "").Replace(",", "-");
+            if (scopeVar.Value is not MapType mapType) {
+                AddTarget((location, "CUS-copy", $"{scopeVar.Key}<->{collectionTypeStr}<->{replacementCollectionTypeStr}"));
+            } else {
+                var mapKeyTypeStr = $"{replacementCollectionTypeStr.Split("-")[0]}->";
+                if (collectionType.TypeArgs.Count == 1 && collectionType.TypeArgs[0].ToString() == mapType.TypeArgs[0].ToString())
+                    AddTarget((location, "CUS-copy", $"{scopeVar.Key}<->{collectionTypeStr}<->{mapKeyTypeStr}"));
+                var mapValueTypeStr = $"map<-{replacementCollectionTypeStr.Split("-")[1]}";
+                if (collectionType.TypeArgs.Count == 1 && collectionType.TypeArgs[0].ToString() == mapType.TypeArgs[1].ToString())
+                    AddTarget((location, "CUS-copy", $"{scopeVar.Key}<->{collectionTypeStr}<->{mapValueTypeStr}"));
+            }
+        }
+        
+        if (!IsCollectionType(collectionType) || collectionType.TypeArgs.Any(t => !IsPrimitiveType(t))) 
+            return; // CUS-fstElem and CUS-lstElem only work for primitive types
+        
         AddTarget((location, "CUS-fstElem", collectionTypeStr)); // mutation will update collection's first element
         if (collectionType is SeqType || collectionType.IsArrayType || 
             collectionType.ToString() == "string") // remaining collections are unordered so we update a single arbitrary element
@@ -527,11 +543,6 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         if (type.IsCharType) return "char";
         return type.IsStringType ? "string" : "";
     }
-
-    private bool IsPrimitiveType(Type type) {
-        return type.IsIntegerType || type.IsRealType || type.IsBitVectorType || 
-               type.IsBoolType || type.IsCharType || type.IsStringType;
-    }
     
     private string TypeToStr(Type type) {
         return type switch {
@@ -549,6 +560,49 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
                 uType.Name == "nat" ? "nat" : "",
             _ => "",
         };
+    }
+    
+    private bool IsPrimitiveType(Type type) {
+        return type.IsIntegerType || type.IsRealType || type.IsBitVectorType || 
+               type.IsBoolType || type.IsCharType || type.IsStringType;
+    }
+
+    private bool IsCollectionType(Type type) {
+        return type is SetType || type is MultiSetType || type is SeqType || 
+               type is MapType || type.IsArrayType || type.ToString() == "string";
+    }
+
+    private bool AreCollectionTypesReplacementCompatible(Type lhsCollectionType, Type rhsCollectionType) {
+        switch (lhsCollectionType) {
+            case SeqType: case var _ when lhsCollectionType.IsArrayType: 
+                return ((rhsCollectionType is SeqType || rhsCollectionType.IsArrayType) &&
+                        AreCollectionArgTypesReplacementCompatible(lhsCollectionType, rhsCollectionType)) || 
+                       (rhsCollectionType.ToString() == "string" && lhsCollectionType.TypeArgs[0] is CharType);
+            case var _ when lhsCollectionType.ToString() == "string": 
+                return rhsCollectionType.ToString() == "string" ||
+                       ((rhsCollectionType is SeqType || rhsCollectionType.IsArrayType) && rhsCollectionType.TypeArgs[0] is CharType);
+            case SetType: case MultiSetType:
+                return ((rhsCollectionType is SeqType || rhsCollectionType is SetType || rhsCollectionType is MultiSetType) &&
+                        AreCollectionArgTypesReplacementCompatible(lhsCollectionType, rhsCollectionType)) || 
+                       (rhsCollectionType.ToString() == "string" && lhsCollectionType.TypeArgs[0] is CharType) ||
+                       (rhsCollectionType is MapType mapType && 
+                        (IsMapKeyTypeReplacementCompatible(lhsCollectionType, mapType) || 
+                         IsMapValueTypeReplacementCompatible(lhsCollectionType, mapType)));
+        }
+        return false;
+    }
+    
+    private bool AreCollectionArgTypesReplacementCompatible(Type lhsCollectionType, Type rhsCollectionType) {
+        return lhsCollectionType.TypeArgs.Select(t => t.ToString())
+            .SequenceEqual(rhsCollectionType.TypeArgs.Select(t => t.ToString()));
+    }
+    
+    private bool IsMapKeyTypeReplacementCompatible(Type lhsCollectionType, MapType rhsCollectionType) {
+        return lhsCollectionType.TypeArgs[0].ToString() == rhsCollectionType.TypeArgs[0].ToString();
+    }
+    
+    private bool IsMapValueTypeReplacementCompatible(Type lhsCollectionType, MapType rhsCollectionType) {
+        return lhsCollectionType.TypeArgs[0].ToString() == rhsCollectionType.TypeArgs[1].ToString();
     }
 
     /// -------------------------------------
