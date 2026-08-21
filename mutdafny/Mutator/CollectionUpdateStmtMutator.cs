@@ -52,7 +52,8 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
         return collectionUpdateType switch {
             "fstElem" => CreateElementUpdateStmt(collection, true),
             "lstElem" => CreateElementUpdateStmt(collection, false),
-            "copy" => CreateCollectionCopy(collection),
+            "copy" => CreateCollectionCopyStmt(collection),
+            "compInit" => CreateCollectionComprehensionStmt(collection),
             _ => null,
         };
     }
@@ -151,7 +152,7 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
     /// --------
     /// CUS-copy
     /// --------
-    private Statement? CreateCollectionCopy(NameSegment collection) {
+    private Statement? CreateCollectionCopyStmt(NameSegment collection) {
         var args = collectionTypeStr.Split("<->");
         if (args.Length != 3) return null;
         var sourceCollection = new NameSegment(_mutOrigin, args[0], null);
@@ -226,6 +227,80 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
         return new ExprRhs(multisetInitExpr);
     }
 
+    /// ------------
+    /// CUS-compInit
+    /// ------------
+    private Statement? CreateCollectionComprehensionStmt(NameSegment collection) {
+        AssignmentRhs? comprehensionExpr = collectionTypeStr switch {
+            _ when collectionTypeStr.StartsWith("seq<") => CreateSeqComprehensionExpr(collection),
+            _ when collectionTypeStr.StartsWith("array<") => CreateArrayComprehensionExpr(collection),
+            _ when collectionTypeStr.StartsWith("set<") => CreateSetComprehensionExpr(collection),
+            _ when collectionTypeStr.StartsWith("multiset<") => CreateMultisetComprehensionExpr(collection),
+            _ when collectionTypeStr.StartsWith("map<") => CreateMapComprehensionExpr(collection),
+            _ => null,
+        };
+        return comprehensionExpr == null ? null : new AssignStatement(null, [collection], [comprehensionExpr]);
+    }
+
+    private ExprRhs? CreateSeqComprehensionExpr(NameSegment collection) {
+        var seqLengthExpr = new UnaryOpExpr(_mutOrigin, UnaryOpExpr.Opcode.Cardinality, collection);
+        var seqInit = CreateComprehensionLambdaExpr();
+        if (seqInit == null) return null;
+        var seqComprehensionExpr = new SeqConstructionExpr(_mutOrigin, null, seqLengthExpr, seqInit);
+        return new ExprRhs(seqComprehensionExpr);
+    }
+
+    private TypeRhs? CreateArrayComprehensionExpr(NameSegment collection) {
+        var arrayType = CreateArgTypeFromStr(collectionTypeStr);
+        var arrayDimensions = new ExprDotName(_mutOrigin, collection, new Name("Length"), null);
+        var arrayComprehension = CreateComprehensionLambdaExpr();
+        return arrayType == null || arrayComprehension == null ? null : 
+            new TypeRhs(_mutOrigin, arrayType, [arrayDimensions], arrayComprehension);
+    }
+
+    private ExprRhs? CreateSetComprehensionExpr(NameSegment collection) {
+        var setType = CreateArgTypeFromStr(collectionTypeStr);
+        var elemBoundVar = new BoundVar(_mutOrigin, "elemAuxVar'", setType);
+        var elemVar = new NameSegment(_mutOrigin, "elemAuxVar'", null);
+        var elemVarId = new IdentifierExpr(_mutOrigin, "elemAuxVar'");
+        var elementSeq = CreateSeqComprehensionExpr(collection)?.Expr;
+        var rangeExpr = new BinaryExpr(_mutOrigin, BinaryExpr.Opcode.In, elemVar, elementSeq);
+        if (setType == null || elementSeq == null) 
+            return null;
+        var setComprehension = new SetComprehension(_mutOrigin, true, [elemBoundVar], rangeExpr, elemVarId, null);
+        return new ExprRhs(setComprehension);
+    }
+
+    private ExprRhs? CreateMultisetComprehensionExpr(NameSegment collection) {
+        var elementSet = CreateSetComprehensionExpr(collection)?.Expr;
+        if (elementSet == null) return null;
+        var multisetComprehension = new MultiSetFormingExpr(_mutOrigin, elementSet);
+        return new ExprRhs(multisetComprehension);
+    }
+
+    private ExprRhs? CreateMapComprehensionExpr(NameSegment collection) {
+        var mapKeyType = CreateArgTypeFromStr(collectionTypeStr);
+        var elemBoundVar = new BoundVar(_mutOrigin, "elemAuxVar'", mapKeyType);
+        var elemVar = new NameSegment(_mutOrigin, "elemAuxVar'", null);
+        var elementSeq = CreateSeqComprehensionExpr(collection)?.Expr;
+        var rangeExpr = new BinaryExpr(_mutOrigin, BinaryExpr.Opcode.In, elemVar, elementSeq);
+        var elementValue = CreateDefaultComprehensionValueExpr(elemVar, true);
+        if (mapKeyType == null || elementSeq == null || elementValue == null) 
+            return null;
+        var mapComprehension = new MapComprehension(_mutOrigin, true, [elemBoundVar], 
+            rangeExpr, null, elementValue, null);
+        return new ExprRhs(mapComprehension);
+    }
+
+    private LambdaExpr? CreateComprehensionLambdaExpr() {
+        var indexBoundVar = new BoundVar(_mutOrigin, "indexAuxVar'", new IntType());
+        var indexVar = new NameSegment(_mutOrigin, "indexAuxVar'", null);
+        var element = CreateDefaultComprehensionValueExpr(indexVar);
+        if (element == null) return null;
+        return new LambdaExpr(_mutOrigin, [indexBoundVar], 
+            null, new Specification<FrameExpression>(), element);
+    }
+
     /// --------
     /// Utils
     /// --------
@@ -246,12 +321,32 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
             _ => null
         };
     }
+    
+    private Expression? CreateDefaultComprehensionValueExpr(NameSegment indexVar, bool targetMapValue = false) {
+        var firstIndex = collectionTypeStr.IndexOf('<') + 1;
+        var lastIndex = collectionTypeStr.LastIndexOf('>');
+        var strLength = lastIndex - firstIndex;
+        var elementType = collectionTypeStr.Substring(firstIndex, strLength);
+        if (collectionTypeStr.StartsWith("map<"))
+            elementType = !targetMapValue ? elementType.Split("-")[0] : elementType.Split("-")[1];
+        return elementType switch {
+            "int" or "nat" => indexVar,
+            "real" => new ConversionExpr(_mutOrigin, indexVar, new RealType()),
+            _ when elementType.StartsWith("bv") => new LiteralExpr(_mutOrigin, BigInteger.Zero),
+            "bool" => new LiteralExpr(_mutOrigin, false),
+            "char" => new CharLiteralExpr(_mutOrigin, "0"),
+            "string" => new StringLiteralExpr(_mutOrigin, "", false),
+            _ => null
+        };
+    }
 
     private Type? CreateArgTypeFromStr(string type) {
         var firstIndex = type.IndexOf('<') + 1;
         var lastIndex = type.LastIndexOf('>');
         var strLength = lastIndex - firstIndex;
         type = type.Substring(firstIndex, strLength);
+        if (collectionTypeStr.StartsWith("map<"))
+            type = type.Split("-")[0];
         return type switch {
             "int" or "nat" => new IntType(),
             "real" => new RealType(),
