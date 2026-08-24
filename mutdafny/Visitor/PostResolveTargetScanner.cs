@@ -17,7 +17,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     private VarDeclStmt? _prevVarDeclStmt;
     private ExprDotName? _childExprDotName;
     private List<string> _childMethodCallArgTypes = [];
-    private Method? _currentMethod = null;
+    private Method? _currentMethod;
     private Dictionary<string, Type> _currentScopeVars = [];
     private List<MethodOrFunction> _declaredMethods = [];
     private List<ApplySuffix> _methodCalls = [];
@@ -202,6 +202,18 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
             if (nSegExpr.Name == var.Key) continue;
             if (nSegExpr.Type.ToString() == var.Value.ToString())
                 AddTarget(($"{nSegExpr.Center.pos}", "VER", var.Key));
+        }
+    }
+
+    private void ScanELRTargets(Expression expr) {
+        if (!ShouldImplement("ELR") || !IsIncludedInTarget(expr) || 
+            (expr.Type is not IntType && expr.Type.ToString() != "nat")) 
+            return;
+        
+        var exprLocation = $"{expr.StartToken.pos}-{expr.EndToken.pos}";
+        foreach (var var in _currentScopeVars) {
+            if (!IsCollectionType(var.Value)) continue;
+            AddTarget((exprLocation, "ELR", $"{var.Key}:{var.Value}"));
         }
     }
     
@@ -808,11 +820,13 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
             ScanUOITargets(litExpr);
         }
         ScanLVRTargets(litExpr);
+        ScanELRTargets(litExpr);
     }
     
     protected override void VisitExpression(BinaryExpr bExpr) {
         ScanUOITargets(bExpr);
         ScanEVRTargets(bExpr);
+        ScanELRTargets(bExpr);
         if (bExpr.Op == BinaryExpr.Opcode.Mod || IsModuleComparisonWithZero(bExpr.E0, bExpr.E1))
             _skipChildUOIMutation = true;
         HandleExpression(bExpr.E0);
@@ -825,6 +839,8 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         _skipChildUOIMutation = true;
         ScanUODTargets(uExpr);
         ScanEVRTargets(uExpr);
+        if (uExpr is not UnaryOpExpr uOpExpr || uOpExpr.Op is not UnaryOpExpr.Opcode.Cardinality) 
+            ScanELRTargets(uExpr);
         base.VisitExpression(uExpr);
     }
     
@@ -843,17 +859,17 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         ScanUOITargets(cExpr);
         ScanEVRTargets(cExpr);
         foreach (var operand in cExpr.Operands) {
+            ScanELRTargets(operand);
             if (operand is not NegationExpression)
                 ScanUOITargets(operand);
-            
             if (operand is LiteralExpr litExpr) {
                 ScanLVRTargets(litExpr);
             } else if (operand is not NegationExpression) {
                 ScanEVRTargets(operand);
             }
-            
             if (operand is NameSegment nSegExpr)
                 ScanVERTargets(nSegExpr);
+            
             if (operand is SuffixExpr suffixExpr && !_skipChildFARMutation && 
                 suffixExpr is ExprDotName exprDName && exprDName.Lhs is NameSegment nSegExprLhs && 
                 nSegExprLhs.Type.AsTopLevelTypeWithMembers != null && nSegExprLhs.Type.AsTopLevelTypeWithMembers is ClassLikeDecl)
@@ -877,24 +893,28 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         
         ScanUOITargets(nSegExpr);
         ScanEVRTargets(nSegExpr);
+        ScanELRTargets(nSegExpr);
         ScanDCRTargets(nSegExpr);
     }
     
     protected override void VisitExpression(LetExpr ltExpr) {
         ScanUOITargets(ltExpr);
         ScanEVRTargets(ltExpr);
+        ScanELRTargets(ltExpr);
         base.VisitExpression(ltExpr);
     }
     
     protected override void VisitExpression(LetOrFailExpr ltOrFExpr) {
         ScanUOITargets(ltOrFExpr);
         ScanEVRTargets(ltOrFExpr);
+        ScanELRTargets(ltOrFExpr);
         base.VisitExpression(ltOrFExpr);
     }
     
     protected override void VisitExpression(ApplyExpr appExpr) {
         ScanUOITargets(appExpr);
         ScanEVRTargets(appExpr);
+        ScanELRTargets(appExpr);
         base.VisitExpression(appExpr);
     }
     
@@ -929,6 +949,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         ScanMethodTargets(suffixExpr);
         ScanUOITargets(suffixExpr);
         ScanEVRTargets(suffixExpr);
+        ScanELRTargets(suffixExpr);
         _skipChildEVRMutation = true;
         _skipChildVERMutation = true;
         _skipChildDCRMutation = true;
@@ -947,30 +968,35 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     protected override void VisitExpression(FunctionCallExpr fCallExpr) {
         ScanUOITargets(fCallExpr);
         ScanEVRTargets(fCallExpr);
+        ScanELRTargets(fCallExpr);
         base.VisitExpression(fCallExpr);
     }
     
     protected override void VisitExpression(MemberSelectExpr mSelExpr) {
         ScanUOITargets(mSelExpr);
         ScanEVRTargets(mSelExpr);
+        ScanELRTargets(mSelExpr);
         base.VisitExpression(mSelExpr);
     }
     
     protected override void VisitExpression(ITEExpr iteExpr) {
         ScanUOITargets(iteExpr);
         ScanEVRTargets(iteExpr);
+        ScanELRTargets(iteExpr);
         base.VisitExpression(iteExpr);
     }
     
     protected override void VisitExpression(MatchExpr mExpr) {
         ScanUOITargets(mExpr);
         ScanEVRTargets(mExpr);
+        ScanELRTargets(mExpr);
         base.VisitExpression(mExpr);
     }
     
     protected override void VisitExpression(NestedMatchExpr nMExpr) {
         ScanUOITargets(nMExpr);
         ScanEVRTargets(nMExpr);
+        ScanELRTargets(nMExpr);
         base.VisitExpression(nMExpr);
     }
     
@@ -1001,6 +1027,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     protected override void VisitExpression(SeqSelectExpr seqSExpr) {
         ScanUOITargets(seqSExpr);
         ScanEVRTargets(seqSExpr);
+        ScanELRTargets(seqSExpr);
         _skipChildEVRMutation = true;
         base.VisitExpression(seqSExpr);
         _skipChildEVRMutation = false;
@@ -1009,6 +1036,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     protected override void VisitExpression(MultiSelectExpr mSExpr) {
         ScanUOITargets(mSExpr);
         ScanEVRTargets(mSExpr);
+        ScanELRTargets(mSExpr);
         _skipChildEVRMutation = true;
         base.VisitExpression(mSExpr);
         _skipChildEVRMutation = false;
