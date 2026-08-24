@@ -30,6 +30,10 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
         var collectionUpdateStmt = CreateCollectionUpdateStmt(collection);
         if (collectionUpdateStmt == null) return null;
         _currentBlock.Body.Insert(_currentBlock.Body.IndexOf(aStmt) + 1, collectionUpdateStmt);
+        
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(collectionUpdateStmt);
+        ForbidChildrenMutation(collectionUpdateStmt);
         return collectionUpdateStmt;
     }
     
@@ -47,6 +51,10 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
         if (method.Body.Body[^1] is ReturnStmt) 
             method.Body.Body.RemoveAt(method.Body.Body.Count - 1);
         method.Body.Body.Add(collectionUpdateStmt);
+        
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(collectionUpdateStmt);
+        ForbidChildrenMutation(collectionUpdateStmt);
         return collectionUpdateStmt;
     }
 
@@ -366,7 +374,9 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
         var startPosition = int.Parse(positions[0]);
         var endPosition = int.Parse(positions[1]);
         
-        if (stmt.StartToken.pos == startPosition && stmt.EndToken.pos == endPosition) {
+        if (stmt.StartToken.pos == startPosition && stmt.EndToken.pos == endPosition &&
+            !AlreadyMutated(stmt) && !ContainsMutatedChildren(stmt)) 
+        {
             _assignLhsIndex = int.Parse(positions[2]);
             return true;
         }
@@ -378,7 +388,8 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
         if (positions.Length != 2) return false;
         var position = int.Parse(positions[0]);
         
-        if (method.EndToken.pos == position) {
+        if (method.EndToken.pos == position && (method.Body?.Body[^1] is not ReturnStmt rStmt || 
+            (!AlreadyMutated(rStmt) && !ContainsMutatedChildren(rStmt)))) {
             _methodOutsIndex = int.Parse(positions[1]);
             return true;
         }
