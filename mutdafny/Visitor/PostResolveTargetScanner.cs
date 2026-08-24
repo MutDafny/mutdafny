@@ -213,6 +213,12 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         var exprLocation = $"{expr.StartToken.pos}-{expr.EndToken.pos}";
         foreach (var var in _currentScopeVars) {
             if (!IsCollectionType(var.Value)) continue;
+            if ((expr is UnaryOpExpr uOpExpr && uOpExpr.Op is UnaryOpExpr.Opcode.Cardinality &&
+                 !var.Value.ToString().StartsWith("array<")) ||
+                (expr is ExprDotName exprDName && exprDName.SuffixName == "Length" && 
+                 var.Value.ToString().StartsWith("array<")))
+                continue;
+            
             AddTarget((exprLocation, "ELR", $"{var.Key}:{var.Value}"));
         }
     }
