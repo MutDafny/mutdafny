@@ -44,6 +44,8 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
         _mutOrigin = method.EndToken;
         var collectionUpdateStmt = CreateCollectionUpdateStmt(collection);
         if (collectionUpdateStmt == null) return null;
+        if (method.Body.Body[^1] is ReturnStmt) 
+            method.Body.Body.RemoveAt(method.Body.Body.Count - 1);
         method.Body.Body.Add(collectionUpdateStmt);
         return collectionUpdateStmt;
     }
