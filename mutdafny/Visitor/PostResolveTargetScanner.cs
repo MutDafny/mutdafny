@@ -257,7 +257,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     }
     
     private void ScanCUSTargets() {
-        if (!ShouldImplement("CUS") || _currentMethod == null || !IsIncludedInTarget(_currentMethod)) return;
+        if (!ShouldImplement("CUS") || _currentMethod == null || !IsIncludedInTarget(_currentMethod.EndToken)) return;
         
         foreach (var (o, i) in _currentMethod.Outs.Select((o, i) => (o, i))) {
             var location = $"{_currentMethod.EndToken.pos}-{i}";
