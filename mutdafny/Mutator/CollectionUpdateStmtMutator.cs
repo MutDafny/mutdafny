@@ -62,6 +62,7 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
         return collectionUpdateType switch {
             "fstElem" => CreateElementUpdateStmt(collection, true),
             "lstElem" => CreateElementUpdateStmt(collection, false),
+            "swap" => CreateElementSwapStmt(collection),
             "copy" => CreateCollectionCopyStmt(collection),
             "compInit" => CreateCollectionComprehensionStmt(collection),
             _ => null,
@@ -157,6 +158,44 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
         var collectionIsNotEmptyExpr = new BinaryExpr(_mutOrigin, BinaryExpr.Opcode.Neq,
             collectionToCheck, emptyCollection);
         return new IfStmt(_mutOrigin, false, collectionIsNotEmptyExpr, ifBody, null, null);
+    }
+
+    /// --------
+    /// CUS-swap
+    /// --------
+    private Statement? CreateElementSwapStmt(NameSegment collection) {
+        if (!collectionTypeStr.StartsWith("seq<") && !collectionTypeStr.StartsWith("array<")) return null;
+        Expression collectionLength = collectionTypeStr.StartsWith("seq<") ? 
+            new UnaryOpExpr(_mutOrigin, UnaryOpExpr.Opcode.Cardinality, collection) : 
+            new ExprDotName(_mutOrigin, collection, new Name("Length"), null);
+        var oneLiteral = new LiteralExpr(_mutOrigin, 1);
+        var collectionHasAtLeastTwoElems = new BinaryExpr(_mutOrigin, BinaryExpr.Opcode.Gt, collectionLength, oneLiteral);
+        var elementSwapStmt = collectionTypeStr.StartsWith("seq<") ?
+            CreateSeqElementSwapStmt(collection) :
+            CreateArrayElementSwapStmt(collection);
+        var ifBody = new BlockStmt(_mutOrigin, [elementSwapStmt]);
+        return new IfStmt(_mutOrigin, false, collectionHasAtLeastTwoElems, ifBody, null, null);
+    }
+
+    private AssignStatement CreateSeqElementSwapStmt(NameSegment collection) {
+        var zeroLiteral = new LiteralExpr(_mutOrigin, 0);
+        var oneLiteral = new LiteralExpr(_mutOrigin, 1);
+        var twoLiteral = new LiteralExpr(_mutOrigin, 2);
+        var firstElement = new SeqSelectExpr(_mutOrigin, true, collection, zeroLiteral, null);
+        var secondElement = new SeqSelectExpr(_mutOrigin, true, collection, oneLiteral, null);
+        var swapedSection = new SeqDisplayExpr(_mutOrigin, [secondElement, firstElement]);
+        var remainingSeq = new SeqSelectExpr(_mutOrigin, false, collection, twoLiteral, null);
+        var fullSeq = new BinaryExpr(_mutOrigin, BinaryExpr.Opcode.Add, swapedSection, remainingSeq);
+        return new AssignStatement(_mutOrigin, [collection], [new ExprRhs(fullSeq)]);
+    }
+
+    private AssignStatement CreateArrayElementSwapStmt(NameSegment collection) {
+        var zeroLiteral = new LiteralExpr(_mutOrigin, 0);
+        var oneLiteral = new LiteralExpr(_mutOrigin, 1);
+        var firstElement = new SeqSelectExpr(_mutOrigin, true, collection, zeroLiteral, null);
+        var secondElement = new SeqSelectExpr(_mutOrigin, true, collection, oneLiteral, null);
+        return new AssignStatement(_mutOrigin, [firstElement, secondElement], 
+            [new ExprRhs(secondElement), new ExprRhs(firstElement)]);
     }
 
     /// --------

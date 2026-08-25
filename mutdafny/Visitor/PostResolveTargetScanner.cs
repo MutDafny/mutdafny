@@ -301,7 +301,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         }
         
         if (!IsCollectionType(collectionType) || collectionType.TypeArgs.Any(t => !IsPrimitiveType(t))) 
-            return; // CUS-fstElem, CUS-lstElem, and CUS-compInit only work for primitive types
+            return; // CUS-fstElem, CUS-lstElem, and CUS-compInit only work for primitive arg types
         
         AddTarget((location, "CUS-fstElem", collectionTypeStr)); // mutation will update collection's first element
         if (collectionType is SeqType || collectionType.IsArrayType || 
@@ -309,6 +309,10 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
             AddTarget((location, "CUS-lstElem", collectionTypeStr)); // mutation will update collection's last element
         
         AddTarget((location, "CUS-compInit", collectionTypeStr));
+
+        if (collectionType is not SeqType && !collectionType.IsArrayType && collectionType.ToString() != "string") 
+            return; // CUS-swap only works for sequences and arrays
+        AddTarget((location, "CUS-swap", collectionTypeStr));
     }
 
     private void ScanMethodTargets(ConcreteAssignStatement cAStmt) {
