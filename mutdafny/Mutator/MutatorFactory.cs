@@ -19,6 +19,10 @@ public class MutatorFactory(ErrorReporter reporter)
                 new LiteralValueReplacementMutator(mutationTargetPos, mutationArg, reporter),
             "EVR" => mutationArg == null ? null :
                 new ExprValueReplacementMutator(mutationTargetPos, mutationArg, reporter),
+            "INC" => mutationArg == null ? null :
+                new IncrementMutator(mutationTargetPos, mutationArg, true, reporter),
+            "DEC" => mutationArg == null ? null :
+                new IncrementMutator(mutationTargetPos, mutationArg, false, reporter),
             "VER" => mutationArg == null ? null :
                 new VariableExprReplacementMutator(mutationTargetPos, mutationArg, reporter),
             "ELR" => mutationArg == null ? null :

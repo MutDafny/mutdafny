@@ -10,6 +10,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
 {
     private bool _skipChildUOIMutation;
     private bool _skipChildEVRMutation;
+    private bool _skipChildINCMutation;
     private bool _skipChildVERMutation;
     private bool _skipChildDCRMutation;
     private bool _skipChildFARMutation;
@@ -193,6 +194,23 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
             nnTypeDecl.Class != null) {
             AddTarget(($"{tpRhs.StartToken.pos}-{tpRhs.EndToken.pos}", "EVR", "null"));
         }
+    }
+    
+    private void ScanINCTargets(Expression expr) {
+        var type = expr.Type switch {
+            IntType => "int",
+            RealType => "real",
+            UserDefinedType { Name: "nat" } => "int",
+            _ => ""
+        };
+        if (_skipChildINCMutation || type == "") return;
+        
+        var exprLocation = $"{expr.StartToken.pos}-{expr.EndToken.pos}";
+        if (ShouldImplement("INC") && IsIncludedInTarget(expr))
+            AddTarget(($"{exprLocation}", "INC", type));
+        if (ShouldImplement("DEC") && IsIncludedInTarget(expr))
+            AddTarget(($"{exprLocation}", "DEC", type));
+        _skipChildINCMutation = true;
     }
     
     private void ScanVERTargets(NameSegment nSegExpr) {
@@ -851,8 +869,10 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     }
     
     protected override void VisitExpression(BinaryExpr bExpr) {
+        var prevSkipChildINCMutation = _skipChildINCMutation;
         ScanUOITargets(bExpr);
         ScanEVRTargets(bExpr);
+        ScanINCTargets(bExpr);
         ScanELRTargets(bExpr);
         if (bExpr.ResolvedOp is BinaryExpr.ResolvedOpcode.Concat)
             AddTarget(($"{bExpr.Center.pos}", "CAS", ""));
@@ -863,21 +883,28 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         if (bExpr.Op == BinaryExpr.Opcode.Mod || IsModuleComparisonWithZero(bExpr.E1, bExpr.E0))
             _skipChildUOIMutation = true;
         HandleExpression(bExpr.E1);
+        _skipChildINCMutation = prevSkipChildINCMutation;
     }
     
     protected override void VisitExpression(UnaryExpr uExpr) {
+        var prevSkipChildINCMutation = _skipChildINCMutation;
         _skipChildUOIMutation = true;
         ScanUODTargets(uExpr);
         ScanEVRTargets(uExpr);
+        ScanINCTargets(uExpr);
         if (uExpr is not UnaryOpExpr uOpExpr || uOpExpr.Op is not UnaryOpExpr.Opcode.Cardinality) 
             ScanELRTargets(uExpr);
         base.VisitExpression(uExpr);
+        _skipChildINCMutation = prevSkipChildINCMutation;
     }
     
     protected override void VisitExpression(ParensExpression pExpr) {
         ScanUOITargets(pExpr);
         _skipChildUOIMutation = true;
+        var prevSkipChildINCMutation = _skipChildINCMutation;
+        _skipChildINCMutation = false;
         base.VisitExpression(pExpr);
+        _skipChildINCMutation = prevSkipChildINCMutation;
     }
     
     protected override void VisitExpression(NegationExpression nExpr) {
@@ -886,10 +913,13 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     }
     
     protected override void VisitExpression(ChainingExpression cExpr) {
+        var prevSkipChildINCMutation = _skipChildINCMutation;
         ScanUOITargets(cExpr);
         ScanEVRTargets(cExpr);
         foreach (var operand in cExpr.Operands) {
             ScanELRTargets(operand);
+            ScanINCTargets(operand);
+            _skipChildINCMutation = prevSkipChildINCMutation;
             if (operand is not NegationExpression)
                 ScanUOITargets(operand);
             if (operand is LiteralExpr litExpr) {
@@ -910,6 +940,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     }
 
     protected override void VisitExpression(NameSegment nSegExpr) {
+        var prevSkipChildINCMutation = _skipChildINCMutation;
         if (!_skipChildVERMutation)
             ScanVERTargets(nSegExpr);
         
@@ -923,29 +954,40 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         
         ScanUOITargets(nSegExpr);
         ScanEVRTargets(nSegExpr);
+        ScanINCTargets(nSegExpr);
         ScanELRTargets(nSegExpr);
         ScanDCRTargets(nSegExpr);
+        _skipChildINCMutation = prevSkipChildINCMutation;
     }
     
     protected override void VisitExpression(LetExpr ltExpr) {
+        var prevSkipChildINCMutation = _skipChildINCMutation;
         ScanUOITargets(ltExpr);
         ScanEVRTargets(ltExpr);
+        ScanINCTargets(ltExpr);
         ScanELRTargets(ltExpr);
         base.VisitExpression(ltExpr);
+        _skipChildINCMutation = prevSkipChildINCMutation;
     }
     
     protected override void VisitExpression(LetOrFailExpr ltOrFExpr) {
+        var prevSkipChildINCMutation = _skipChildINCMutation;
         ScanUOITargets(ltOrFExpr);
         ScanEVRTargets(ltOrFExpr);
+        ScanINCTargets(ltOrFExpr);
         ScanELRTargets(ltOrFExpr);
         base.VisitExpression(ltOrFExpr);
+        _skipChildINCMutation = prevSkipChildINCMutation;
     }
     
     protected override void VisitExpression(ApplyExpr appExpr) {
+        var prevSkipChildINCMutation = _skipChildINCMutation;
         ScanUOITargets(appExpr);
         ScanEVRTargets(appExpr);
+        ScanINCTargets(appExpr);
         ScanELRTargets(appExpr);
         base.VisitExpression(appExpr);
+        _skipChildINCMutation = prevSkipChildINCMutation;
     }
     
     protected override void VisitExpression(SuffixExpr suffixExpr) {
@@ -976,9 +1018,11 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
             }
         }
         
+        var prevSkipChildINCMutation = _skipChildINCMutation;
         ScanMethodTargets(suffixExpr);
         ScanUOITargets(suffixExpr);
         ScanEVRTargets(suffixExpr);
+        ScanINCTargets(suffixExpr);
         ScanELRTargets(suffixExpr);
         _skipChildEVRMutation = true;
         _skipChildVERMutation = true;
@@ -993,27 +1037,37 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         _skipChildVERMutation = false;
         _skipChildDCRMutation = false;
         _skipChildFARMutation = false;
+        _skipChildINCMutation = prevSkipChildINCMutation;
     }
     
     protected override void VisitExpression(FunctionCallExpr fCallExpr) {
+        var prevSkipChildINCMutation = _skipChildINCMutation;
         ScanUOITargets(fCallExpr);
         ScanEVRTargets(fCallExpr);
+        ScanINCTargets(fCallExpr);
         ScanELRTargets(fCallExpr);
         base.VisitExpression(fCallExpr);
+        _skipChildINCMutation = prevSkipChildINCMutation;
     }
     
     protected override void VisitExpression(MemberSelectExpr mSelExpr) {
+        var prevSkipChildINCMutation = _skipChildINCMutation;
         ScanUOITargets(mSelExpr);
         ScanEVRTargets(mSelExpr);
+        ScanINCTargets(mSelExpr);
         ScanELRTargets(mSelExpr);
         base.VisitExpression(mSelExpr);
+        _skipChildINCMutation = prevSkipChildINCMutation;
     }
     
     protected override void VisitExpression(ITEExpr iteExpr) {
+        var prevSkipChildINCMutation = _skipChildINCMutation;
         ScanUOITargets(iteExpr);
         ScanEVRTargets(iteExpr);
+        ScanINCTargets(iteExpr);
         ScanELRTargets(iteExpr);
         base.VisitExpression(iteExpr);
+        _skipChildINCMutation = prevSkipChildINCMutation;
     }
     
     protected override void VisitExpression(MatchExpr mExpr) {
@@ -1055,21 +1109,27 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     }
     
     protected override void VisitExpression(SeqSelectExpr seqSExpr) {
+        var prevSkipChildINCMutation = _skipChildINCMutation;
         ScanUOITargets(seqSExpr);
         ScanEVRTargets(seqSExpr);
+        ScanINCTargets(seqSExpr);
         ScanELRTargets(seqSExpr);
         _skipChildEVRMutation = true;
         base.VisitExpression(seqSExpr);
         _skipChildEVRMutation = false;
+        _skipChildINCMutation = prevSkipChildINCMutation;
     }
     
     protected override void VisitExpression(MultiSelectExpr mSExpr) {
+        var prevSkipChildINCMutation = _skipChildINCMutation;
         ScanUOITargets(mSExpr);
         ScanEVRTargets(mSExpr);
+        ScanINCTargets(mSExpr);
         ScanELRTargets(mSExpr);
         _skipChildEVRMutation = true;
         base.VisitExpression(mSExpr);
         _skipChildEVRMutation = false;
+        _skipChildINCMutation = prevSkipChildINCMutation;
     }
     
     protected override void VisitExpression(SeqUpdateExpr seqUExpr) {
