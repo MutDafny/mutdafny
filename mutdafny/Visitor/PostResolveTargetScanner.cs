@@ -277,6 +277,17 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
             }
         }   
     }
+    
+    private void ScanCUSTargets(ReturnStmt rStmt) {
+        if (!ShouldImplement("CUS") || !IsIncludedInTarget(rStmt)) return;
+        
+        foreach (var (rhs, i) in rStmt.Rhss.Select((rhs, i) => (rhs, i))) {
+            var location = $"{rStmt.StartToken.pos}-{rStmt.EndToken.pos}-{i}";
+            if (rhs is ExprRhs exprRhs && exprRhs.Expr is NameSegment nSegExpr && 
+                nSegExpr.ToString() != _currentMethod?.Outs[i].Name)
+                ScanCUSUpdateElementTargets(nSegExpr.Name, nSegExpr.Type, location);
+        }
+    }
 
     private void ScanCUSUpdateElementTargets(string collection, Type collectionType, string location) {
         if (collectionType.IsArrayType && collectionType.TypeArgs.Any(t => !IsPrimitiveType(t)))
@@ -819,6 +830,12 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         if (canApplySWV && ShouldImplement("SWV") && IsIncludedInTarget(vDeclStmt) && IsIncludedInTarget(_prevVarDeclStmt))
             AddTarget(($"{vDeclStmt.Center.pos}", "SWV", $"{_prevVarDeclStmt?.Center.pos}"));
         _prevVarDeclStmt = vDeclStmt;
+    }
+    
+    protected override void VisitStatement(ProduceStmt pStmt) {
+        if (pStmt is ReturnStmt rStmt)
+            ScanCUSTargets(rStmt);
+        base.VisitStatement(pStmt);
     }
 
     /// --------------------------------------

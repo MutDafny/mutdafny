@@ -37,6 +37,26 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
         return collectionUpdateStmt;
     }
     
+    private Statement? Mutate(ReturnStmt rStmt) {
+        if (_currentBlock == null) return null;
+        
+        NameSegment? collection = null;
+        if (_assignLhsIndex != -1 && rStmt.Rhss.Count > _assignLhsIndex && 
+            rStmt.Rhss[_assignLhsIndex] is ExprRhs { Expr: NameSegment nSegExpr })
+            collection = nSegExpr;
+        if (collection == null) return null;
+
+        _mutOrigin = rStmt.StartToken;
+        var collectionUpdateStmt = CreateCollectionUpdateStmt(collection);
+        if (collectionUpdateStmt == null) return null;
+        _currentBlock.Body.Insert(_currentBlock.Body.IndexOf(rStmt), collectionUpdateStmt);
+        
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(collectionUpdateStmt);
+        ForbidChildrenMutation(collectionUpdateStmt);
+        return collectionUpdateStmt;
+    }
+    
     private Statement? Mutate(Method method) {
         if (method.Body == null) return null;
         NameSegment? collection = null;
@@ -48,9 +68,13 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
         _mutOrigin = method.EndToken;
         var collectionUpdateStmt = CreateCollectionUpdateStmt(collection);
         if (collectionUpdateStmt == null) return null;
-        if (method.Body.Body[^1] is ReturnStmt) 
-            method.Body.Body.RemoveAt(method.Body.Body.Count - 1);
-        method.Body.Body.Add(collectionUpdateStmt);
+        if (method.Body.Body[^1] is ReturnStmt rStmt) {
+            method.Body.Body.Insert(method.Body.Body.Count - 1, collectionUpdateStmt);
+            if (rStmt.Rhss[_methodOutsIndex].ToString() != collection.ToString())
+                rStmt.Rhss[_methodOutsIndex] = new ExprRhs(collection);
+        } else {
+            method.Body.Body.Add(collectionUpdateStmt);
+        }
         
         MutantGenerator.NumMutations++;
         MutantGenerator.MutatedNodes.Add(collectionUpdateStmt);
@@ -467,5 +491,17 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
             }
         }
         base.VisitStatement(aStmt);
+    }
+
+    protected override void VisitStatement(ProduceStmt pStmt) {
+        if (pStmt is ReturnStmt rStmt && IsTarget(rStmt)) {
+            TargetStatement = Mutate(rStmt);
+            if (TargetStatement != null) {
+                MutantGenerator.NumMutations++;
+                MutantGenerator.MutatedNodes.Add(TargetStatement);
+                return; 
+            }
+        }
+        base.VisitStatement(pStmt);
     }
 }
