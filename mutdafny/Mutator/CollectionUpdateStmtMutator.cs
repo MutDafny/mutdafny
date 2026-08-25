@@ -70,7 +70,7 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
         if (collectionUpdateStmt == null) return null;
         if (method.Body.Body[^1] is ReturnStmt rStmt) {
             method.Body.Body.Insert(method.Body.Body.Count - 1, collectionUpdateStmt);
-            if (rStmt.Rhss[_methodOutsIndex].ToString() != collection.ToString())
+            if (rStmt.Rhss != null && rStmt.Rhss.Count > _methodOutsIndex && rStmt.Rhss[_methodOutsIndex].ToString() != collection.ToString())
                 rStmt.Rhss[_methodOutsIndex] = new ExprRhs(collection);
         } else {
             method.Body.Body.Add(collectionUpdateStmt);
