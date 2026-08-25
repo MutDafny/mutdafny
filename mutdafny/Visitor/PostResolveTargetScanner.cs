@@ -602,11 +602,16 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
             MultiSetType => "multiset",
             SeqType => "seq",
             MapType => "map",
-            UserDefinedType uType => uType.Name == "string" ? 
-                "string" : 
-                uType.Name == "nat" ? "nat" : "",
+            UserDefinedType uType => uType.Name == "string" ? "string" :
+                uType.Name == "nat" ? "nat" :
+                uType.AsDatatype != null ? DatatypeDefaultTypeCode(uType.AsDatatype) : "",
             _ => "",
         };
+    }
+
+    private string DatatypeDefaultTypeCode(DatatypeDecl dt) {
+        var nullaryCtor = dt.Ctors.FirstOrDefault(c => c.Formals.Count == 0);
+        return nullaryCtor == null ? "datatype" : $"datatype:{nullaryCtor.Name}";
     }
     
     private bool IsPrimitiveType(Type type) {
