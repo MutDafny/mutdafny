@@ -43,6 +43,7 @@ public class MutatorFactory(ErrorReporter reporter)
                 new CollectionInitReplacementMutator(mutationTargetPos, mutationArg, reporter),
             _ when mutationOperator.StartsWith("CUS") => mutationArg == null ? null :
                 new CollectionUpdateStmtMutator(mutationTargetPos, mutationArg, mutationOperator.Split("-")[1], reporter),
+            "CAS" => new SequenceConcatenationArgSwap(mutationTargetPos, reporter),
             "CBR" => new CaseBlockReplacementMutator(mutationTargetPos, reporter),
             "CBE" => new ConditionalBlockExtractionMutator(mutationTargetPos, reporter),
             "TAR" => mutationArg == null ? null :

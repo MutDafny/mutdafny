@@ -854,6 +854,9 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         ScanUOITargets(bExpr);
         ScanEVRTargets(bExpr);
         ScanELRTargets(bExpr);
+        if (bExpr.ResolvedOp is BinaryExpr.ResolvedOpcode.Concat)
+            AddTarget(($"{bExpr.Center.pos}", "CAS", ""));
+        
         if (bExpr.Op == BinaryExpr.Opcode.Mod || IsModuleComparisonWithZero(bExpr.E0, bExpr.E1))
             _skipChildUOIMutation = true;
         HandleExpression(bExpr.E0);
