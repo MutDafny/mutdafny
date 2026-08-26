@@ -5,7 +5,7 @@ using Type = Microsoft.Dafny.Type;
 
 namespace MutDafny.Mutator;
 
-public class CollectionUpdateStmtMutator(string insertPos, string collectionTypeStr, string collectionUpdateType, ErrorReporter reporter) 
+public class CollectionUpdateStmtMutator(string insertPos, string collectionUpdateType, string collectionTypeStr, ErrorReporter reporter) 
     : Mutator(insertPos, reporter)
 {
     private int _assignLhsIndex = -1;
@@ -83,26 +83,34 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
     }
 
     private Statement? CreateCollectionUpdateStmt(NameSegment collection) {
+        if (collectionUpdateType == "CEU" && 
+            collectionTypeStr.Split("<->")[0] != "fstElem" && 
+            collectionTypeStr.Split("<->")[0] != "lstElem")
+            return null;
+        var isCEUFirstElem = collectionTypeStr.Split("<->")[0] == "fstElem";
+        
         return collectionUpdateType switch {
-            "fstElem" => CreateElementUpdateStmt(collection, true),
-            "lstElem" => CreateElementUpdateStmt(collection, false),
-            "swap" => CreateElementSwapStmt(collection),
-            "copy" => CreateCollectionCopyStmt(collection),
-            "compInit" => CreateCollectionComprehensionStmt(collection),
+            "CEU" => CreateElementUpdateStmt(collection, isCEUFirstElem),
+            "CES" => CreateElementSwapStmt(collection),
+            "CCC" => CreateCollectionCopyStmt(collection),
+            "CCU" => CreateCollectionComprehensionStmt(collection),
             _ => null,
         };
     }
 
     /// ---------------------------
-    /// CUS-fstElem and CUS-lstElem
+    /// CEU
     /// ---------------------------
     private Statement? CreateElementUpdateStmt(NameSegment collection, bool firstElem) {
-        return collectionTypeStr switch {
-            _ when collectionTypeStr.StartsWith("seq<") => CreateSeqUpdateStmt(collection, firstElem),
-            _ when collectionTypeStr.StartsWith("array<") => CreateArrayUpdateStmt(collection, firstElem),
-            _ when collectionTypeStr.StartsWith("set<") => CreateSetUpdateStmt(collection),
-            _ when collectionTypeStr.StartsWith("multiset<") => CreateMultisetUpdateStmt(collection),
-            _ when collectionTypeStr.StartsWith("map<") => CreateMapUpdateStmt(collection),
+        var args = collectionTypeStr.Split("<->");
+        if (args.Length != 2) return null;
+        var typeStr = args[1];
+        return typeStr switch {
+            _ when typeStr.StartsWith("seq<") => CreateSeqUpdateStmt(collection, firstElem),
+            _ when typeStr.StartsWith("array<") => CreateArrayUpdateStmt(collection, firstElem),
+            _ when typeStr.StartsWith("set<") => CreateSetUpdateStmt(collection),
+            _ when typeStr.StartsWith("multiset<") => CreateMultisetUpdateStmt(collection),
+            _ when typeStr.StartsWith("map<") => CreateMapUpdateStmt(collection),
             _ => null,
         };
     }
@@ -122,7 +130,7 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
     }
 
     private Expression CreateCollectionIndexExpr(NameSegment collection, bool firstElem) {
-        Expression lengthExpr = collectionTypeStr.StartsWith("seq<")
+        Expression lengthExpr = collectionTypeStr.Split("<->")[1].StartsWith("seq<")
             ? new UnaryOpExpr(_mutOrigin, UnaryOpExpr.Opcode.Cardinality, collection)
             : new ExprDotName(_mutOrigin, collection, new Name("Length"), null);
         return firstElem ? new LiteralExpr(_mutOrigin, 0) : 
@@ -184,9 +192,9 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
         return new IfStmt(_mutOrigin, false, collectionIsNotEmptyExpr, ifBody, null, null);
     }
 
-    /// --------
-    /// CUS-swap
-    /// --------
+    /// ---------------------------
+    /// CES
+    /// ---------------------------
     private Statement? CreateElementSwapStmt(NameSegment collection) {
         if (!collectionTypeStr.StartsWith("seq<") && !collectionTypeStr.StartsWith("array<")) return null;
         Expression collectionLength = collectionTypeStr.StartsWith("seq<") ? 
@@ -222,9 +230,9 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
             [new ExprRhs(secondElement), new ExprRhs(firstElement)]);
     }
 
-    /// --------
-    /// CUS-copy
-    /// --------
+    /// ---------------------------
+    /// CCC
+    /// ---------------------------
     private Statement? CreateCollectionCopyStmt(NameSegment collection) {
         var args = collectionTypeStr.Split("<->");
         if (args.Length != 3) return null;
@@ -300,9 +308,9 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
         return new ExprRhs(multisetInitExpr);
     }
 
-    /// ------------
-    /// CUS-compInit
-    /// ------------
+    /// ---------------------------
+    /// CCU
+    /// ---------------------------
     private Statement? CreateCollectionComprehensionStmt(NameSegment collection) {
         AssignmentRhs? comprehensionExpr = collectionTypeStr switch {
             _ when collectionTypeStr.StartsWith("seq<") => CreateSeqComprehensionExpr(collection),
@@ -378,11 +386,12 @@ public class CollectionUpdateStmtMutator(string insertPos, string collectionType
     /// Utils
     /// --------
     private LiteralExpr? CreateDefaultArgValueExpr() {
-        var firstIndex = collectionTypeStr.IndexOf('<') + 1;
-        var lastIndex = collectionTypeStr.LastIndexOf('>');
+        var typeStr = collectionTypeStr.Split("<->")[1];
+        var firstIndex = typeStr.IndexOf('<') + 1;
+        var lastIndex = typeStr.LastIndexOf('>');
         var strLength = lastIndex - firstIndex;
-        var elementType = collectionTypeStr.Substring(firstIndex, strLength);
-        if (collectionTypeStr.StartsWith("map<"))
+        var elementType = typeStr.Substring(firstIndex, strLength);
+        if (typeStr.StartsWith("map<"))
             elementType = elementType.Split("-")[1];
         return elementType switch {
             "int" or "nat" => new LiteralExpr(_mutOrigin, 0),

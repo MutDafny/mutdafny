@@ -274,74 +274,78 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         AddTarget((exprLocation, "CIR", arg));
     }
     
-    private void ScanCUSTargets() {
-        if (!ShouldImplement("CUS") || _currentMethod == null || !IsIncludedInTarget(_currentMethod)) return;
+    private void ScanCollectionUpdateTargets() {
+        if (_currentMethod == null || !IsIncludedInTarget(_currentMethod)) return;
         
         foreach (var (o, i) in _currentMethod.Outs.Select((o, i) => (o, i))) {
             var location = $"{_currentMethod.EndToken.pos}-{i}";
-            ScanCUSUpdateElementTargets(o.Name, o.Type, location);
+            ScanCollectionUpdateTargets(o.Name, o.Type, location);
         }
     }
     
-    private void ScanCUSTargets(AssignStatement aStmt) {
-        if (!ShouldImplement("CUS") || !IsIncludedInTarget(aStmt)) return;
+    private void ScanCollectionUpdateTargets(AssignStatement aStmt) {
+        if (!IsIncludedInTarget(aStmt)) return;
         
         foreach (var (lhs, i) in aStmt.Lhss.Select((lhs, i) => (lhs, i))) {
             var location = $"{aStmt.StartToken.pos}-{aStmt.EndToken.pos}-{i}";
             if (lhs is SeqSelectExpr seqSExpr && seqSExpr.Seq is NameSegment seqNSegExpr) {
-                ScanCUSUpdateElementTargets(seqNSegExpr.Name, seqSExpr.Seq.Type, location);
+                ScanCollectionUpdateTargets(seqNSegExpr.Name, seqSExpr.Seq.Type, location);
             } else if (lhs is NameSegment nSegExpr) {
-                ScanCUSUpdateElementTargets(nSegExpr.Name, nSegExpr.Type, location);
+                ScanCollectionUpdateTargets(nSegExpr.Name, nSegExpr.Type, location);
             }
         }   
     }
     
-    private void ScanCUSTargets(ReturnStmt rStmt) {
-        if (!ShouldImplement("CUS") || !IsIncludedInTarget(rStmt)) return;
+    private void ScanCollectionUpdateTargets(ReturnStmt rStmt) {
+        if (!IsIncludedInTarget(rStmt)) return;
         
         foreach (var (rhs, i) in rStmt.Rhss.Select((rhs, i) => (rhs, i))) {
             var location = $"{rStmt.StartToken.pos}-{rStmt.EndToken.pos}-{i}";
             if (rhs is ExprRhs exprRhs && exprRhs.Expr is NameSegment nSegExpr && 
                 nSegExpr.ToString() != _currentMethod?.Outs[i].Name)
-                ScanCUSUpdateElementTargets(nSegExpr.Name, nSegExpr.Type, location);
+                ScanCollectionUpdateTargets(nSegExpr.Name, nSegExpr.Type, location);
         }
     }
 
-    private void ScanCUSUpdateElementTargets(string collection, Type collectionType, string location) {
+    private void ScanCollectionUpdateTargets(string collection, Type collectionType, string location) {
         if (collectionType.IsArrayType && collectionType.TypeArgs.Any(t => !IsPrimitiveType(t)))
             return;
         var collectionTypeStr = collectionType.ToString() != "string" ? collectionType.ToString() : "seq<char>";
         collectionTypeStr = collectionTypeStr.Replace(" ", "").Replace(",", "-");
         foreach (var scopeVar in _currentScopeVars) {
-            if (scopeVar.Key == collection) continue;
+            if (!ShouldImplement("CCC") || scopeVar.Key == collection) continue;
             if (!AreCollectionTypesReplacementCompatible(collectionType, scopeVar.Value)) continue; 
             var replacementCollectionTypeStr = scopeVar.Value.ToString() != "string" ? scopeVar.Value.ToString() : "seq<char>";
             replacementCollectionTypeStr = replacementCollectionTypeStr.Replace(" ", "").Replace(",", "-");
             if (scopeVar.Value is not MapType mapType) {
-                AddTarget((location, "CUS-copy", $"{scopeVar.Key}<->{collectionTypeStr}<->{replacementCollectionTypeStr}"));
+                AddTarget((location, "CCC", $"{scopeVar.Key}<->{collectionTypeStr}<->{replacementCollectionTypeStr}"));
             } else {
                 var mapKeyTypeStr = $"{replacementCollectionTypeStr.Split("-")[0]}->";
                 if (collectionType.TypeArgs.Count == 1 && collectionType.TypeArgs[0].ToString() == mapType.TypeArgs[0].ToString())
-                    AddTarget((location, "CUS-copy", $"{scopeVar.Key}<->{collectionTypeStr}<->{mapKeyTypeStr}"));
+                    AddTarget((location, "CCC", $"{scopeVar.Key}<->{collectionTypeStr}<->{mapKeyTypeStr}"));
                 var mapValueTypeStr = $"map<-{replacementCollectionTypeStr.Split("-")[1]}";
                 if (collectionType.TypeArgs.Count == 1 && collectionType.TypeArgs[0].ToString() == mapType.TypeArgs[1].ToString())
-                    AddTarget((location, "CUS-copy", $"{scopeVar.Key}<->{collectionTypeStr}<->{mapValueTypeStr}"));
+                    AddTarget((location, "CCC", $"{scopeVar.Key}<->{collectionTypeStr}<->{mapValueTypeStr}"));
             }
         }
         
         if (!IsCollectionType(collectionType) || collectionType.TypeArgs.Any(t => !IsPrimitiveType(t))) 
-            return; // CUS-fstElem, CUS-lstElem, and CUS-compInit only work for primitive arg types
-        
-        AddTarget((location, "CUS-fstElem", collectionTypeStr)); // mutation will update collection's first element
-        if (collectionType is SeqType || collectionType.IsArrayType || 
-            collectionType.ToString() == "string") // remaining collections are unordered so we update a single arbitrary element
-            AddTarget((location, "CUS-lstElem", collectionTypeStr)); // mutation will update collection's last element
-        
-        AddTarget((location, "CUS-compInit", collectionTypeStr));
+            return; // CEU, CCU, and CES only work for primitive arg types
 
-        if (collectionType is not SeqType && !collectionType.IsArrayType && collectionType.ToString() != "string") 
-            return; // CUS-swap only works for sequences and arrays
-        AddTarget((location, "CUS-swap", collectionTypeStr));
+        if (ShouldImplement("CEU")) {
+            AddTarget((location, "CEU", $"fstElem<->{collectionTypeStr}")); // mutation will update collection's first element
+            if (collectionType is SeqType || collectionType.IsArrayType || 
+                collectionType.ToString() == "string") // remaining collections are unordered so we update a single arbitrary element
+                AddTarget((location, "CEU", $"lstElem<->{collectionTypeStr}")); // mutation will update collection's last element      
+        }
+        
+        if (ShouldImplement("CCU"))
+            AddTarget((location, "CCU", collectionTypeStr));
+
+        if (!ShouldImplement("CES") || (collectionType is not SeqType && 
+            !collectionType.IsArrayType && collectionType.ToString() != "string")) 
+            return; // CES only works for sequences and arrays
+        AddTarget((location, "CES", collectionTypeStr));
     }
 
     private void ScanMethodTargets(ConcreteAssignStatement cAStmt) {
@@ -740,7 +744,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         }
         base.HandleMethod(method);
         if (method.Body != null)
-            ScanCUSTargets();
+            ScanCollectionUpdateTargets();
         ScanPRVTargets();
         
         _currentMethod = null;
@@ -795,7 +799,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     }
     
     protected override void VisitStatement(AssignStatement aStmt) {
-        ScanCUSTargets(aStmt);
+        ScanCollectionUpdateTargets(aStmt);
         if (ContainsLemmaChild(aStmt)) return;
         base.VisitStatement(aStmt);
         VisitLhss(aStmt);
@@ -852,7 +856,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     
     protected override void VisitStatement(ProduceStmt pStmt) {
         if (pStmt is ReturnStmt rStmt)
-            ScanCUSTargets(rStmt);
+            ScanCollectionUpdateTargets(rStmt);
         base.VisitStatement(pStmt);
     }
 
