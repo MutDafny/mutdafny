@@ -128,8 +128,11 @@ dotnet dafny/Binaries/Dafny.dll verify <full path to the program under test> \
 | COD (Conditional Operator Deletion) | Deletion of a not operator in front of a conditional expression | NA |
 | LOD (Logical Operator Deletion) | Deletion of a not operator in front of a logical expression | NA |
 | LVR (Literal Value Replacement) | Replacement of a numerical literal value with its increment, decrement and zero and of a string literal value either an empty one, a default one, or a mutation of the original | Replacement value |
-| EVR (Expression Value Replacement) | Replacement of an expression with a default literal value of its type  | Type |
+| EVR (Expression-Value Replacement) | Replacement of an expression with a default literal value of its type  | Type |
+| INC (Arithmetic Expression Increment)* | Replacement of a non-literal arithmetic expression with its increment | Type
+| DEC (Arithmetic Expression Decrement)* | Replacement of a non-literal arithmetic expression with its decrement | Type
 | VER (Variable Expression Replacement) | Replacement of a variable with another of the same type | The name of the replacement variable |
+| ELR (Expression-Collection Length Replacement)* | Replacement of an arithmetic expression with the length of a collection | The name of the collection variable and its type
 | LSR (Loop Statement Replacement) | Replacement of `continue` with `break` and of `break` with ether `continue` or `return` | Type of replacement statement (`continue`, `break` or `return`) |
 | LBI (Loop Break Insertion) | Insertion of a `break` statement at the beggining of the body of a loop | NA |
 | MRR (Method Return Value Replacement) | Replacement of a method call with a default literal of its return type | Type/list of types (for methods with multiple output variables) |
@@ -139,6 +142,11 @@ dotnet dafny/Binaries/Dafny.dll verify <full path to the program under test> \
 | MVR (Method-Variable Replacement) | Replacement of a method call with a variable of the same type | The name/list of names (for methods with multiple outputs) of the replacement variable(s) |
 | SAR (Swap Argument) | Swap a method call argument with another used in the same method call with the same type | The position of the replacement argument |
 | CIR (Collection Initialization Replacement) | Replacement of non-empty collection initializers with an empty one and of empty initializers with a default non-empty one | NA (for empty initialization) or type of the collection's elements |
+| CEU (Collection Element Update)* | Insertion of a statement updating the first or last element of a collection with a default value of its arguments' type | The element to update (first or last) and the collection's type |
+| CES (Collection Element Swap)* | Insertion of a statement swapping the first and second elements of a collection, disturbing its order | Collection's type |
+| CAS (Sequence Concatenation Argument Swap)* | Swap the two arguments of a sequence concatenation operator, disturbing its order | NA |
+| CCC (Collection Content Copy)* | Insertion of a statement assigning the contents of a collection to those of another collection | The name of the collection variable whose content will be copied, its type, and the type of the collection that will be assigned to |
+| CCU (Collection Comprehension Update)* | Insertion of a statement assigning a default comprehension expression to collection | Collection's type |
 | CBR (Case Block Replacement) | Replacement of match statement cases with the default one and of the default label with one provided by the programmer | NA |
 | CBE (Case Block Extraction) | Extraction of one of the blocks of an if or if-then-else statement to the outside scope and deletion of the remaining ones  | NA |
 | TAR (Tuple Access Repalcement) | Replacement of the index used in a tuple element access | The replacement index |
@@ -155,4 +163,6 @@ dotnet dafny/Binaries/Dafny.dll verify <full path to the program under test> \
 | PRV (Polymorphic Reference Replacement) | Replacement of a child reference assignment to a parent with a child reference of a different type | The name of the replacement variable |
 | SWS (Swap Statement) | Swap a statement with the one either immediately below or above it | NA |
 | SWV (Swap Variable Declaration) | Swap the RHS of a variable declaration statement with the one from the variable declaration immediately below or above it | The position of the variable declaration with the replacement RHS |
+
+\* These operators were not included in MutDafny's initial (published) version. They were added later on after discovering certain types of weaknesses previously unidentified by the initial set of 40 mutation operators.
 
