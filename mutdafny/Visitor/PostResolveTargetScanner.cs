@@ -224,8 +224,8 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     }
 
     private void ScanELRTargets(Expression expr) {
-        if (!ShouldImplement("ELR") || !IsIncludedInTarget(expr) || 
-            (expr.Type is not IntType && expr.Type.ToString() != "nat")) 
+        if (!ShouldImplement("ELR") || !IsIncludedInTarget(expr) ||
+            (expr.Type is not IntType && expr.Type?.ToString() != "nat"))
             return;
         
         var exprLocation = $"{expr.StartToken.pos}-{expr.EndToken.pos}";
