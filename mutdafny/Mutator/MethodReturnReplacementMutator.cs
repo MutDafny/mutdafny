@@ -65,6 +65,7 @@ public class MethodReturnReplacementMutator(string mutationTargetPos, string val
             "multiset" => new MultiSetDisplayExpr(originalExpr.Origin, []),
             "seq" => new SeqDisplayExpr(originalExpr.Origin, []),
             "map" => new MapDisplayExpr(originalExpr.Origin, true, []),
+            _ when type.StartsWith("datatype:") => new NameSegment(originalExpr.Origin, type["datatype:".Length..], null),
             _ => new LiteralExpr(originalExpr.Origin, null)
         };
     }
