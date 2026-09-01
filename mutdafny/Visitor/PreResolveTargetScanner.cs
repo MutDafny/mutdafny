@@ -152,7 +152,8 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
         return lhsNameList;
     }
 
-    private List<string> GetRhsNameList(List<AssignmentRhs> rhss) {
+    private List<string> GetRhsNameList(List<AssignmentRhs>? rhss) {
+        if (rhss == null) return []; // null for a bare `return;`
         var rhsNameList = new List<string>();
         foreach (var rhs in rhss) {
             if (rhs is not ExprRhs exprRhs) return [];

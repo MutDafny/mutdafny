@@ -73,6 +73,8 @@ public class MutatorFactory(ErrorReporter reporter)
             "SWS" => new SwapStmtMutator(mutationTargetPos, reporter),
             "SWV" => mutationArg == null ? null :
                 new SwapVarDeclMutator(mutationTargetPos, mutationArg, reporter),
+            "VSR" => mutationArg == null ? null :
+                new VacuousStubMutator(mutationTargetPos, mutationArg, reporter),
             _ => null
         };
     }
