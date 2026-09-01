@@ -297,7 +297,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     }
     
     private void ScanCollectionUpdateTargets(ReturnStmt rStmt) {
-        if (!IsIncludedInTarget(rStmt)) return;
+        if (rStmt.Rhss == null || !IsIncludedInTarget(rStmt)) return; // Rhss is null for a bare `return;`
         
         foreach (var (rhs, i) in rStmt.Rhss.Select((rhs, i) => (rhs, i))) {
             var location = $"{rStmt.StartToken.pos}-{rStmt.EndToken.pos}-{i}";
