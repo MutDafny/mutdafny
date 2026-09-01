@@ -1,6 +1,4 @@
-﻿using System.Numerics;
-using Microsoft.BaseTypes;
-using Microsoft.Dafny;
+﻿using Microsoft.Dafny;
 
 namespace MutDafny.Mutator;
 
@@ -21,7 +19,7 @@ public class MethodReturnReplacementMutator(string mutationTargetPos, string val
         TargetExpression = null;
         var mutatedExpr = originalExpr;
         if (_types.Count != 0 || _childSuffixExpr == null || _childSuffixExpr is not ApplySuffix appSufExpr)
-            mutatedExpr = CreateDefaultExpression(_types[0], originalExpr);
+            mutatedExpr = CreateDefaultExpression(_types[0], originalExpr.Origin);
         if (!_alreadyCountedMut) {
             MutantGenerator.NumMutations++;
             _alreadyCountedMut = true;
@@ -41,7 +39,7 @@ public class MethodReturnReplacementMutator(string mutationTargetPos, string val
         var rhss = new List<AssignmentRhs>();
         foreach (var type in _types)
         {
-            var newRhs = CreateDefaultExpression(type, originalRhs);
+            var newRhs = CreateDefaultExpression(type, originalRhs.Origin);
             var newExprRhs = new ExprRhs(newRhs);
             rhss.Add(newExprRhs);
             if (!_alreadyCountedMut) {
@@ -51,23 +49,6 @@ public class MethodReturnReplacementMutator(string mutationTargetPos, string val
             MutantGenerator.MutatedNodes.Add(newRhs);
         }
         return rhss; 
-    }
-    
-    private Expression CreateDefaultExpression(string type, Expression originalExpr) {
-        return type switch {
-            "int" => new LiteralExpr(originalExpr.Origin, 0),
-            "real" => new LiteralExpr(originalExpr.Origin, BigDec.ZERO),
-            "bv" => new LiteralExpr(originalExpr.Origin, BigInteger.Zero),
-            "bool" => new LiteralExpr(originalExpr.Origin, false),
-            "char" => new CharLiteralExpr(originalExpr.Origin, "0"),
-            "string" => new StringLiteralExpr(originalExpr.Origin, "", false),
-            "set" => new SetDisplayExpr(originalExpr.Origin, true, []),
-            "multiset" => new MultiSetDisplayExpr(originalExpr.Origin, []),
-            "seq" => new SeqDisplayExpr(originalExpr.Origin, []),
-            "map" => new MapDisplayExpr(originalExpr.Origin, true, []),
-            _ when type.StartsWith("datatype:") => new NameSegment(originalExpr.Origin, type["datatype:".Length..], null),
-            _ => new LiteralExpr(originalExpr.Origin, null)
-        };
     }
     
     /// ---------------------------
