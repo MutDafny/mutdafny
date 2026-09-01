@@ -883,7 +883,8 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         ScanEVRTargets(bExpr);
         ScanINCTargets(bExpr);
         ScanELRTargets(bExpr);
-        if (bExpr.ResolvedOp is BinaryExpr.ResolvedOpcode.Concat)
+        if (bExpr.ResolvedOp is BinaryExpr.ResolvedOpcode.Concat &&
+            ShouldImplement("CAS") && IsIncludedInTarget(bExpr))
             AddTarget(($"{bExpr.Center.pos}", "CAS", ""));
         
         if (bExpr.Op == BinaryExpr.Opcode.Mod || IsModuleComparisonWithZero(bExpr.E0, bExpr.E1))

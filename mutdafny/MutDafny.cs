@@ -93,7 +93,8 @@ public class MutDafny : PluginConfiguration
                operatorName == "CBE" || operatorName == "TAR" || operatorName == "DCR" || operatorName == "FAR" || 
                operatorName == "SDL" || operatorName == "VDL" || operatorName == "SLD" || operatorName == "ODL" || 
                operatorName == "THI" || operatorName == "THD" || operatorName == "AMR" || operatorName == "MMR" || 
-               operatorName == "PRV" || operatorName == "SWS" || operatorName == "SWV";
+               operatorName == "PRV" || operatorName == "SWS" || operatorName == "SWV" ||
+               operatorName == "CAS";
     }
 }
 
