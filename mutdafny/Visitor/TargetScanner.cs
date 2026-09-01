@@ -18,6 +18,10 @@ public abstract class TargetScanner(string mutationTargetURI, int mutationTarget
         return !IsFirstVisit && !IsParentSpec && (operatorsInUse.Count == 0 || operatorsInUse.Contains(op));
     }
     
+    protected bool IsOperatorRequested(string op) {
+        return operatorsInUse.Count == 0 || operatorsInUse.Contains(op);
+    }
+    
     private static List<(string, string, string)> ImportPreviousTargets() {
         if (!File.Exists("targets.csv"))
             return [];

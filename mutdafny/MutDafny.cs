@@ -94,7 +94,7 @@ public class MutDafny : PluginConfiguration
                operatorName == "SDL" || operatorName == "VDL" || operatorName == "SLD" || operatorName == "ODL" || 
                operatorName == "THI" || operatorName == "THD" || operatorName == "AMR" || operatorName == "MMR" || 
                operatorName == "PRV" || operatorName == "SWS" || operatorName == "SWV" ||
-               operatorName == "CAS";
+               operatorName == "CAS" || operatorName == "VSR";
     }
 }
 

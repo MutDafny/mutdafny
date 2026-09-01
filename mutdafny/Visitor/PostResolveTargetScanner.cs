@@ -274,6 +274,99 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         AddTarget((exprLocation, "CIR", arg));
     }
     
+    private void ScanVSRTargets(Method method) {
+        if (!ShouldImplement("VSR")) return;
+        if (method.Body == null || method.Body is DividedBlockStmt) return;
+        if (!IsIncludedInTarget(method)) return;
+
+        var location = $"{method.StartToken.pos}-{method.EndToken.pos}";
+
+        if (method.Outs.Count == 0) {
+            if (method.Body.Body.Count != 0 && !IsOperatorRequested("SDL"))
+                AddTarget((location, "VSR", "empty"));
+            return;
+        }
+
+        var defaults = new List<string>();
+        foreach (var o in method.Outs) {
+            var token = DefaultStubToken(o.Type);
+            if (token == null) return;
+            defaults.Add(token);
+        }
+        AddTarget((location, "VSR", string.Join("+", defaults)));
+
+        var identityTargets = 0;
+        for (var i = 0; i < method.Outs.Count && identityTargets < 2; i++) {
+            foreach (var formal in method.Ins) {
+                if (formal.Type.ToString() != method.Outs[i].Type.ToString()) continue;
+                if (IsBodyExactlyAssignment(method, method.Outs[i].Name, formal.Name)) break;
+                var plan = new List<string>(defaults);
+                plan[i] = $"v{formal.Name}";
+                AddTarget((location, "VSR", string.Join("+", plan)));
+                identityTargets++;
+                break;
+            }
+        }
+
+        var literals = new SortedSet<BigInteger>();
+        foreach (var ens in method.Ens)
+            CollectSmallIntLiterals(ens.E, literals);
+        var literalTargets = 0;
+        foreach (var literal in literals) {
+            if (literalTargets >= 2) break;
+            if (literal.IsZero) continue;
+            var plan = new List<string>(defaults);
+            var usedLiteral = false;
+            for (var i = 0; i < plan.Count; i++) {
+                if (plan[i] != "dint" && plan[i] != "dnat") continue;
+                if (literal.Sign < 0 && plan[i] == "dnat") continue;
+                plan[i] = $"l{literal}";
+                usedLiteral = true;
+            }
+            if (!usedLiteral) break;
+            AddTarget((location, "VSR", string.Join("+", plan)));
+            literalTargets++;
+        }
+    }
+
+    private bool IsBodyExactlyAssignment(Method method, string outName, string inName) {
+        if (method.Outs.Count != 1 || method.Body == null || method.Body.Body.Count != 1)
+            return false;
+
+        Expression? lhs = null;
+        AssignmentRhs? rhs = null;
+        switch (method.Body.Body[0]) {
+            case AssignStatement aStmt when aStmt.Lhss.Count == 1 && aStmt.Rhss.Count == 1:
+                lhs = aStmt.Lhss[0];
+                rhs = aStmt.Rhss[0];
+                break;
+            case SingleAssignStmt sAStmt:
+                lhs = sAStmt.Lhs;
+                rhs = sAStmt.Rhs;
+                break;
+        }
+        return rhs is ExprRhs exprRhs &&
+               lhs?.ToString() == outName &&
+               exprRhs.Expr.ToString() == inName;
+    }
+
+    private string? DefaultStubToken(Type type) {
+        var code = TypeToStr(type);
+        if (code == "" || code == "datatype") return null;
+        return code.StartsWith("datatype:")
+            ? $"c{code["datatype:".Length..]}"
+            : $"d{code}";
+    }
+
+    private void CollectSmallIntLiterals(INode node, SortedSet<BigInteger> found) {
+        if (found.Count >= 8) return;
+        if (node is LiteralExpr { Value: BigInteger value } &&
+            value >= -1 && value <= 1000)
+            found.Add(value);
+        foreach (var child in node.Children)
+            CollectSmallIntLiterals(child, found);
+    }
+
     private void ScanCollectionUpdateTargets() {
         if (_currentMethod == null || !IsIncludedInTarget(_currentMethod.EndToken)) return;
         
@@ -732,6 +825,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
 
         _currentMethod = method;
         _declaredMethods.Add(method);
+        ScanVSRTargets(method);
 
         var methodIndependentVars = new Dictionary<string, Type>(_currentScopeVars);
         var methodIndependentChildClassVars = new Dictionary<string, Type>(_currentScopeChildClassVariables);
