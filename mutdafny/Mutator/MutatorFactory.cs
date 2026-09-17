@@ -40,6 +40,8 @@ public class MutatorFactory(ErrorReporter reporter)
                 new MethodCallReplacementMutator(mutationTargetPos, mutationArg, reporter),
             "MVR" => mutationArg == null ? null :
                 new MethodVarReplacementMutator(mutationTargetPos, mutationArg, reporter),
+            "VSR" => mutationArg == null ? null :
+                new VacuousStubMutator(mutationTargetPos, mutationArg, reporter),
             "SAR" => mutationArg == null ? null :
                 new SwapArgMutator(mutationTargetPos, mutationArg, reporter),
             "CIR" => mutationArg == null ? 

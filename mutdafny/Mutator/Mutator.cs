@@ -1,4 +1,6 @@
-﻿using Microsoft.Dafny;
+﻿using System.Numerics;
+using Microsoft.BaseTypes;
+using Microsoft.Dafny;
 
 namespace MutDafny.Mutator;
 
@@ -36,5 +38,25 @@ public abstract class Mutator(string mutationTargetPos, ErrorReporter reporter) 
             if (child is not Node childNode) continue; 
             MutantGenerator.MutatedNodes.Add(childNode);
         }
+    }
+    
+    /// -----
+    /// Utils
+    /// -----
+    protected static Expression CreateDefaultExpression(string type, IOrigin origin) {
+        return type switch {
+            "int" or "nat" => new LiteralExpr(origin, 0),
+            "real" => new LiteralExpr(origin, BigDec.ZERO),
+            "bv" => new LiteralExpr(origin, BigInteger.Zero),
+            "bool" => new LiteralExpr(origin, false),
+            "char" => new CharLiteralExpr(origin, "0"),
+            "string" => new StringLiteralExpr(origin, "", false),
+            "set" => new SetDisplayExpr(origin, true, []),
+            "multiset" => new MultiSetDisplayExpr(origin, []),
+            "seq" => new SeqDisplayExpr(origin, []),
+            "map" => new MapDisplayExpr(origin, true, []),
+            _ when type.StartsWith("datatype:") => new NameSegment(origin, type["datatype:".Length..], null),
+            _ => new LiteralExpr(origin, null)
+        };
     }
 }

@@ -88,12 +88,13 @@ public class MutDafny : PluginConfiguration
                operatorName == "LVR" || operatorName == "EVR" || operatorName == "INC" || operatorName == "DEC" || 
                operatorName == "VER" || operatorName == "ELR" || operatorName == "LSR" || operatorName == "LBI" || 
                operatorName == "MRR" || operatorName == "MAP" || operatorName == "MNR" || operatorName == "MCR" || 
-               operatorName == "MVR" || operatorName == "SAR" || operatorName == "CIR" || operatorName == "CEU" || 
-               operatorName == "CES" || operatorName == "CCC" || operatorName == "CCU" || operatorName == "CBR" || 
-               operatorName == "CBE" || operatorName == "TAR" || operatorName == "DCR" || operatorName == "FAR" || 
-               operatorName == "SDL" || operatorName == "VDL" || operatorName == "SLD" || operatorName == "ODL" || 
-               operatorName == "THI" || operatorName == "THD" || operatorName == "AMR" || operatorName == "MMR" || 
-               operatorName == "PRV" || operatorName == "SWS" || operatorName == "SWV";
+               operatorName == "MVR" || operatorName == "VSR" || operatorName == "SAR" || operatorName == "CIR" || 
+               operatorName == "CEU" || operatorName == "CES" || operatorName == "CCC" || operatorName == "CCU" || 
+               operatorName == "CAS" || operatorName == "CBR" || operatorName == "CBE" || operatorName == "TAR" || 
+               operatorName == "DCR" || operatorName == "FAR" || operatorName == "SDL" || operatorName == "VDL" || 
+               operatorName == "SLD" || operatorName == "ODL" || operatorName == "THI" || operatorName == "THD" || 
+               operatorName == "AMR" || operatorName == "MMR" || operatorName == "PRV" || operatorName == "SWS" || 
+               operatorName == "SWV";
     }
 }
 
