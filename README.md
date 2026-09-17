@@ -140,6 +140,7 @@ dotnet dafny/Binaries/Dafny.dll verify <full path to the program under test> \
 | MNR (Method Naked Receiver) | Deletion of a class method call, its receiver being mantained | NA |
 | MCR (Method Call Replacement) | Replacement of a method call with another method with the same signature | The name of the replacement method |
 | MVR (Method-Variable Replacement) | Replacement of a method call with a variable of the same type | The name/list of names (for methods with multiple outputs) of the replacement variable(s) |
+| VSR (Vacuous Stub Replacement) | Replacement of the entire body of a method with default assignments to its outputs | Default value/list of default values (for methods with multiple outputs) |
 | SAR (Swap Argument) | Swap a method call argument with another used in the same method call with the same type | The position of the replacement argument |
 | CIR (Collection Initialization Replacement) | Replacement of non-empty collection initializers with an empty one and of empty initializers with a default non-empty one | NA (for empty initialization) or type of the collection's elements |
 | CEU (Collection Element Update)* | Insertion of a statement updating the first or last element of a collection with a default value of its arguments' type | The element to update (first or last) and the collection's type |
