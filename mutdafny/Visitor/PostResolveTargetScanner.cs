@@ -282,7 +282,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
         var location = $"{method.StartToken.pos}-{method.EndToken.pos}";
 
         if (method.Outs.Count == 0) {
-            if (method.Body.Body.Count != 0 && !IsOperatorRequested("SDL"))
+            if (method.Body.Body.Count != 0 && !ShouldImplement("SDL"))
                 AddTarget((location, "VSR", "empty"));
             return;
         }
