@@ -573,9 +573,10 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
         VisitStatement(whileStmt as LoopStmt);
         
         if (IsWorthVisiting(whileStmt.Guard.StartToken.pos, whileStmt.Guard.EndToken.pos)) {
+            var prevParentLoopGuardBody = _parentLoopGuardBody;
             _parentLoopGuardBody = whileStmt.Body;
             HandleExpression(whileStmt.Guard);
-            _parentLoopGuardBody = null;
+            _parentLoopGuardBody = prevParentLoopGuardBody;
         }
         if (whileStmt.Body != null) HandleBlock(whileStmt.Body);  
     }
