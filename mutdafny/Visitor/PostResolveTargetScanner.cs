@@ -20,7 +20,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     private List<string> _childMethodCallArgTypes = [];
     private Method? _currentMethod;
     private Dictionary<string, Type> _currentScopeVars = [];
-    private Dictionary<string, Expression> _assigns = [];
+    private Dictionary<string, AssignmentRhs> _assigns = [];
     private List<MethodOrFunction> _declaredMethods = [];
     private List<ApplySuffix> _methodCalls = [];
     private readonly List<(string, ClassLikeDecl, Type)> _classFields = []; // field name, class type, field type
@@ -406,11 +406,13 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
             return;
         var collectionTypeStr = collectionType.ToString() != "string" ? collectionType.ToString() : "seq<char>";
         collectionTypeStr = collectionTypeStr.Replace(" ", "").Replace(",", "-");
-        // get the value the collection currently holds, to avoid copying the same value
-        var currentValueSource = _assigns.TryGetValue(collection, out var assignedExpr) && 
-            assignedExpr is NameSegment assignedNSegExpr ? 
+        _assigns.TryGetValue(collection, out var lastAssignedRhs);
+        // get the value the collection currently holds
+        var currentValueSource = lastAssignedRhs is ExprRhs { Expr: NameSegment assignedNSegExpr } ?
             assignedNSegExpr.Name : null;
+        
         foreach (var scopeVar in _currentScopeVars) {
+            // avoid copying itself or the value it already holds
             if (!ShouldImplement("CCC") || scopeVar.Key == collection || scopeVar.Key == currentValueSource) 
                 continue;
             if (!AreCollectionTypesReplacementCompatible(collectionType, scopeVar.Value)) continue;
@@ -428,23 +430,34 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
             }
         }
         
-        if (!IsCollectionType(collectionType) || collectionType.TypeArgs.Any(t => !IsPrimitiveType(t))) 
+        if (!IsCollectionType(collectionType) || collectionType.TypeArgs.Any(t => !IsPrimitiveType(t)))
             return; // CEU, CCU, and CES only work for primitive arg types
 
         if (ShouldImplement("CEU")) {
             AddTarget((location, "CEU", $"fstElem<->{collectionTypeStr}")); // mutation will update collection's first element
-            if (collectionType is SeqType || collectionType.IsArrayType || 
+            if (collectionType is SeqType || collectionType.IsArrayType ||
                 collectionType.ToString() == "string") // remaining collections are unordered so we update a single arbitrary element
-                AddTarget((location, "CEU", $"lstElem<->{collectionTypeStr}")); // mutation will update collection's last element      
+                AddTarget((location, "CEU", $"lstElem<->{collectionTypeStr}")); // mutation will update collection's last element
         }
         
-        if (ShouldImplement("CCU"))
+        // applying CCU or CES to a collection that was just emptily initialized produces an equivalent mutant
+        var isEmptyInit = lastAssignedRhs != null && IsEmptyCollectionInitialization(lastAssignedRhs);
+
+        if (ShouldImplement("CCU") && !isEmptyInit)
             AddTarget((location, "CCU", collectionTypeStr));
 
-        if (!ShouldImplement("CES") || (collectionType is not SeqType && 
-            !collectionType.IsArrayType && collectionType.ToString() != "string")) 
+        if (!ShouldImplement("CES") || isEmptyInit || (collectionType is not SeqType &&
+            !collectionType.IsArrayType && collectionType.ToString() != "string"))
             return; // CES only works for sequences and arrays
         AddTarget((location, "CES", collectionTypeStr));
+    }
+
+    private bool IsEmptyCollectionInitialization(AssignmentRhs rhs) {
+        if (rhs is ExprRhs { Expr: DisplayExpression dExpr }) return dExpr.Elements.Count == 0;
+        if (rhs is ExprRhs { Expr: MapDisplayExpr mDExpr }) return mDExpr.Elements.Count == 0;
+        if (rhs is TypeRhs { ArrayDimensions: not null } tpRhs)
+            return (tpRhs.InitDisplay == null || tpRhs.InitDisplay.Count == 0) && tpRhs.ElementInit == null;
+        return false;
     }
 
     private void ScanMethodTargets(ConcreteAssignStatement cAStmt) {
@@ -831,6 +844,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
 
         _currentMethod = method;
         _declaredMethods.Add(method);
+        _assigns = [];
         ScanVSRTargets(method);
 
         var methodIndependentVars = new Dictionary<string, Type>(_currentScopeVars);
@@ -884,14 +898,12 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     protected override void HandleBlock(List<Statement> statements) {
         var blockIndependentVars = new Dictionary<string, Type>(_currentScopeVars);
         var blockIndependentChildClassVars = new Dictionary<string, Type>(_currentScopeChildClassVariables);
-        var blockIndependentAssigns = new Dictionary<string, Expression>(_assigns);
         var blockIndependentPrevVarDecl = _prevVarDeclStmt;
         _prevVarDeclStmt = null;
         base.HandleBlock(statements);
         ScanPRVTargets();
         _currentScopeVars = blockIndependentVars;
         _currentScopeChildClassVariables = blockIndependentChildClassVars;
-        _assigns = blockIndependentAssigns;
         _prevVarDeclStmt = blockIndependentPrevVarDecl;
         _childClassAccessedVariables = [];
     }
@@ -907,8 +919,11 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
 
     protected override void VisitStatement(AssignStatement aStmt) {
         foreach (var (lhs, i) in aStmt.Lhss.Select((lhs, i) => (lhs, i))) {
-            if (lhs != null && i < aStmt.Rhss.Count && aStmt.Rhss[i] is ExprRhs rhs)
-                _assigns.AddOrUpdate(lhs.ToString(), rhs.Expr, (_, _) => rhs.Expr);
+            if (lhs == null) continue;
+            if (lhs is SeqSelectExpr { Seq: NameSegment seqNSegExpr })
+                _assigns.AddOrUpdate(seqNSegExpr.Name, aStmt.Rhss[i], (_, _) => aStmt.Rhss[i]);
+            else if (i < aStmt.Rhss.Count)
+                _assigns.AddOrUpdate(lhs.ToString(), aStmt.Rhss[i], (_, _) => aStmt.Rhss[i]);
         }
         ScanCollectionUpdateTargets(aStmt);
         if (ContainsLemmaChild(aStmt)) return;
