@@ -35,9 +35,11 @@ USAGE="Usage: ${BASH_SOURCE[0]}
    [--method <the specific method of the program to mutate, e.g., Main (none by default)>]
    [--line <the specific line of the program to mutate, e.g., 3 (none by default)>]
    [--range <the specific range of positions of the program to mutate, e.g., 150-300 (none by default)>]
+   [--operators <comma-separated operator codes to restrict scanning to, e.g., AOR,ROR,LVR (all operators by default)>]
    [--num_mutations <the number of mutations to apply to the input program, e.g., 1 (by default)>]
    [help]"
-if [ "$#" -ne "1" ] && [ "$#" -ne "3" ] && [ "$#" -ne "5" ] && [ "$#" -ne "7" ] && [ "$#" -ne "9" ] && [ "$#" -ne "11" ]; then
+
+if [ "$#" -lt "1" ] || [ "$(( ($# - 1) % 2 ))" -ne "0" ]; then
   die "$USAGE"
 fi
 
@@ -53,6 +55,7 @@ WHITELIST_FILE=""
 METHOD=""
 LINE=""
 RANGE=""
+OPERATORS=""
 NUM_MUTS=1
 while [[ "$1" = --* ]]; do
   OPTION=$1; shift
@@ -71,6 +74,9 @@ while [[ "$1" = --* ]]; do
       shift;;
     (--range)
       RANGE=$1;
+      shift;;
+    (--operators)
+      OPERATORS=$(echo "$1" | tr ',' ' ');
       shift;;
     (--num_mutations)
       NUM_MUTS=$1;
@@ -119,9 +125,10 @@ for program_file in $dataset_files; do
   echo "# timefactor:1"     >> "$job_script_file_path"
   echo "bash $master_job_script_file_path \
     \"$program_file\" \
-    --method $METHOD \
-    --line $LINE \
-    --range $RANGE \
+    ${METHOD:+--method $METHOD }\\
+    ${LINE:+--line $LINE }\\
+    ${RANGE:+--range $RANGE }\\
+    ${OPERATORS:+--operators $OPERATORS }\\
     --num_mutations $NUM_MUTS \
     --run_dir \"$job_script_dir_path\" \
     --output_dir \"$SCRIPT_DIR/mutants/$NUM_MUTS-mut\" > \"$job_log_file_path\" 2>&1" >> "$job_script_file_path"

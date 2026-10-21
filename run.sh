@@ -12,10 +12,10 @@
 #   [--method <the specific method of the program to mutate, e.g., Main (none by default)>]
 #   [--line <the specific line of the program to mutate, e.g., 3 (none by default)>]
 #   [--range <the specific range of positions of the program to mutate, e.g., 150-300 (none by default)>]
+#   [--operators <comma-separated operator codes to restrict scanning to, e.g., AOR,ROR,LVR (all operators by default)>]
 #   [--num_mutations <the number of mutations to apply to the input program, e.g., 1 (by default)>]
 #   [--run_dir <the directory where the script should be run, e.g., $SCRIPT_DIR (by deafult)>]
 #   [--output_dir <the directory where the mutants will be stores, e.g., $SCRIPT_DIR (by deafult)>]
-#   [--operators <comma-separated operator codes to restrict scanning to, e.g., AOR,ROR,LVR (all operators by default)>]
 #   [help]
 # ------------------------------------------------------------------------------ General utils
 
@@ -33,10 +33,10 @@ USAGE="Usage: ${BASH_SOURCE[0]}
    [--method <the specific method of the program to mutate, e.g., Main (none by default)>]
    [--line <the specific line of the program to mutate, e.g., 3 (none by default)>]
    [--range <the specific range of positions of the program to mutate, e.g., 150-300 (none by default)>]
+   [--operators <comma-separated operator codes to restrict scanning to, e.g., AOR,ROR,LVR (all operators by default)>]
    [--num_mutations <the number of mutations to apply to the input program, e.g., 1 (by default)>]
    [--run_dir <the directory where the script should be run, e.g., ./ (by deafult)>]
    [--output_dir <the directory where the mutants will be stores, e.g., $SCRIPT_DIR (by deafult)>]
-   [--operators <comma-separated operator codes to restrict scanning to, e.g., AOR,ROR,LVR (all operators by default)>]
    [help]"
 
 # 1 (program only), or program + an odd number of --flag/value tokens.
@@ -55,10 +55,10 @@ shift
 METHOD=""
 LINE=""
 RANGE=""
+OPERATORS=""
 NUM_MUTS=1
 RUN_DIR="$SCRIPT_DIR"
 OUT_DIR="$SCRIPT_DIR/mutants"
-OPERATORS=""
 while [[ "$1" = --* ]]; do
   OPTION=$1; shift
   case $OPTION in
@@ -71,6 +71,9 @@ while [[ "$1" = --* ]]; do
     (--range)
       RANGE=$1;
       shift;;
+    (--operators)
+      OPERATORS=$(echo "$1" | tr ',' ' ');
+      shift;;
     (--num_mutations)
       NUM_MUTS=$1;
       shift;;
@@ -79,9 +82,6 @@ while [[ "$1" = --* ]]; do
       shift;;
     (--output_dir)
       OUT_DIR=$1;
-      shift;;
-    (--operators)
-      OPERATORS=$(echo "$1" | tr ',' ' ');
       shift;;
     (--help)
       echo "$USAGE";
