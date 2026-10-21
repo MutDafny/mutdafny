@@ -238,6 +238,21 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
              (bExpr.Op == BinaryExpr.Opcode.Eq && replacementOp == BinaryExpr.Opcode.Ge)))
             return true;
         
+        // n % i == i-1 <==> n % i >= i-1; n % i != i-1 <==> n % i < i-1
+        if (IsModuleComparisonWithDivisorMinusOne(bExpr.E0, bExpr.E1) &&
+            ((bExpr.Op == BinaryExpr.Opcode.Eq && replacementOp == BinaryExpr.Opcode.Ge) ||
+             (bExpr.Op == BinaryExpr.Opcode.Ge && replacementOp == BinaryExpr.Opcode.Eq) ||
+             (bExpr.Op == BinaryExpr.Opcode.Neq && replacementOp == BinaryExpr.Opcode.Lt) ||
+             (bExpr.Op == BinaryExpr.Opcode.Lt && replacementOp == BinaryExpr.Opcode.Neq)))
+            return true;
+        // i-1 == n % i <==> i-1 <= n % i; i-1 != n % i <==> i-1 > n % i
+        if (IsModuleComparisonWithDivisorMinusOne(bExpr.E1, bExpr.E0) &&
+            ((bExpr.Op == BinaryExpr.Opcode.Eq && replacementOp == BinaryExpr.Opcode.Le) ||
+             (bExpr.Op == BinaryExpr.Opcode.Le && replacementOp == BinaryExpr.Opcode.Eq) ||
+             (bExpr.Op == BinaryExpr.Opcode.Neq && replacementOp == BinaryExpr.Opcode.Gt) ||
+             (bExpr.Op == BinaryExpr.Opcode.Gt && replacementOp == BinaryExpr.Opcode.Neq)))
+            return true;
+        
         // a.Length == 0 <==> a.Length <= 0
         if (IsCollectionLengthComparisonWithZero(bExpr.E0, bExpr.E1) &&
             ((bExpr.Op == BinaryExpr.Opcode.Eq && replacementOp == BinaryExpr.Opcode.Le) ||
@@ -264,6 +279,16 @@ public class PreResolveTargetScanner(string mutationTargetURI, string mutationTa
             return true;
         
         return false;
+    }
+    
+    private bool IsModuleComparisonWithDivisorMinusOne(Expression expr0, Expression expr1) {
+        if (expr0 is not BinaryExpr bExpr || bExpr.Op != BinaryExpr.Opcode.Mod)
+            return false;
+        if (bExpr.E1 is not LiteralExpr divLitExpr || divLitExpr.Value is not BigInteger divisor)
+            return false;
+        if (expr1 is not LiteralExpr litExpr || litExpr.Value is not BigInteger bi)
+            return false;
+        return bi == divisor - BigInteger.One;
     }
 
     private bool IsCollectionLengthComparisonWithZero(Expression expr0, Expression expr1) {
