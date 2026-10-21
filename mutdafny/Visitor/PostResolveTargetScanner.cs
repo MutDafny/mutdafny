@@ -20,6 +20,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     private List<string> _childMethodCallArgTypes = [];
     private Method? _currentMethod;
     private Dictionary<string, Type> _currentScopeVars = [];
+    private Dictionary<string, Expression> _assigns = [];
     private List<MethodOrFunction> _declaredMethods = [];
     private List<ApplySuffix> _methodCalls = [];
     private readonly List<(string, ClassLikeDecl, Type)> _classFields = []; // field name, class type, field type
@@ -386,7 +387,7 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
             } else if (lhs is NameSegment nSegExpr) {
                 ScanCollectionUpdateTargets(nSegExpr.Name, nSegExpr.Type, location);
             }
-        }   
+        }
     }
     
     private void ScanCollectionUpdateTargets(ReturnStmt rStmt) {
@@ -405,9 +406,14 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
             return;
         var collectionTypeStr = collectionType.ToString() != "string" ? collectionType.ToString() : "seq<char>";
         collectionTypeStr = collectionTypeStr.Replace(" ", "").Replace(",", "-");
+        // get the value the collection currently holds, to avoid copying the same value
+        var currentValueSource = _assigns.TryGetValue(collection, out var assignedExpr) && 
+            assignedExpr is NameSegment assignedNSegExpr ? 
+            assignedNSegExpr.Name : null;
         foreach (var scopeVar in _currentScopeVars) {
-            if (!ShouldImplement("CCC") || scopeVar.Key == collection) continue;
-            if (!AreCollectionTypesReplacementCompatible(collectionType, scopeVar.Value)) continue; 
+            if (!ShouldImplement("CCC") || scopeVar.Key == collection || scopeVar.Key == currentValueSource) 
+                continue;
+            if (!AreCollectionTypesReplacementCompatible(collectionType, scopeVar.Value)) continue;
             var replacementCollectionTypeStr = scopeVar.Value.ToString() != "string" ? scopeVar.Value.ToString() : "seq<char>";
             replacementCollectionTypeStr = replacementCollectionTypeStr.Replace(" ", "").Replace(",", "-");
             if (scopeVar.Value is not MapType mapType) {
@@ -878,16 +884,18 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
     protected override void HandleBlock(List<Statement> statements) {
         var blockIndependentVars = new Dictionary<string, Type>(_currentScopeVars);
         var blockIndependentChildClassVars = new Dictionary<string, Type>(_currentScopeChildClassVariables);
+        var blockIndependentAssigns = new Dictionary<string, Expression>(_assigns);
         var blockIndependentPrevVarDecl = _prevVarDeclStmt;
         _prevVarDeclStmt = null;
         base.HandleBlock(statements);
         ScanPRVTargets();
         _currentScopeVars = blockIndependentVars;
         _currentScopeChildClassVariables = blockIndependentChildClassVars;
+        _assigns = blockIndependentAssigns;
         _prevVarDeclStmt = blockIndependentPrevVarDecl;
         _childClassAccessedVariables = [];
     }
-    
+
     protected override void VisitStatement(ConcreteAssignStatement cAStmt) { }
 
     private void VisitLhss(ConcreteAssignStatement cAStmt) {
@@ -896,19 +904,23 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
                 _currentScopeVars.Add(nSegExpr.Name, nSegExpr.Type);
         }
     }
-    
+
     protected override void VisitStatement(AssignStatement aStmt) {
+        foreach (var (lhs, i) in aStmt.Lhss.Select((lhs, i) => (lhs, i))) {
+            if (lhs != null && i < aStmt.Rhss.Count && aStmt.Rhss[i] is ExprRhs rhs)
+                _assigns.AddOrUpdate(lhs.ToString(), rhs.Expr, (_, _) => rhs.Expr);
+        }
         ScanCollectionUpdateTargets(aStmt);
         if (ContainsLemmaChild(aStmt)) return;
         base.VisitStatement(aStmt);
         VisitLhss(aStmt);
-        
+
         if (_childMethodCallPos != null) // rhs is method call
             ScanMethodTargets(aStmt);
         _childMethodCallArgTypes = [];
         _childExprDotName = null;
     }
-    
+
     protected override void VisitStatement(AssignSuchThatStmt aStStmt) {
         base.VisitStatement(aStStmt);
         VisitLhss(aStStmt);
