@@ -229,15 +229,23 @@ public class PostResolveTargetScanner(string mutationTargetURI, string mutationT
             (expr.Type is not IntType && expr.Type?.ToString() != "nat"))
             return;
         
+        // the expression is 0 either directly, or indirectly through a variable assigned 0
+        var targetIsZero = expr is LiteralExpr { Value: BigInteger bi } && bi == BigInteger.Zero ||
+            expr is NameSegment nSegExpr && _assigns.TryGetValue(nSegExpr.Name, out var lastAssignedRhs1) &&
+            lastAssignedRhs1 is ExprRhs { Expr: LiteralExpr { Value: BigInteger tbi } } && tbi == BigInteger.Zero;
         var exprLocation = $"{expr.StartToken.pos}-{expr.EndToken.pos}";
         foreach (var var in _currentScopeVars) {
             if (!IsCollectionType(var.Value)) continue;
             if ((expr is UnaryOpExpr uOpExpr && uOpExpr.Op is UnaryOpExpr.Opcode.Cardinality &&
                  !var.Value.ToString().StartsWith("array<")) ||
-                (expr is ExprDotName exprDName && exprDName.SuffixName == "Length" && 
+                (expr is ExprDotName exprDName && exprDName.SuffixName == "Length" &&
                  var.Value.ToString().StartsWith("array<")))
                 continue;
-            
+            // replacing 0 with the length of a collection that was emptily initialized produces an equivalent mutant
+            if (targetIsZero && _assigns.TryGetValue(var.Key, out var lastAssignedRhs2) &&
+                IsEmptyCollectionInitialization(lastAssignedRhs2))
+                continue;
+
             AddTarget((exprLocation, "ELR", $"{var.Key}:{var.Value}"));
         }
     }
